@@ -53,7 +53,7 @@ export default function Dashboard() {
             { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai', active: false },
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands', active: false },
           ].map((item, i) => (
-            <a key={i} href={item.href} style={{
+            <span key={i} onClick={() => window.location.href = item.href} style={{ cursor: 'pointer',
               padding: '12px 16px',
               borderRadius: '12px',
               display: 'flex',
@@ -91,7 +91,7 @@ export default function Dashboard() {
             >
               <span style={{ fontSize: '18px' }}>{item.icon}</span>
               {item.label}
-            </a>
+            </span>
           ))}
         </div>
       </aside>
