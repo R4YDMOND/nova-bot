@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 
 export default function Home() {
   const [serverCount, setServerCount] = useState(0)
+  const [scrolled, setScrolled] = useState(false)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
@@ -11,6 +12,10 @@ export default function Home() {
       .then(res => res.json())
       .then(data => setServerCount(data.total))
       .catch(() => setServerCount(0))
+
+    const handleScroll = () => setScrolled(window.scrollY > 50)
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   const scrollToFeatures = () => {
@@ -21,6 +26,48 @@ export default function Home() {
   return (
     <main style={{ background: '#0A0A0F', minHeight: '100vh' }}>
       
+      {/* ===== HEADER ===== */}
+      <header style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+        padding: '16px 40px',
+        background: scrolled ? 'rgba(10, 10, 15, 0.95)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(10px)' : 'none',
+        borderBottom: scrolled ? '1px solid #1F2937' : '1px solid transparent',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        transition: 'all 0.3s ease'
+      }}>
+        {/* Логотип */}
+        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
+          <div style={{ width: '36px', height: '36px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '18px' }}>N</div>
+          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#FFFFFF' }}>Нова</span>
+        </a>
+
+        {/* Навигация */}
+        <nav style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+          <span onClick={scrollToFeatures} style={{ color: '#94A3B8', fontSize: '14px', cursor: 'pointer', transition: 'color 0.2s' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+          >Возможности</span>
+          <a href="/dashboard" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+          >Центр управления</a>
+          <a href="/docs" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+          >Документация</a>
+          <a href="/login" style={{
+            padding: '8px 20px', background: '#00E5FF', color: '#000000',
+            borderRadius: '10px', fontWeight: '600', fontSize: '14px',
+            textDecoration: 'none', transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 229, 255, 0.4)'}
+          onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+          >Войти</a>
+        </nav>
+      </header>
+
+      {/* ===== HERO ===== */}
       <section style={{
         minHeight: '100vh',
         display: 'flex',
@@ -87,6 +134,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ===== FEATURES ===== */}
       <section id="features" style={{ padding: '100px 20px', background: '#111118' }}>
         <h2 style={{ textAlign: 'center', fontSize: 'clamp(28px, 5vw, 40px)', fontWeight: 'bold', marginBottom: '60px', color: '#FFFFFF' }}>
           Возможности <span style={{ color: '#00E5FF' }}>Нова</span>
@@ -113,6 +161,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ===== HOW TO ===== */}
       <section style={{ padding: '100px 20px', background: '#0A0A0F' }}>
         <h2 style={{ textAlign: 'center', fontSize: 'clamp(28px, 5vw, 40px)', fontWeight: 'bold', marginBottom: '60px', color: '#FFFFFF' }}>
           Как <span style={{ color: '#00E5FF' }}>подключить</span> Нова
@@ -138,30 +187,12 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ===== FOOTER ===== */}
       <footer style={{ padding: '40px 20px', borderTop: '1px solid #1F2937', background: '#111118' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '36px', height: '36px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF' }}>N</div>
             <span style={{ fontWeight: '600', color: '#FFFFFF' }}>Нова 2026</span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-            <span onClick={scrollToFeatures} style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px', cursor: 'pointer' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-            >Возможности</span>
-            <a href="/dashboard" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-         >Центр управления</a>
-            <a href="/docs" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-            >Документация</a>
-            <a href="/login" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-            >Поддержка</a>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
