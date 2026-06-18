@@ -56,6 +56,7 @@ export default function Home() {
             onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
             onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
           >Документация</a>
+          <span style={{ fontSize: '13px', color: '#64748B' }}>LOLKA-сообщество</span>
           <a href="/login" style={{
             padding: '8px 20px', background: '#00E5FF', color: '#000000',
             borderRadius: '10px', fontWeight: '600', fontSize: '14px',
@@ -186,23 +187,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
-      {/* ===== FOOTER ===== */}
-      <footer style={{ padding: '40px 20px', borderTop: '1px solid #1F2937', background: '#111118' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF' }}>N</div>
-            <span style={{ fontWeight: '600', color: '#FFFFFF' }}>Нова 2026</span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '14px', color: '#94A3B8' }}>LOLKA-сообщество разработчика</span>
-            <div style={{ width: '36px', height: '36px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <span style={{ fontSize: '18px' }}>💬</span>
-            </div>
-          </div>
-        </div>
-      </footer>
 
     </main>
   )
