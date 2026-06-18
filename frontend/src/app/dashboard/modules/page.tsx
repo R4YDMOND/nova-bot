@@ -6,11 +6,11 @@ const navigate = (url: string) => window.location.href = url
 
 export default function ModulesPage() {
   const [modules, setModules] = useState([
-    { id: 'moderation', name: 'Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов', enabled: true },
+    { id: 'moderation', name: 'Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов', enabled: true, link: '/dashboard/moderation' },
     { id: 'levels', name: 'Система уровней', icon: '📊', desc: 'Опыт за активность, награды, лидерборд', enabled: true, link: '/dashboard/ranking' },
     { id: 'ai', name: 'AI-помощник', icon: '🤖', desc: 'Умные ответы, генерация контента', enabled: false, link: '/dashboard/ai' },
-     { id: 'moderation', name: 'Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов', enabled: true, link: '/dashboard/moderation' },
     { id: 'music', name: 'Музыка', icon: '🎵', desc: 'Воспроизведение треков', enabled: false, link: '/dashboard/music' },
+    { id: 'commands', name: 'Команды', icon: '⚡', desc: 'Кастомные команды и автопостинг', enabled: true, link: '/dashboard/commands' },
     { id: 'analytics', name: 'Аналитика', icon: '📈', desc: 'Статистика, отчёты, графики', enabled: false, link: '/dashboard/analytics' },
   ])
 
