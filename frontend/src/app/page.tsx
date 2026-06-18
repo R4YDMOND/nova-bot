@@ -153,7 +153,7 @@ export default function Home() {
             <a href="/dashboard" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-            >Dashboard</a>
+         >Центр управления</a>
             <a href="/docs" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
