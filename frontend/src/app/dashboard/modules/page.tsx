@@ -40,8 +40,8 @@ export default function ModulesPage() {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
           {[
-            { icon: '📊', label: 'Обзор', href: '/dashboard', active: false },
-            { icon: '🖥️', label: 'Мои серверы', href: '/dashboard', active: false },
+            { icon: '📊', label: 'Обзор', href: '/dashboard?refresh', active: false },
+            { icon: '🖥️', label: 'Мои серверы', href: '/dashboard?refresh', active: false },
             { icon: '🧩', label: 'Модули', href: '/dashboard/modules', active: true },
             { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai', active: false },
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands', active: false },
