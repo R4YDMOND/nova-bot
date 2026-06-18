@@ -37,6 +37,7 @@ export default function ModulesPage() {
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
           {[
             { icon: '📊', label: 'Обзор', href: '/dashboard' },
+            { icon: '🖥️', label: 'Мои серверы', href: '/dashboard' },
             { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
             { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai' },
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
