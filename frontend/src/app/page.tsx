@@ -16,7 +16,6 @@ export default function Home() {
   return (
     <main style={{ background: '#0A0A0F', minHeight: '100vh' }}>
       
-      {/* === HERO === */}
       <section style={{
         minHeight: '100vh',
         display: 'flex',
@@ -29,59 +28,31 @@ export default function Home() {
       }}>
         
         <div style={{
-          width: '100px',
-          height: '100px',
-          background: '#16161F',
-          borderRadius: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '30px',
+          width: '100px', height: '100px', background: '#16161F',
+          borderRadius: '24px', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', marginBottom: '30px',
           boxShadow: '0 0 20px rgba(0, 229, 255, 0.3)'
         }}>
           <span style={{ fontSize: '48px', fontWeight: 'bold', color: '#00E5FF' }}>N</span>
         </div>
 
-        <h1 style={{
-          fontSize: 'clamp(40px, 8vw, 72px)',
-          fontWeight: '800',
-          color: '#FFFFFF',
-          lineHeight: '1.1',
-          marginBottom: '16px'
-        }}>
+        <h1 style={{ fontSize: 'clamp(40px, 8vw, 72px)', fontWeight: '800', color: '#FFFFFF', lineHeight: '1.1', marginBottom: '16px' }}>
           НОВА
         </h1>
         
-        <p style={{
-          fontSize: 'clamp(18px, 3vw, 24px)',
-          color: '#94A3B8',
-          maxWidth: '500px',
-          marginBottom: '8px'
-        }}>
+        <p style={{ fontSize: 'clamp(18px, 3vw, 24px)', color: '#94A3B8', maxWidth: '500px', marginBottom: '8px' }}>
           Умный помощник для Lolka-серверов
         </p>
 
-        <p style={{
-          fontSize: '16px',
-          color: '#64748B',
-          marginBottom: '40px'
-        }}>
+        <p style={{ fontSize: '16px', color: '#64748B', marginBottom: '40px' }}>
           Вспышка энергии для твоего сообщества
         </p>
 
         <a href="/login" style={{
-          padding: '16px 40px',
-          fontSize: '18px',
-          fontWeight: '600',
-          background: '#00E5FF',
-          color: '#000000',
-          border: 'none',
-          borderRadius: '16px',
-          cursor: 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '10px',
-          textDecoration: 'none',
+          padding: '16px 40px', fontSize: '18px', fontWeight: '600',
+          background: '#00E5FF', color: '#000000', border: 'none',
+          borderRadius: '16px', cursor: 'pointer', display: 'inline-flex',
+          alignItems: 'center', gap: '10px', textDecoration: 'none',
           transition: 'transform 0.3s ease'
         }}
         onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
@@ -91,22 +62,11 @@ export default function Home() {
           Интегрировать Нова
         </a>
 
-        <p style={{
-          fontSize: '14px',
-          color: '#64748B',
-          marginTop: '16px'
-        }}>
+        <p style={{ fontSize: '14px', color: '#64748B', marginTop: '16px' }}>
           Вебхуки уже работают • Полная версия скоро
         </p>
 
-        {/* Статистика */}
-        <div style={{
-          display: 'flex',
-          gap: 'clamp(20px, 5vw, 60px)',
-          marginTop: '60px',
-          flexWrap: 'wrap',
-          justifyContent: 'center'
-        }}>
+        <div style={{ display: 'flex', gap: 'clamp(20px, 5vw, 60px)', marginTop: '60px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#00E5FF' }}>{serverCount}+</div>
             <div style={{ fontSize: '14px', color: '#94A3B8' }}>Серверов</div>
@@ -122,7 +82,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* === FEATURES === */}
       <section style={{ padding: '100px 20px', background: '#111118' }}>
         <h2 style={{ textAlign: 'center', fontSize: 'clamp(28px, 5vw, 40px)', fontWeight: 'bold', marginBottom: '60px', color: '#FFFFFF' }}>
           Возможности <span style={{ color: '#00E5FF' }}>Нова</span>
@@ -149,7 +108,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* === HOW TO === */}
       <section style={{ padding: '100px 20px', background: '#0A0A0F' }}>
         <h2 style={{ textAlign: 'center', fontSize: 'clamp(28px, 5vw, 40px)', fontWeight: 'bold', marginBottom: '60px', color: '#FFFFFF' }}>
           Как <span style={{ color: '#00E5FF' }}>подключить</span> Нова
@@ -175,7 +133,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* === FOOTER === */}
       <footer style={{ padding: '40px 20px', borderTop: '1px solid #1F2937', background: '#111118' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -194,10 +151,6 @@ export default function Home() {
               onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
               >{link.label}</a>
-            ))}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-              >{link}</a>
             ))}
           </div>
 
