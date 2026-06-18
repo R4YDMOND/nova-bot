@@ -56,7 +56,6 @@ export default function RankingPage() {
             { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
             { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai' },
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
-            { icon: '🏆', label: 'Система уровней', href: '/dashboard/ranking' },
           ].map((item, i) => {
             const isActive = item.label === 'Система уровней'
             return (
