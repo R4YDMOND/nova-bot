@@ -8,6 +8,7 @@ interface Module {
   desc: string
   enabled: boolean
   settings: { label: string; key: string; type: string; value: string | number | boolean }[]
+  link?: string
 }
 
 export default function ModulesPage() {
@@ -28,7 +29,8 @@ export default function ModulesPage() {
         { label: 'XP за сообщение', key: 'xpPerMsg', type: 'number', value: 10 },
         { label: 'Множитель XP', key: 'xpMultiplier', type: 'number', value: 1.5 },
         { label: 'Показывать лидерборд', key: 'showLeaderboard', type: 'toggle', value: true },
-      ]
+      ],
+      link: '/dashboard/ranking'
     },
     {
       name: 'AI-помощник', icon: '🤖', enabled: false,
@@ -37,7 +39,8 @@ export default function ModulesPage() {
         { label: 'Стиль общения', key: 'style', type: 'select', value: 'friendly' },
         { label: 'Температура (0-1)', key: 'temperature', type: 'number', value: 0.7 },
         { label: 'Использовать эмодзи', key: 'useEmoji', type: 'toggle', value: true },
-      ]
+      ],
+      link: '/dashboard/ai'
     },
     {
       name: 'Музыка', icon: '🎵', enabled: false,
@@ -54,7 +57,8 @@ export default function ModulesPage() {
       settings: [
         { label: 'Префикс команд', key: 'prefix', type: 'text', value: '/' },
         { label: 'Разрешить всем', key: 'allowAll', type: 'toggle', value: false },
-      ]
+      ],
+      link: '/dashboard/commands'
     },
     {
       name: 'Аналитика', icon: '📈', enabled: false,
@@ -76,6 +80,10 @@ export default function ModulesPage() {
   }
 
   const openSettings = (mod: Module) => {
+    if (mod.link) {
+      window.location.href = mod.link
+      return
+    }
     setSelectedModule(mod)
     setIsModalOpen(true)
   }
@@ -161,7 +169,7 @@ export default function ModulesPage() {
               onMouseEnter={(e) => { e.currentTarget.style.background = '#00E5FF'; e.currentTarget.style.color = '#000'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#00E5FF'; }}
               >
-                Настроить →
+                {mod.link ? 'Открыть настройки →' : 'Настроить →'}
               </button>
             </div>
           ))}
@@ -192,7 +200,6 @@ export default function ModulesPage() {
             boxShadow: '0 0 40px rgba(0,229,255,0.1)'
           }} onClick={(e) => e.stopPropagation()}>
 
-            {/* Заголовок */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ fontSize: '32px' }}>{selectedModule.icon}</span>
@@ -203,7 +210,6 @@ export default function ModulesPage() {
 
             <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '24px' }}>{selectedModule.desc}</p>
 
-            {/* Настройки */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {selectedModule.settings.map((setting, i) => (
                 <div key={i} style={{
@@ -244,7 +250,6 @@ export default function ModulesPage() {
               ))}
             </div>
 
-            {/* Кнопки */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
               <button onClick={() => setIsModalOpen(false)} style={{
                 padding: '10px 20px', background: 'transparent', color: '#94A3B8',
