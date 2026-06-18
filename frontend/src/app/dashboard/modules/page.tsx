@@ -40,13 +40,13 @@ export default function ModulesPage() {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
           {[
-            { icon: '📊', label: 'Обзор', active: false },
-            { icon: '🖥️', label: 'Мои серверы', active: false },
-            { icon: '🧩', label: 'Модули', active: true },
-            { icon: '✨', label: 'AI-Настройки', active: false },
-            { icon: '⚡', label: 'Команды', active: false },
+            { icon: '📊', label: 'Обзор', href: '/dashboard', active: false },
+            { icon: '🖥️', label: 'Мои серверы', href: '/dashboard', active: false },
+            { icon: '🧩', label: 'Модули', href: '/dashboard/modules', active: true },
+            { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai', active: false },
+            { icon: '⚡', label: 'Команды', href: '/dashboard/commands', active: false },
           ].map((item, i) => (
-            <a key={i} href={item.label === 'Мои серверы' ? '/dashboard' : '#'} style={{
+          <a key={i} href={item.href} style={{
               padding: '12px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center',
               gap: '12px', fontSize: '15px', fontWeight: item.active ? '600' : '400',
               color: item.active ? '#FFFFFF' : '#94A3B8',
