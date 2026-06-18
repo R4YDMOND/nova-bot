@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from 'react'
 
+interface Feature {
+  icon: string
+  title: string
+  desc: string
+  settings: string[]
+}
+
 export default function Home() {
   const [serverCount, setServerCount] = useState(0)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [activeFeature, setActiveFeature] = useState<Feature | null>(null)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
@@ -13,14 +22,48 @@ export default function Home() {
       .catch(() => setServerCount(0))
   }, [])
 
-  const features = [
-    { icon: '🛡️', title: 'Модерация', desc: 'Спам, мат, рейды — автофильтрация 24/7' },
-    { icon: '📊', title: 'Уровни', desc: 'Опыт за активность, награды, лидерборд' },
-    { icon: '🤖', title: 'AI-чат', desc: 'Умные ответы, генерация, поддержка' },
-    { icon: '🎵', title: 'Музыка', desc: 'Плеер в голосовых каналах' },
-    { icon: '⚡', title: 'Команды', desc: 'Кастомные команды без кода' },
-    { icon: '📈', title: 'Аналитика', desc: 'Рост, активность, статистика' },
+  const features: Feature[] = [
+    {
+      icon: '🛡️', title: 'Модерация',
+      desc: 'Антиспам, антимат, антирейд. Безопасность 24/7.',
+      settings: ['Фильтр мата', 'Антиспам', 'Защита от рейдов', 'Авто-предупреждения', 'Чёрный список слов']
+    },
+    {
+      icon: '📊', title: 'Система уровней',
+      desc: 'Награждайте участников опытом за активность.',
+      settings: ['Опыт за сообщения', 'Бонусы за голос', 'Роли за уровни', 'Лидерборд', 'Кастомные награды']
+    },
+    {
+      icon: '🤖', title: 'AI-помощник',
+      desc: 'Умные ответы и поддержка разговоров.',
+      settings: ['Стиль общения', 'Автоответы', 'Запрещённые темы', 'Контекст диалога', 'Кастомный промпт']
+    },
+    {
+      icon: '🎵', title: 'Музыка',
+      desc: 'Воспроизведение музыки в голосовых каналах.',
+      settings: ['Поиск треков', 'Плейлисты', 'Очередь', 'Громкость', 'DJ-роль']
+    },
+    {
+      icon: '⚡', title: 'Кастомные команды',
+      desc: 'Создавайте свои команды без кода.',
+      settings: ['Текстовые команды', 'Команды с ответом', 'Автопостинг', 'Расписание', 'Переменные']
+    },
+    {
+      icon: '📈', title: 'Аналитика',
+      desc: 'Отслеживайте рост и активность.',
+      settings: ['Активность по дням', 'Популярные команды', 'Рост участников', 'Отчёты', 'Экспорт данных']
+    },
   ]
+
+  const openModal = (feature: Feature) => {
+    setActiveFeature(feature)
+    setModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setModalOpen(false)
+    setActiveFeature(null)
+  }
 
   const steps = ['Интегрировать', 'Настроить вебхуки', 'Выбрать модули', 'Готово!']
 
@@ -48,7 +91,7 @@ export default function Home() {
       {/* ===== MAIN GRID ===== */}
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
-        {/* === HERO (левая колонка, на всю высоту) === */}
+        {/* === HERO === */}
         <div style={{
           background: 'linear-gradient(135deg, #111118 0%, #16161F 100%)',
           borderRadius: '24px', padding: '48px 40px',
@@ -82,7 +125,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* === FEATURES (правая колонка, верх) === */}
+        {/* === FEATURES === */}
         <div style={{
           background: '#111118', borderRadius: '24px', padding: '28px',
           border: '1px solid #1F2937'
@@ -92,7 +135,7 @@ export default function Home() {
             {features.map((f, i) => (
               <div key={i} style={{
                 background: '#16161F', borderRadius: '12px', padding: '14px',
-                transition: 'all 0.2s', cursor: 'default',
+                transition: 'all 0.2s', cursor: 'pointer',
                 border: '1px solid transparent'
               }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0,229,255,0.3)'; e.currentTarget.style.background = '#1A1A26'; }}
@@ -100,13 +143,16 @@ export default function Home() {
               >
                 <span style={{ fontSize: '20px' }}>{f.icon}</span>
                 <div style={{ fontSize: '13px', fontWeight: '600', marginTop: '6px' }}>{f.title}</div>
-                <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{f.desc}</div>
+                <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px', marginBottom: '8px' }}>{f.desc}</div>
+                <span onClick={(e) => { e.stopPropagation(); openModal(f); }} style={{
+                  fontSize: '11px', color: '#00E5FF', cursor: 'pointer', fontWeight: '500'
+                }}>Настроить →</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* === HOW TO (правая колонка, низ) === */}
+        {/* === HOW TO === */}
         <div style={{
           background: '#111118', borderRadius: '24px', padding: '28px',
           border: '1px solid #1F2937'
@@ -126,6 +172,64 @@ export default function Home() {
         </div>
 
       </div>
+
+      {/* ===== MODAL ===== */}
+      {modalOpen && activeFeature && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={closeModal}>
+          <div style={{
+            background: '#16161F', borderRadius: '24px', padding: '32px',
+            width: '440px', maxWidth: '90vw', border: '1px solid #1F2937',
+            boxShadow: '0 0 40px rgba(0,229,255,0.1)'
+          }} onClick={(e) => e.stopPropagation()}>
+            
+            {/* Заголовок модалки */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '32px' }}>{activeFeature.icon}</span>
+                <h2 style={{ fontSize: '22px', fontWeight: 'bold' }}>{activeFeature.title}</h2>
+              </div>
+              <span onClick={closeModal} style={{ fontSize: '24px', cursor: 'pointer', color: '#94A3B8' }}>✕</span>
+            </div>
+
+            <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '24px' }}>{activeFeature.desc}</p>
+
+            {/* Настройки */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {activeFeature.settings.map((setting, i) => (
+                <div key={i} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  background: '#111118', borderRadius: '12px', padding: '12px 16px'
+                }}>
+                  <span style={{ fontSize: '14px' }}>{setting}</span>
+                  <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px', cursor: 'pointer' }}>
+                    <input type="checkbox" defaultChecked={i < 3} style={{ opacity: 0, width: 0, height: 0 }} />
+                    <span style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: i < 3 ? '#00E5FF' : '#374151', borderRadius: '22px', transition: '0.3s' }}>
+                      <span style={{ position: 'absolute', height: '16px', width: '16px', left: i < 3 ? '22px' : '3px', bottom: '3px', background: '#FFF', borderRadius: '50%', transition: '0.3s' }} />
+                    </span>
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            {/* Кнопки */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
+              <button onClick={closeModal} style={{
+                padding: '10px 20px', background: 'transparent', color: '#94A3B8',
+                border: '1px solid #1F2937', borderRadius: '10px', cursor: 'pointer', fontSize: '14px'
+              }}>Закрыть</button>
+              <button onClick={closeModal} style={{
+                padding: '10px 24px', background: '#00E5FF', color: '#000',
+                border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '14px'
+              }}>Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
