@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 
 export default function Home() {
   const [serverCount, setServerCount] = useState(0)
-  const [scrolled, setScrolled] = useState(false)
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
@@ -12,182 +11,121 @@ export default function Home() {
       .then(res => res.json())
       .then(data => setServerCount(data.total))
       .catch(() => setServerCount(0))
-
-    const handleScroll = () => setScrolled(window.scrollY > 50)
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const scrollToFeatures = () => {
-    const el = document.getElementById('features')
-    if (el) el.scrollIntoView({ behavior: 'smooth' })
-  }
+  const features = [
+    { icon: '🛡️', title: 'Модерация', desc: 'Спам, мат, рейды — автофильтрация 24/7' },
+    { icon: '📊', title: 'Уровни', desc: 'Опыт за активность, награды, лидерборд' },
+    { icon: '🤖', title: 'AI-чат', desc: 'Умные ответы, генерация, поддержка' },
+    { icon: '🎵', title: 'Музыка', desc: 'Плеер в голосовых каналах' },
+    { icon: '⚡', title: 'Команды', desc: 'Кастомные команды без кода' },
+    { icon: '📈', title: 'Аналитика', desc: 'Рост, активность, статистика' },
+  ]
+
+  const steps = ['Интегрировать', 'Настроить вебхуки', 'Выбрать модули', 'Готово!']
 
   return (
-    <main style={{ background: '#0A0A0F', minHeight: '100vh' }}>
+    <div style={{ background: '#0A0A0F', minHeight: '100vh', color: '#F1F5F9', fontFamily: 'Inter, sans-serif' }}>
       
       {/* ===== HEADER ===== */}
       <header style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        padding: '16px 40px',
-        background: scrolled ? 'rgba(10, 10, 15, 0.95)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(10px)' : 'none',
-        borderBottom: scrolled ? '1px solid #1F2937' : '1px solid transparent',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        transition: 'all 0.3s ease'
+        padding: '16px 40px', background: 'rgba(10,10,15,0.95)',
+        borderBottom: '1px solid #1F2937', position: 'sticky', top: 0, zIndex: 100
       }}>
-        {/* Логотип */}
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
           <div style={{ width: '36px', height: '36px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '18px' }}>N</div>
-          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#FFFFFF' }}>Нова</span>
+          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#FFF' }}>Нова</span>
         </a>
-
-        {/* Навигация */}
-        <nav style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <span onClick={scrollToFeatures} style={{ color: '#94A3B8', fontSize: '14px', cursor: 'pointer', transition: 'color 0.2s' }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-          >Возможности</span>
-          <a href="/dashboard" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-          >Центр управления</a>
-          <a href="/docs" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-          >Документация</a>
-          <span style={{ fontSize: '13px', color: '#64748B' }}>LOLKA-сообщество</span>
-          <a href="/login" style={{
-            padding: '8px 20px', background: '#00E5FF', color: '#000000',
-            borderRadius: '10px', fontWeight: '600', fontSize: '14px',
-            textDecoration: 'none', transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 229, 255, 0.4)'}
-          onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
-          >Войти</a>
+        <nav style={{ display: 'flex', gap: '20px', alignItems: 'center', fontSize: '14px' }}>
+          <a href="/dashboard" style={{ color: '#94A3B8', textDecoration: 'none' }}>Центр управления</a>
+          <a href="/docs" style={{ color: '#94A3B8', textDecoration: 'none' }}>Документация</a>
+          <span style={{ color: '#64748B' }}>LOLKA-сообщество</span>
+          <a href="/login" style={{ padding: '8px 18px', background: '#00E5FF', color: '#000', borderRadius: '10px', fontWeight: '600', textDecoration: 'none' }}>Войти</a>
         </nav>
       </header>
 
-      {/* ===== HERO ===== */}
-      <section style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        padding: '40px 20px',
-        background: 'linear-gradient(180deg, #0A0A0F 0%, #111118 100%)'
-      }}>
-        
+      {/* ===== MAIN GRID ===== */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+
+        {/* === HERO (левая колонка, на всю высоту) === */}
         <div style={{
-          width: '100px', height: '100px', background: '#16161F',
-          borderRadius: '24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', marginBottom: '30px',
-          boxShadow: '0 0 20px rgba(0, 229, 255, 0.3)'
+          background: 'linear-gradient(135deg, #111118 0%, #16161F 100%)',
+          borderRadius: '24px', padding: '48px 40px',
+          border: '1px solid #1F2937',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          gridRow: '1 / 3'
         }}>
-          <span style={{ fontSize: '48px', fontWeight: 'bold', color: '#00E5FF' }}>N</span>
-        </div>
-
-        <h1 style={{ fontSize: 'clamp(40px, 8vw, 72px)', fontWeight: '800', color: '#FFFFFF', lineHeight: '1.1', marginBottom: '16px' }}>
-          НОВА
-        </h1>
-        
-        <p style={{ fontSize: 'clamp(18px, 3vw, 24px)', color: '#94A3B8', maxWidth: '500px', marginBottom: '8px' }}>
-          Умный помощник для Lolka-серверов
-        </p>
-
-        <p style={{ fontSize: '16px', color: '#64748B', marginBottom: '40px' }}>
-          Вспышка энергии для твоего сообщества
-        </p>
-
-        <a href="/login" style={{
-          padding: '16px 40px', fontSize: '18px', fontWeight: '600',
-          background: '#00E5FF', color: '#000000', border: 'none',
-          borderRadius: '16px', cursor: 'pointer', display: 'inline-flex',
-          alignItems: 'center', gap: '10px', textDecoration: 'none',
-          transition: 'transform 0.3s ease'
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
-        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          <span>⭐</span>
-          Интегрировать Нова
-        </a>
-
-        <p style={{ fontSize: '14px', color: '#64748B', marginTop: '16px' }}>
-          Вебхуки уже работают • Полная версия скоро
-        </p>
-
-        <div style={{ display: 'flex', gap: 'clamp(20px, 5vw, 60px)', marginTop: '60px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#00E5FF' }}>{serverCount}+</div>
-            <div style={{ fontSize: '14px', color: '#94A3B8' }}>Серверов</div>
+          <div style={{ width: '64px', height: '64px', background: '#0A0A0F', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '24px', boxShadow: '0 0 20px rgba(0,229,255,0.2)' }}>
+            <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#00E5FF' }}>N</span>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#00E5FF' }}>85K+</div>
-            <div style={{ fontSize: '14px', color: '#94A3B8' }}>Пользователей</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#00E5FF' }}>&lt;0.8s</div>
-            <div style={{ fontSize: '14px', color: '#94A3B8' }}>Ответ</div>
+          <h1 style={{ fontSize: '52px', fontWeight: '800', lineHeight: '1.1', marginBottom: '16px' }}>Нова</h1>
+          <p style={{ fontSize: '18px', color: '#94A3B8', marginBottom: '8px' }}>Умный помощник для Lolka</p>
+          <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '32px' }}>Вспышка энергии для твоего сообщества</p>
+          
+          <a href="/login" style={{
+            padding: '14px 32px', background: '#00E5FF', color: '#000',
+            borderRadius: '14px', fontWeight: '600', fontSize: '16px',
+            textDecoration: 'none', display: 'inline-flex', alignItems: 'center',
+            gap: '8px', width: 'fit-content', transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(0,229,255,0.4)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
+          >⭐ Интегрировать Нова</a>
+          
+          <p style={{ fontSize: '12px', color: '#64748B', marginTop: '12px' }}>Вебхуки работают • Полная версия скоро</p>
+
+          <div style={{ display: 'flex', gap: '32px', marginTop: 'auto', paddingTop: '40px' }}>
+            <div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#00E5FF' }}>{serverCount}+</div><div style={{ fontSize: '12px', color: '#64748B' }}>Серверов</div></div>
+            <div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#00E5FF' }}>85K+</div><div style={{ fontSize: '12px', color: '#64748B' }}>Пользователей</div></div>
+            <div><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#00E5FF' }}>&lt;0.8s</div><div style={{ fontSize: '12px', color: '#64748B' }}>Ответ</div></div>
           </div>
         </div>
-      </section>
 
-      {/* ===== FEATURES ===== */}
-      <section id="features" style={{ padding: '100px 20px', background: '#111118' }}>
-        <h2 style={{ textAlign: 'center', fontSize: 'clamp(28px, 5vw, 40px)', fontWeight: 'bold', marginBottom: '60px', color: '#FFFFFF' }}>
-          Возможности <span style={{ color: '#00E5FF' }}>Нова</span>
-        </h2>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', maxWidth: '1100px', margin: '0 auto' }}>
-          {[
-            { icon: '🛡️', title: 'Модерация', desc: 'Автоматическая фильтрация спама и мата. Безопасность 24/7.' },
-            { icon: '📊', title: 'Система уровней', desc: 'Награждайте участников опытом за активность.' },
-            { icon: '🤖', title: 'AI-помощник', desc: 'Умные ответы и поддержка разговоров с участниками.' },
-            { icon: '🎵', title: 'Музыка', desc: 'Воспроизведение музыки в голосовых каналах.' },
-            { icon: '⚡', title: 'Кастомные команды', desc: 'Создавайте свои команды без программирования.' },
-            { icon: '📈', title: 'Аналитика', desc: 'Отслеживайте рост и активность сообщества.' },
-          ].map((f, i) => (
-            <div key={i} style={{ background: '#16161F', borderRadius: '20px', padding: '30px', transition: 'all 0.3s ease', cursor: 'default' }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 229, 255, 0.2)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div style={{ fontSize: '36px', marginBottom: '16px' }}>{f.icon}</div>
-              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: '#FFFFFF' }}>{f.title}</h3>
-              <p style={{ fontSize: '15px', color: '#94A3B8', lineHeight: '1.5' }}>{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ===== HOW TO ===== */}
-      <section style={{ padding: '100px 20px', background: '#0A0A0F' }}>
-        <h2 style={{ textAlign: 'center', fontSize: 'clamp(28px, 5vw, 40px)', fontWeight: 'bold', marginBottom: '60px', color: '#FFFFFF' }}>
-          Как <span style={{ color: '#00E5FF' }}>подключить</span> Нова
-        </h2>
-
-        <div style={{ maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {[
-            { step: '01', title: 'Нажмите «Интегрировать Нова»', desc: 'Перейдите на страницу интеграции.' },
-            { step: '02', title: 'Настройте вебхуки', desc: 'Следуйте инструкции для вашего сервера.' },
-            { step: '03', title: 'Выберите модули', desc: 'Включите нужные функции бота.' },
-            { step: '04', title: 'Готово!', desc: 'Нова начинает работать на сервере.' },
-          ].map((item, i) => (
-            <div key={i} style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', background: '#16161F', borderRadius: '16px', padding: '24px' }}>
-              <div style={{ width: '56px', height: '56px', minWidth: '56px', background: '#0A0A0F', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 'bold', color: '#00E5FF', boxShadow: '0 0 10px rgba(0, 229, 255, 0.2)' }}>
-                {item.step}
+        {/* === FEATURES (правая колонка, верх) === */}
+        <div style={{
+          background: '#111118', borderRadius: '24px', padding: '28px',
+          border: '1px solid #1F2937'
+        }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>⚡ Возможности</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {features.map((f, i) => (
+              <div key={i} style={{
+                background: '#16161F', borderRadius: '12px', padding: '14px',
+                transition: 'all 0.2s', cursor: 'default',
+                border: '1px solid transparent'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0,229,255,0.3)'; e.currentTarget.style.background = '#1A1A26'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = '#16161F'; }}
+              >
+                <span style={{ fontSize: '20px' }}>{f.icon}</span>
+                <div style={{ fontSize: '13px', fontWeight: '600', marginTop: '6px' }}>{f.title}</div>
+                <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{f.desc}</div>
               </div>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px', color: '#FFFFFF' }}>{item.title}</h3>
-                <p style={{ fontSize: '15px', color: '#94A3B8' }}>{item.desc}</p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </section>
 
-    </main>
+        {/* === HOW TO (правая колонка, низ) === */}
+        <div style={{
+          background: '#111118', borderRadius: '24px', padding: '28px',
+          border: '1px solid #1F2937'
+        }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>🚀 Как подключить</h3>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {steps.map((step, i) => (
+              <div key={i} style={{
+                flex: 1, background: '#16161F', borderRadius: '12px',
+                padding: '14px', textAlign: 'center'
+              }}>
+                <div style={{ width: '28px', height: '28px', background: '#0A0A0F', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 'bold', color: '#00E5FF', margin: '0 auto 8px' }}>{i + 1}</div>
+                <div style={{ fontSize: '12px', fontWeight: '500' }}>{step}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
   )
 }
