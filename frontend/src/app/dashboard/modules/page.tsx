@@ -25,10 +25,13 @@ export default function ModulesPage() {
     setModules(newModules)
   }
 
+  const navigate = (url: string) => {
+    window.location.href = url
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex' }}>
       
-      {/* Sidebar */}
       <aside style={{
         width: '260px', background: '#111118', borderRight: '1px solid #1F2937',
         padding: '30px 20px', display: 'flex', flexDirection: 'column'
@@ -40,38 +43,44 @@ export default function ModulesPage() {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
           {[
-            { icon: '📊', label: 'Обзор', href: '/dashboard?refresh', active: false },
-            { icon: '🖥️', label: 'Мои серверы', href: '/dashboard?refresh', active: false },
-            { icon: '🧩', label: 'Модули', href: '/dashboard/modules', active: true },
-            { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai', active: false },
-            { icon: '⚡', label: 'Команды', href: '/dashboard/commands', active: false },
-          <span key={i} onClick={() => window.location.href = item.href} style={{
-              padding: '12px 16px', borderRadius: '12px', display: 'flex',
-              alignItems: 'center', gap: '12px', fontSize: '15px',
-              fontWeight: item.active ? '600' : '400',
-              color: item.active ? '#FFFFFF' : '#94A3B8',
-              background: item.active ? '#1F2937' : 'transparent',
-              textDecoration: 'none', transition: 'all 0.2s',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => { if (!item.active) e.currentTarget.style.background = '#1A1A24' }}
-            onMouseLeave={(e) => { if (!item.active) e.currentTarget.style.background = 'transparent' }}
-            >
-              <span style={{ fontSize: '18px' }}>{item.icon}</span>
-              {item.label}
+            { icon: '📊', label: 'Обзор', href: '/dashboard' },
+            { icon: '🖥️', label: 'Мои серверы', href: '/dashboard' },
+            { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
+            { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai' },
+            { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
+          ].map((item, i) => {
+            const isActive = item.label === 'Модули'
+            return (
+              <span key={i} onClick={() => navigate(item.href)} style={{
+                padding: '12px 16px', borderRadius: '12px', display: 'flex',
+                alignItems: 'center', gap: '12px', fontSize: '15px', cursor: 'pointer',
+                fontWeight: isActive ? '600' : '400',
+                color: isActive ? '#FFFFFF' : '#94A3B8',
+                background: isActive ? '#1F2937' : 'transparent',
+                transition: 'all 0.2s'
+              }}>
+                <span style={{ fontSize: '18px' }}>{item.icon}</span>
+                {item.label}
+              </span>
+            )
+          })}
+        </nav>
+
+        <div style={{ borderTop: '1px solid #1F2937', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {['📖 Документация', '🛟 Поддержка'].map((item, i) => (
+            <span key={i} style={{ padding: '12px 16px', borderRadius: '12px', fontSize: '15px', color: '#94A3B8', cursor: 'pointer' }}>
+              {item}
             </span>
           ))}
-        </nav>
+        </div>
       </aside>
 
-      {/* Main */}
       <main style={{ flex: 1, padding: '40px', overflow: 'auto' }}>
         <div style={{ marginBottom: '40px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#FFFFFF', marginBottom: '8px' }}>Модули Нова</h1>
           <p style={{ color: '#94A3B8', fontSize: '15px' }}>Сервер: TestServer • 🟢 Активен</p>
         </div>
 
-        {/* Tabs */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '30px', flexWrap: 'wrap' }}>
           {['Все модули', 'Основные', 'Развлечения', 'AI', 'Модерация'].map((tab, i) => (
             <button key={i} style={{
@@ -85,7 +94,6 @@ export default function ModulesPage() {
           ))}
         </div>
 
-        {/* Modules Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
           {modules.map((mod, i) => (
             <div key={i} style={{
@@ -128,7 +136,6 @@ export default function ModulesPage() {
           ))}
         </div>
 
-        {/* Save button */}
         <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'flex-end' }}>
           <button style={{
             padding: '14px 32px', background: '#00E5FF', color: '#000000',
