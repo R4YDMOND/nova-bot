@@ -8,6 +8,7 @@ const navigate = (url: string) => window.location.href = url
 export default function Dashboard() {
   const [servers, setServers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [timeframe, setTimeframe] = useState('7d')
 
   useEffect(() => {
     fetch(`${API_URL}/api/servers`)
@@ -23,19 +24,30 @@ export default function Dashboard() {
     voiceHours: 1560,
     growth: 12.5,
     messagesChart: [30, 45, 28, 60, 52, 70, 65],
+    onlineNow: 87,
+    newUsers: 24,
   }
 
   const recentActivity = [
-    { user: 'Alice', action: 'достигла 42 уровня', time: '2 мин назад', icon: '📊' },
-    { user: 'Bob', action: 'использовал /play', time: '5 мин назад', icon: '🎵' },
-    { user: 'Charlie', action: 'получил предупреждение', time: '12 мин назад', icon: '⚠️' },
-    { user: 'Diana', action: 'присоединилась к серверу', time: '28 мин назад', icon: '👋' },
-    { user: 'Eve', action: 'создала команду /meme', time: '45 мин назад', icon: '⚡' },
+    { user: 'Alice', action: 'достигла 42 уровня', time: '2 мин назад', icon: '📊', color: '#22C55E' },
+    { user: 'Bob', action: 'использовал /play', time: '5 мин назад', icon: '🎵', color: '#3B82F6' },
+    { user: 'Charlie', action: 'получил предупреждение', time: '12 мин назад', icon: '⚠️', color: '#F59E0B' },
+    { user: 'Diana', action: 'присоединилась к серверу', time: '28 мин назад', icon: '👋', color: '#A855F7' },
+    { user: 'Eve', action: 'создала команду /meme', time: '45 мин назад', icon: '⚡', color: '#EC4899' },
+  ]
+
+  const topCommands = [
+    { name: '/ping', uses: 2340, color: '#00E5FF' },
+    { name: '/rank', uses: 1820, color: '#22C55E' },
+    { name: '/help', uses: 1560, color: '#3B82F6' },
+    { name: '/ai', uses: 1200, color: '#A855F7' },
+    { name: '/play', uses: 890, color: '#F59E0B' },
   ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
       
+      {/* Sidebar */}
       <aside style={{ width: '240px', minWidth: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '32px' }}>
           <div style={{ width: '34px', height: '34px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '17px' }}>N</div>
@@ -44,7 +56,7 @@ export default function Dashboard() {
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
           {[
             { icon: '📊', label: 'Обзор', href: '/dashboard' },
-            { icon: '🖥️', label: 'Мои серверы', href: '/dashboard/servers' },
+            { icon: '🖥️', label: 'Серверы', href: '/dashboard/servers' },
             { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
           ].map((item, i) => {
@@ -62,55 +74,79 @@ export default function Dashboard() {
             )
           })}
         </nav>
+        <div style={{ borderTop: '1px solid #1F2937', paddingTop: '16px' }}>
+          <a href="/docs" style={{ padding: '10px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#94A3B8', textDecoration: 'none' }}>
+            <span style={{ fontSize: '16px' }}>📖</span> Документация
+          </a>
+        </div>
       </aside>
 
-      <main style={{ flex: 1, padding: '40px 48px', overflow: 'auto' }}>
+      {/* Main */}
+      <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
         
-        <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>📊 Обзор сервера</h1>
-          <p style={{ color: '#94A3B8', fontSize: '14px' }}>Добро пожаловать! Вот сводка за сегодня.</p>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+          <div>
+            <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>Обзор</h1>
+            <p style={{ color: '#94A3B8', fontSize: '13px' }}>Сводка активности сервера</p>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', background: '#111118', borderRadius: '10px', padding: '3px' }}>
+            {['7d', '30d', '90d'].map(t => (
+              <button key={t} onClick={() => setTimeframe(t)} style={{
+                padding: '7px 14px', borderRadius: '8px', border: 'none',
+                background: timeframe === t ? '#1F2937' : 'transparent',
+                color: timeframe === t ? '#FFF' : '#94A3B8',
+                cursor: 'pointer', fontSize: '12px', fontWeight: '500', transition: 'all 0.15s'
+              }}>{t}</button>
+            ))}
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        {/* Stats Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
           {[
-            { label: 'Всего сообщений', value: stats.totalMessages.toLocaleString(), color: '#00E5FF', icon: '💬' },
-            { label: 'Активных пользователей', value: stats.activeUsers, color: '#22C55E', icon: '👥' },
-            { label: 'Команд использовано', value: stats.commandsUsed.toLocaleString(), color: '#A855F7', icon: '⚡' },
-            { label: 'Часов в голосовых', value: stats.voiceHours.toLocaleString(), color: '#F59E0B', icon: '🎤' },
-            { label: 'Рост за неделю', value: `+${stats.growth}%`, color: '#22C55E', icon: '📈' },
-            { label: 'Серверов', value: servers.length, color: '#EC4899', icon: '🖥️' },
+            { label: 'Сообщений', value: stats.totalMessages.toLocaleString(), change: '+12%', icon: '💬', color: '#00E5FF' },
+            { label: 'Онлайн', value: stats.onlineNow, change: '+5%', icon: '🟢', color: '#22C55E' },
+            { label: 'Команд', value: stats.commandsUsed.toLocaleString(), change: '+8%', icon: '⚡', color: '#A855F7' },
+            { label: 'Новых', value: stats.newUsers, change: '+18%', icon: '👋', color: '#F59E0B' },
           ].map((stat, i) => (
             <div key={i} style={{
-              background: '#16161F', borderRadius: '16px', padding: '20px 24px',
+              background: '#16161F', borderRadius: '14px', padding: '20px',
               border: '1px solid #1F2937', transition: 'all 0.2s', cursor: 'default'
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = stat.color; e.currentTarget.style.boxShadow = `0 0 15px ${stat.color}20`; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1F2937'; e.currentTarget.style.boxShadow = 'none'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = stat.color; e.currentTarget.style.background = '#1A1A26'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1F2937'; e.currentTarget.style.background = '#16161F'; }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                <span style={{ fontSize: '24px' }}>{stat.icon}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ fontSize: '13px', color: '#94A3B8' }}>{stat.label}</span>
+                <span style={{ fontSize: '18px' }}>{stat.icon}</span>
               </div>
-              <div style={{ fontSize: '26px', fontWeight: 'bold', color: stat.color, marginBottom: '4px' }}>{stat.value}</div>
-              <div style={{ fontSize: '13px', color: '#94A3B8' }}>{stat.label}</div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#FFF', marginBottom: '4px' }}>{stat.value}</div>
+              <span style={{ fontSize: '12px', color: stat.color, fontWeight: '500' }}>{stat.change} за период</span>
             </div>
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* Charts + Activity Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '14px', marginBottom: '24px' }}>
           
-          <div style={{ background: '#16161F', borderRadius: '16px', padding: '24px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>📈 Сообщения за 7 дней</h3>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '140px' }}>
+          {/* Chart */}
+          <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600' }}>📈 Сообщения</h3>
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>За неделю</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '120px' }}>
               {stats.messagesChart.map((val, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>{val}</span>
+                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: '#64748B', opacity: 0 }}>{val}</span>
                   <div style={{
                     width: '100%', background: 'linear-gradient(180deg, #00E5FF 0%, #7B5EFF 100%)',
-                    borderRadius: '6px 6px 0 0', height: `${val}%`, maxHeight: '100px',
-                    transition: 'all 0.3s', opacity: 0.8
+                    borderRadius: '4px 4px 0 0', height: `${val * 1.2}px`, maxHeight: '100px',
+                    transition: 'all 0.3s', opacity: 0.85, cursor: 'pointer'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.filter = 'brightness(1.2)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.filter = 'none'; }}
                   />
                   <span style={{ fontSize: '10px', color: '#64748B' }}>{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][i]}</span>
                 </div>
@@ -118,42 +154,83 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ background: '#16161F', borderRadius: '16px', padding: '24px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>🕐 Последняя активность</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {/* Activity */}
+          <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🕐 Активность</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
               {recentActivity.map((act, i) => (
                 <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0',
-                  borderBottom: i < recentActivity.length - 1 ? '1px solid #1F2937' : 'none'
+                  display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0',
+                  borderBottom: i < recentActivity.length - 1 ? '1px solid #1A1A24' : 'none'
                 }}>
-                  <span style={{ fontSize: '20px' }}>{act.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: '500', fontSize: '14px' }}>{act.user}</span>
-                    <span style={{ color: '#94A3B8', fontSize: '13px' }}> {act.action}</span>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: act.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}>{act.icon}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontWeight: '500', fontSize: '13px' }}>{act.user}</span>
+                    <span style={{ color: '#94A3B8', fontSize: '12px' }}> {act.action}</span>
                   </div>
-                  <span style={{ fontSize: '11px', color: '#64748B' }}>{act.time}</span>
+                  <span style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap' }}>{act.time}</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        <div style={{ marginTop: '32px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          {[
-            { label: '🧩 Модули', href: '/dashboard/modules', color: '#00E5FF' },
-            { label: '⚡ Команды', href: '/dashboard/commands', color: '#A855F7' },
-            { label: '🖥️ Серверы', href: '/dashboard/servers', color: '#F59E0B' },
-            { label: '📖 Документация', href: '/docs', color: '#22C55E' },
-          ].map((btn, i) => (
-            <button key={i} onClick={() => navigate(btn.href)} style={{
-              padding: '12px 20px', background: '#16161F', color: btn.color,
-              border: '1px solid #1F2937', borderRadius: '12px', fontWeight: '600',
-              cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = btn.color; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1F2937'; }}
-            >{btn.label}</button>
-          ))}
+        {/* Top Commands + Servers */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          
+          {/* Top Commands */}
+          <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🔥 Популярные команды</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {topCommands.map((cmd, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0' }}>
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: cmd.color }} />
+                  <code style={{ fontSize: '12px', fontFamily: 'monospace', color: '#FFF', minWidth: '50px' }}>{cmd.name}</code>
+                  <div style={{ flex: 1, height: '4px', background: '#1A1A24', borderRadius: '2px' }}>
+                    <div style={{ width: `${(cmd.uses / 2340) * 100}%`, height: '100%', background: cmd.color, borderRadius: '2px' }} />
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#94A3B8', minWidth: '40px', textAlign: 'right' }}>{cmd.uses}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Servers Preview */}
+          <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600' }}>🖥️ Серверы</h3>
+              <button onClick={() => navigate('/dashboard/servers')} style={{
+                padding: '6px 14px', background: 'transparent', color: '#00E5FF',
+                border: '1px solid #1F2937', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '500'
+              }}>Все →</button>
+            </div>
+            
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '13px' }}>Загрузка...</div>
+            ) : servers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <div style={{ fontSize: '28px', marginBottom: '8px' }}>🖥️</div>
+                <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '12px' }}>Нет серверов</p>
+                <button onClick={() => navigate('/login')} style={{
+                  padding: '8px 16px', background: '#00E5FF', color: '#000', border: 'none',
+                  borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '12px'
+                }}>⭐ Интегрировать</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {servers.slice(0, 4).map((s: any) => (
+                  <div key={s.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                    background: '#111118', borderRadius: '10px'
+                  }}>
+                    <div style={{ width: '32px', height: '32px', background: '#0A0A0F', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🖥️</div>
+                    <span style={{ fontSize: '13px', fontWeight: '500', flex: 1 }}>{s.name}</span>
+                    <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '10px', background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>🟢</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
