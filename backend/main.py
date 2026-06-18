@@ -279,3 +279,94 @@ def save_ai_settings(data: dict):
         return {"error": str(e)}
     finally:
         db.close()
+
+# ==================== Отправка сообщений ====================
+
+@app.post("/api/send/lolka")
+def send_to_lolka_webhook(data: dict):
+    """
+    Отправляет сообщение в Lolka через вебхук.
+    Принимает: { "webhook_url": "...", "message": "...", "username": "Нова" }
+    """
+    webhook_url = data.get("webhook_url", "")
+    message = data.get("message", "")
+    username = data.get("username", "Нова")
+    
+    if not webhook_url or not message:
+        return {"status": "error", "message": "webhook_url и message обязательны"}
+    
+    payload = {
+        "content": message,
+        "username": username,
+    }
+    
+    try:
+        resp = requests.post(webhook_url, json=payload, timeout=10)
+        return {
+            "status": "ok",
+            "sent": resp.ok,
+            "status_code": resp.status_code,
+            "platform": "lolka"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/send/vk")
+def send_to_vk(data: dict):
+    """
+    Отправляет сообщение в VK через API.
+    Принимает: { "group_id": "...", "message": "...", "access_token": "..." }
+    """
+    group_id = data.get("group_id", "")
+    message = data.get("message", "")
+    access_token = data.get("access_token", os.getenv("VK_ACCESS_TOKEN", ""))
+    
+    if not group_id or not message:
+        return {"status": "error", "message": "group_id и message обязательны"}
+    
+    try:
+        resp = requests.post("https://api.vk.com/method/wall.post", params={
+            "owner_id": f"-{group_id}",
+            "message": message,
+            "access_token": access_token,
+            "v": "5.199"
+        }, timeout=10)
+        data_resp = resp.json()
+        return {
+            "status": "ok",
+            "sent": "error" not in data_resp,
+            "response": data_resp,
+            "platform": "vk"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/send/broadcast")
+def send_broadcast(data: dict):
+    """
+    Массовая рассылка по всем вебхукам.
+    Принимает: { "message": "...", "platforms": ["lolka", "vk"], "webhooks": [...] }
+    """
+    message = data.get("message", "")
+    platforms = data.get("platforms", [])
+    webhooks = data.get("webhooks", [])
+    
+    results = []
+    
+    for wh in webhooks:
+        if wh.get("platform") == "lolka" and "lolka" in platforms:
+            result = send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": message})
+            results.append({"platform": "lolka", "result": result})
+        
+        elif wh.get("platform") == "vk" and "vk" in platforms:
+            result = send_to_vk({"group_id": wh.get("group_id"), "message": message})
+            results.append({"platform": "vk", "result": result})
+    
+    return {
+        "status": "ok",
+        "sent_count": len([r for r in results if r["result"].get("sent")]),
+        "total": len(results),
+        "details": results
+    }
