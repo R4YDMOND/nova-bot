@@ -7,6 +7,7 @@ interface Feature {
   title: string
   desc: string
   settings: string[]
+  link?: string
 }
 
 export default function Home() {
@@ -31,12 +32,14 @@ export default function Home() {
     {
       icon: '📊', title: 'Система уровней',
       desc: 'Награждайте участников опытом за активность.',
-      settings: ['Опыт за сообщения', 'Бонусы за голос', 'Роли за уровни', 'Лидерборд', 'Кастомные награды']
+      settings: ['Опыт за сообщения', 'Бонусы за голос', 'Роли за уровни', 'Лидерборд', 'Кастомные награды'],
+      link: '/dashboard/ranking'
     },
     {
       icon: '🤖', title: 'AI-помощник',
       desc: 'Умные ответы и поддержка разговоров.',
-      settings: ['Стиль общения', 'Автоответы', 'Запрещённые темы', 'Контекст диалога', 'Кастомный промпт']
+      settings: ['Стиль общения', 'Автоответы', 'Запрещённые темы', 'Контекст диалога', 'Кастомный промпт'],
+      link: '/dashboard/ai'
     },
     {
       icon: '🎵', title: 'Музыка',
@@ -46,7 +49,8 @@ export default function Home() {
     {
       icon: '⚡', title: 'Кастомные команды',
       desc: 'Создавайте свои команды без кода.',
-      settings: ['Текстовые команды', 'Команды с ответом', 'Автопостинг', 'Расписание', 'Переменные']
+      settings: ['Текстовые команды', 'Команды с ответом', 'Автопостинг', 'Расписание', 'Переменные'],
+      link: '/dashboard/commands'
     },
     {
       icon: '📈', title: 'Аналитика',
@@ -187,7 +191,6 @@ export default function Home() {
             boxShadow: '0 0 40px rgba(0,229,255,0.1)'
           }} onClick={(e) => e.stopPropagation()}>
             
-            {/* Заголовок модалки */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ fontSize: '32px' }}>{activeFeature.icon}</span>
@@ -198,7 +201,6 @@ export default function Home() {
 
             <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '24px' }}>{activeFeature.desc}</p>
 
-            {/* Настройки */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {activeFeature.settings.map((setting, i) => (
                 <div key={i} style={{
@@ -216,16 +218,23 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Кнопки */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
               <button onClick={closeModal} style={{
                 padding: '10px 20px', background: 'transparent', color: '#94A3B8',
                 border: '1px solid #1F2937', borderRadius: '10px', cursor: 'pointer', fontSize: '14px'
               }}>Закрыть</button>
-              <button onClick={closeModal} style={{
-                padding: '10px 24px', background: '#00E5FF', color: '#000',
-                border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '14px'
-              }}>Сохранить</button>
+              {activeFeature.link ? (
+                <a href={activeFeature.link} style={{
+                  padding: '10px 24px', background: '#00E5FF', color: '#000',
+                  border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer',
+                  fontSize: '14px', textDecoration: 'none', display: 'inline-block'
+                }}>Расширенные настройки →</a>
+              ) : (
+                <button onClick={closeModal} style={{
+                  padding: '10px 24px', background: '#00E5FF', color: '#000',
+                  border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '14px'
+                }}>Сохранить</button>
+              )}
             </div>
           </div>
         </div>
