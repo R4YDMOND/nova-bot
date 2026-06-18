@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
-from models import Server
+from models import Server, ModuleConfig, AISettings
 import requests
 import random
 
@@ -146,3 +146,136 @@ def lolka_webhook(data: dict):
         "status": "received",
         "message": "Сообщение получено"
     }
+
+
+# ==================== API для модулей ====================
+
+@app.get("/api/settings/modules")
+def get_modules(server_id: str = Query("default")):
+    """Получить настройки модулей для сервера"""
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            return {"modules": [], "message": "Сервер не найден"}
+        
+        configs = db.query(ModuleConfig).filter(ModuleConfig.server_id == server.id).all()
+        modules = [
+            {"name": c.module_name, "enabled": c.is_enabled, "config": c.config}
+            for c in configs
+        ]
+        return {"modules": modules}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/settings/modules")
+def save_modules(data: dict):
+    """Сохранить настройки модулей"""
+    db = SessionLocal()
+    try:
+        server_id = data.get("server_id", "default")
+        modules = data.get("modules", [])
+        
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            server = Server(name="Auto-created", server_id=server_id)
+            db.add(server)
+            db.commit()
+            db.refresh(server)
+        
+        for mod in modules:
+            existing = db.query(ModuleConfig).filter(
+                ModuleConfig.server_id == server.id,
+                ModuleConfig.module_name == mod["name"]
+            ).first()
+            
+            if existing:
+                existing.is_enabled = mod.get("enabled", False)
+                existing.config = mod.get("config", "")
+            else:
+                new_config = ModuleConfig(
+                    server_id=server.id,
+                    module_name=mod["name"],
+                    is_enabled=mod.get("enabled", False),
+                    config=mod.get("config", "")
+                )
+                db.add(new_config)
+        
+        db.commit()
+        return {"status": "saved", "modules_count": len(modules)}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+# ==================== API для AI-настроек ====================
+
+@app.get("/api/settings/ai")
+def get_ai_settings(server_id: str = Query("default")):
+    """Получить AI-настройки сервера"""
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            return {"settings": None, "message": "Сервер не найден"}
+        
+        ai = db.query(AISettings).filter(AISettings.server_id == server.id).first()
+        if not ai:
+            return {"settings": {
+                "botName": "Нова",
+                "personality": "friendly",
+                "temperature": 0.7,
+                "maxLength": 500,
+                "useEmoji": True,
+                "systemPrompt": "Ты — дружелюбный AI-помощник."
+            }}
+        
+        return {"settings": {
+            "botName": ai.bot_name,
+            "personality": ai.personality,
+            "temperature": ai.temperature,
+            "systemPrompt": ai.system_prompt or ""
+        }}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/settings/ai")
+def save_ai_settings(data: dict):
+    """Сохранить AI-настройки"""
+    db = SessionLocal()
+    try:
+        server_id = data.get("server_id", "default")
+        
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            server = Server(name="Auto-created", server_id=server_id)
+            db.add(server)
+            db.commit()
+            db.refresh(server)
+        
+        ai = db.query(AISettings).filter(AISettings.server_id == server.id).first()
+        
+        if not ai:
+            ai = AISettings(server_id=server.id)
+            db.add(ai)
+        
+        ai.bot_name = data.get("botName", "Нова")
+        ai.personality = data.get("personality", "friendly")
+        ai.temperature = data.get("temperature", 0.7)
+        ai.system_prompt = data.get("systemPrompt", "")
+        
+        db.commit()
+        return {"status": "saved"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
