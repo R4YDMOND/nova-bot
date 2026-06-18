@@ -45,6 +45,7 @@ export default function ModulesPage() {
             { icon: '🖥️', label: 'Серверы', href: '/dashboard/servers' },
             { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
+            { icon: '🔗', label: 'Вебхуки', href: '/dashboard/webhooks' },
           ].map((item, i) => {
             const isActive = item.label === 'Модули'
             return (
