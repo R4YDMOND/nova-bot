@@ -184,8 +184,17 @@ export default function Home() {
           </div>
 
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-            {['Возможности', 'Демо', 'Документация', 'Поддержка'].map((link, i) => (
-              <a key={i} href="#" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
+            {[
+              { label: 'Возможности', href: '/#features' },
+              { label: 'Dashboard', href: '/dashboard' },
+              { label: 'Документация', href: '/docs' },
+              { label: 'Поддержка', href: '/login' },
+            ].map((link, i) => (
+              <a key={i} href={link.href} style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+              >{link.label}</a>
+            ))}
               onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
               >{link}</a>
