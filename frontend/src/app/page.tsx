@@ -13,6 +13,11 @@ export default function Home() {
       .catch(() => setServerCount(0))
   }, [])
 
+  const scrollToFeatures = () => {
+    const el = document.getElementById('features')
+    if (el) el.scrollIntoView({ behavior: 'smooth' })
+  }
+
   return (
     <main style={{ background: '#0A0A0F', minHeight: '100vh' }}>
       
@@ -82,7 +87,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section style={{ padding: '100px 20px', background: '#111118' }}>
+      <section id="features" style={{ padding: '100px 20px', background: '#111118' }}>
         <h2 style={{ textAlign: 'center', fontSize: 'clamp(28px, 5vw, 40px)', fontWeight: 'bold', marginBottom: '60px', color: '#FFFFFF' }}>
           Возможности <span style={{ color: '#00E5FF' }}>Нова</span>
         </h2>
@@ -141,17 +146,22 @@ export default function Home() {
           </div>
 
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-            {[
-              { label: 'Возможности', href: '/#features' },
-              { label: 'Dashboard', href: '/dashboard' },
-              { label: 'Документация', href: '/docs' },
-              { label: 'Поддержка', href: '/login' },
-            ].map((link, i) => (
-              <a key={i} href={link.href} style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
+            <span onClick={scrollToFeatures} style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px', cursor: 'pointer' }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
               onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-              >{link.label}</a>
-            ))}
+            >Возможности</span>
+            <a href="/dashboard" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+            >Dashboard</a>
+            <a href="/docs" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+            >Документация</a>
+            <a href="/login" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+            >Поддержка</a>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
