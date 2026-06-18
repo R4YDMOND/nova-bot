@@ -45,17 +45,21 @@ export default function ModulesPage() {
             { icon: '🧩', label: 'Модули', href: '/dashboard/modules', active: true },
             { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai', active: false },
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands', active: false },
-          ].map((item, i) => (
-          <a key={i} href={item.href} style={{
-              padding: '12px 16px', borderRadius: '12px', display: 'flex', alignItems: 'center',
-              gap: '12px', fontSize: '15px', fontWeight: item.active ? '600' : '400',
+          <span key={i} onClick={() => window.location.href = item.href} style={{
+              padding: '12px 16px', borderRadius: '12px', display: 'flex',
+              alignItems: 'center', gap: '12px', fontSize: '15px',
+              fontWeight: item.active ? '600' : '400',
               color: item.active ? '#FFFFFF' : '#94A3B8',
               background: item.active ? '#1F2937' : 'transparent',
-              textDecoration: 'none', transition: 'all 0.2s'
-            }}>
+              textDecoration: 'none', transition: 'all 0.2s',
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => { if (!item.active) e.currentTarget.style.background = '#1A1A24' }}
+            onMouseLeave={(e) => { if (!item.active) e.currentTarget.style.background = 'transparent' }}
+            >
               <span style={{ fontSize: '18px' }}>{item.icon}</span>
               {item.label}
-            </a>
+            </span>
           ))}
         </nav>
       </aside>
