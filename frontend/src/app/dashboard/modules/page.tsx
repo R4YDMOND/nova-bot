@@ -33,6 +33,7 @@ export default function ModulesPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
       
+      {/* Sidebar */}
       <aside style={{ width: '240px', minWidth: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '32px' }}>
           <div style={{ width: '34px', height: '34px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '17px' }}>N</div>
@@ -61,7 +62,8 @@ export default function ModulesPage() {
         </nav>
       </aside>
 
-      <main style={{ flex: 1, padding: '32px 40px', maxWidth: '800px' }}>
+      {/* Main */}
+      <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
         
         {/* Header + Save button */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
@@ -78,13 +80,13 @@ export default function ModulesPage() {
           </button>
         </div>
 
-        {/* Modules List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+        {/* Modules List — растянут на всю ширину */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', width: '100%' }}>
           {modules.map((mod, i) => (
             <div key={mod.id} style={{
               display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px',
               borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease',
-              border: '1px solid transparent',
+              border: '1px solid transparent', width: '100%', boxSizing: 'border-box',
               opacity: visible.includes(i) ? 1 : 0,
               transform: visible.includes(i) ? 'translateX(0)' : 'translateX(-10px)',
             }}
