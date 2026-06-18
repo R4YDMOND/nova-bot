@@ -45,9 +45,10 @@ export default function CommandsPage() {
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
           {[
             { icon: '📊', label: 'Обзор', href: '/dashboard' },
-            { icon: '🖥️', label: 'Мои серверы', href: '/dashboard/servers' },
+            { icon: '🖥️', label: 'Серверы', href: '/dashboard/servers' },
             { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
+            { icon: '🔗', label: 'Вебхуки', href: '/dashboard/webhooks' },
           ].map((item, i) => {
             const isActive = item.label === 'Команды'
             return (
