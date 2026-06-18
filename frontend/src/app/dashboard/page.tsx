@@ -9,7 +9,6 @@ const SIDEBAR_ITEMS = [
   { icon: '📊', label: 'Обзор', href: '/dashboard' },
   { icon: '🖥️', label: 'Мои серверы', href: '/dashboard' },
   { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
-  { icon: '✨', label: 'AI-Настройки', href: '/dashboard/ai' },
   { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
 ]
 
