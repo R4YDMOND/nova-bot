@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 
+const navigate = (url: string) => window.location.href = url
+
 export default function ModulesPage() {
   const [modules, setModules] = useState([
     { id: 'moderation', name: 'Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов', enabled: true },
@@ -15,21 +17,16 @@ export default function ModulesPage() {
   const [saved, setSaved] = useState(false)
 
   const toggle = (id: string) => {
-    setModules(modules.map(m => m.id === id ? { ...m, enabled: !m.enabled } : m))
+    const updated = modules.map(m => m.id === id ? { ...m, enabled: !m.enabled } : m)
+    setModules(updated)
   }
 
-  const saveSettings = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-
-  const navigate = (url: string) => window.location.href = url
+  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
       
-      {/* Sidebar */}
-      <aside style={{ width: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
+      <aside style={{ width: '240px', minWidth: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '32px' }}>
           <div style={{ width: '34px', height: '34px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '17px' }}>N</div>
           <span style={{ fontSize: '19px', fontWeight: 'bold', color: '#FFF' }}>Нова</span>
@@ -50,7 +47,7 @@ export default function ModulesPage() {
                 color: isActive ? '#FFF' : '#94A3B8', background: isActive ? '#1F2937' : 'transparent',
                 transition: 'all 0.15s'
               }}>
-                <span style={{ fontSize: '16px' }}>{item.icon}</span>
+                <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{item.icon}</span>
                 {item.label}
               </span>
             )
@@ -58,14 +55,13 @@ export default function ModulesPage() {
         </nav>
       </aside>
 
-      {/* Main */}
       <main style={{ flex: 1, padding: '40px 48px', maxWidth: '900px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
           <div>
             <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Модули</h1>
             <p style={{ color: '#94A3B8', fontSize: '14px' }}>Управляйте функциями бота</p>
           </div>
-          <button onClick={saveSettings} style={{
+          <button onClick={save} style={{
             padding: '10px 22px', background: saved ? '#22C55E' : '#00E5FF', color: '#000',
             border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '14px', cursor: 'pointer',
             transition: 'all 0.25s'
@@ -90,17 +86,34 @@ export default function ModulesPage() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '15px', fontWeight: '500', marginBottom: '2px' }}>
                   {mod.name}
-                  {mod.link && <span style={{ color: '#00E5FF', fontSize: '12px', marginLeft: '6px', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); navigate(mod.link!) }}>↗ настройки</span>}
+                  {mod.link && <span onClick={(e) => { e.stopPropagation(); navigate(mod.link!) }} style={{ color: '#00E5FF', fontSize: '12px', marginLeft: '6px', cursor: 'pointer' }}>↗ настройки</span>}
                 </div>
                 <div style={{ fontSize: '13px', color: '#94A3B8' }}>{mod.desc}</div>
               </div>
-              <div onClick={(e) => { e.stopPropagation(); toggle(mod.id); }}>
-                <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '26px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={mod.enabled} onChange={() => {}} style={{ opacity: 0, width: 0, height: 0 }} />
-                  <span style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: mod.enabled ? '#00E5FF' : '#374151', borderRadius: '26px', transition: '0.25s' }}>
-                    <span style={{ position: 'absolute', height: '20px', width: '20px', left: mod.enabled ? '22px' : '4px', top: '3px', background: mod.enabled ? '#000' : '#94A3B8', borderRadius: '50%', transition: '0.25s' }} />
-                  </span>
-                </label>
+              <div 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  e.preventDefault();
+                  toggle(mod.id); 
+                }}
+                style={{ 
+                  width: '44px', height: '26px', 
+                  background: mod.enabled ? '#00E5FF' : '#374151', 
+                  borderRadius: '26px', cursor: 'pointer',
+                  transition: 'all 0.25s',
+                  position: 'relative',
+                  flexShrink: 0
+                }}
+              >
+                <div style={{ 
+                  position: 'absolute', 
+                  height: '20px', width: '20px', 
+                  left: mod.enabled ? '22px' : '4px', 
+                  top: '3px', 
+                  background: mod.enabled ? '#000' : '#FFF', 
+                  borderRadius: '50%', 
+                  transition: 'all 0.25s' 
+                }} />
               </div>
             </div>
           ))}
