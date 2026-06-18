@@ -13,7 +13,7 @@ const SIDEBAR_ITEMS = [
 ]
 
 export default function CommandsPage() {
-  const [commands] = useState([
+  const [commands, setCommands] = useState([
     { name: '/ping', desc: 'Проверка бота', category: 'Основные', enabled: true },
     { name: '/help', desc: 'Список команд', category: 'Основные', enabled: true },
     { name: '/stats', desc: 'Статистика', category: 'Основные', enabled: true },
@@ -24,9 +24,16 @@ export default function CommandsPage() {
     { name: '/ai', desc: 'Спросить AI', category: 'AI', enabled: true },
   ])
 
+  const [saved, setSaved] = useState(false)
   const [activeCategory, setActiveCategory] = useState('Все')
   const categories = ['Все', 'Основные', 'Модерация', 'Уровни', 'Музыка', 'AI']
   const filtered = activeCategory === 'Все' ? commands : commands.filter(c => c.category === activeCategory)
+
+  const toggle = (name: string) => {
+    setCommands(commands.map(c => c.name === name ? { ...c, enabled: !c.enabled } : c))
+  }
+
+  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
@@ -55,8 +62,17 @@ export default function CommandsPage() {
       </aside>
 
       <main style={{ flex: 1, padding: '40px 48px', overflow: 'auto' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Команды</h1>
-        <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '24px' }}>Управляйте доступными командами</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+          <div>
+            <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>Команды</h1>
+            <p style={{ color: '#94A3B8', fontSize: '14px' }}>Управляйте доступными командами</p>
+          </div>
+          <button onClick={save} style={{
+            padding: '10px 22px', background: saved ? '#22C55E' : '#00E5FF', color: '#000',
+            border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '14px', cursor: 'pointer',
+            transition: 'all 0.25s'
+          }}>{saved ? '✅ Сохранено' : '💾 Сохранить'}</button>
+        </div>
 
         <div style={{ display: 'flex', gap: '6px', marginBottom: '24px', flexWrap: 'wrap' }}>
           {categories.map(cat => (
@@ -85,9 +101,12 @@ export default function CommandsPage() {
                   <td style={{ padding: '14px 20px', fontSize: '14px' }}>{cmd.desc}</td>
                   <td style={{ padding: '14px 20px' }}><span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', background: '#0A0A0F', color: '#94A3B8' }}>{cmd.category}</span></td>
                   <td style={{ padding: '14px 20px' }}>
-                    <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: cmd.enabled ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: cmd.enabled ? '#22C55E' : '#EF4444' }}>
-                      {cmd.enabled ? '🟢 Активна' : '🔴 Отключена'}
-                    </span>
+                    <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '26px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={cmd.enabled} onChange={() => toggle(cmd.name)} style={{ opacity: 0, width: 0, height: 0 }} />
+                      <span style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: cmd.enabled ? '#00E5FF' : '#374151', borderRadius: '26px', transition: '0.25s' }}>
+                        <span style={{ position: 'absolute', height: '20px', width: '20px', left: cmd.enabled ? '22px' : '4px', top: '3px', background: cmd.enabled ? '#000' : '#94A3B8', borderRadius: '50%', transition: '0.25s' }} />
+                      </span>
+                    </label>
                   </td>
                 </tr>
               ))}
