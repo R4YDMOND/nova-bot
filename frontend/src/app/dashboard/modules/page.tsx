@@ -9,7 +9,7 @@ export default function ModulesPage() {
     { id: 'moderation', name: 'Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов', enabled: true },
     { id: 'levels', name: 'Система уровней', icon: '📊', desc: 'Опыт за активность, награды, лидерборд', enabled: true, link: '/dashboard/ranking' },
     { id: 'ai', name: 'AI-помощник', icon: '🤖', desc: 'Умные ответы, генерация контента', enabled: false, link: '/dashboard/ai' },
-    { id: 'moderation', name: 'Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов', enabled: true, link: '/dashboard/moderation' },
+     { id: 'moderation', name: 'Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов', enabled: true, link: '/dashboard/moderation' },
     { id: 'music', name: 'Музыка', icon: '🎵', desc: 'Воспроизведение треков', enabled: false, link: '/dashboard/music' },
     { id: 'analytics', name: 'Аналитика', icon: '📈', desc: 'Статистика, отчёты, графики', enabled: false, link: '/dashboard/analytics' },
   ])
