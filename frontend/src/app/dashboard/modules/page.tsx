@@ -33,7 +33,6 @@ export default function ModulesPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
       
-      {/* Sidebar */}
       <aside style={{ width: '240px', minWidth: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '32px' }}>
           <div style={{ width: '34px', height: '34px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '17px' }}>N</div>
@@ -62,15 +61,21 @@ export default function ModulesPage() {
         </nav>
       </aside>
 
-      {/* Main */}
       <main style={{ flex: 1, padding: '32px 40px', maxWidth: '800px' }}>
         
-        {/* Header */}
+        {/* Header + Save button */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
           <div>
             <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>Модули</h1>
             <p style={{ color: '#94A3B8', fontSize: '13px' }}>Управляйте функциями бота</p>
           </div>
+          <button onClick={save} style={{
+            padding: '10px 22px', background: saved ? '#22C55E' : '#00E5FF', color: '#000',
+            border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '14px', cursor: 'pointer',
+            transition: 'all 0.25s', boxShadow: saved ? '0 0 15px rgba(34,197,94,0.3)' : 'none'
+          }}>
+            {saved ? '✅ Сохранено' : '💾 Сохранить'}
+          </button>
         </div>
 
         {/* Modules List */}
@@ -86,7 +91,6 @@ export default function ModulesPage() {
             onMouseEnter={(e) => { e.currentTarget.style.background = '#111118'; e.currentTarget.style.borderColor = '#1F2937'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
             >
-              {/* Icon */}
               <div style={{
                 width: '42px', height: '42px', minWidth: '42px',
                 background: mod.enabled ? 'rgba(0,229,255,0.08)' : '#111118',
@@ -96,7 +100,6 @@ export default function ModulesPage() {
                 {mod.icon}
               </div>
 
-              {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '1px' }}>
                   {mod.name}
@@ -113,7 +116,6 @@ export default function ModulesPage() {
                 <div style={{ fontSize: '12px', color: '#94A3B8' }}>{mod.desc}</div>
               </div>
 
-              {/* Toggle */}
               <div onClick={(e) => { e.stopPropagation(); toggle(mod.id); }} style={{
                 width: '40px', height: '24px', background: mod.enabled ? '#00E5FF' : '#374151',
                 borderRadius: '24px', cursor: 'pointer', transition: 'all 0.25s ease',
@@ -130,29 +132,15 @@ export default function ModulesPage() {
           ))}
         </div>
 
-        {/* Save button — fixed at bottom right */}
-        <div style={{ position: 'fixed', bottom: '28px', right: '28px', zIndex: 50 }}>
-          <button onClick={save} style={{
-            padding: '12px 24px', background: saved ? '#22C55E' : '#00E5FF', color: '#000',
-            border: 'none', borderRadius: '12px', fontWeight: '600', fontSize: '14px', cursor: 'pointer',
-            transition: 'all 0.3s ease', boxShadow: saved ? '0 4px 20px rgba(34,197,94,0.3)' : '0 4px 15px rgba(0,229,255,0.2)',
-            transform: saved ? 'scale(1.05)' : 'scale(1)'
-          }}>
-            {saved ? '✅ Сохранено!' : '💾 Сохранить'}
-          </button>
-        </div>
-
         {/* Toast */}
         {saved && (
           <div style={{
-            position: 'fixed', bottom: '90px', right: '28px',
+            position: 'fixed', bottom: '24px', right: '24px',
             background: '#22C55E', color: '#000', padding: '10px 20px',
             borderRadius: '12px', fontWeight: '600', fontSize: '13px',
             zIndex: 1000, boxShadow: '0 4px 20px rgba(34,197,94,0.3)',
             animation: 'slideUp 0.3s ease'
-          }}>
-            ✅ Настройки модулей сохранены
-          </div>
+          }}>✅ Настройки модулей сохранены</div>
         )}
         <style>{`@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
       </main>
