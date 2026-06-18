@@ -69,7 +69,7 @@ export default function Home() {
           Вспышка энергии для твоего сообщества
         </p>
 
-        <button style={{
+        <a href="/login" style={{
           padding: '16px 40px',
           fontSize: '18px',
           fontWeight: '600',
@@ -78,9 +78,10 @@ export default function Home() {
           border: 'none',
           borderRadius: '16px',
           cursor: 'pointer',
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
           gap: '10px',
+          textDecoration: 'none',
           transition: 'transform 0.3s ease'
         }}
         onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
@@ -88,7 +89,7 @@ export default function Home() {
         >
           <span>⭐</span>
           Интегрировать Нова
-        </button>
+        </a>
 
         <p style={{
           fontSize: '14px',
