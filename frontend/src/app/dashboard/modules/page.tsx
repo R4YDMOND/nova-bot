@@ -19,7 +19,7 @@ export default function ModulesPage() {
 
   useEffect(() => {
     modules.forEach((_, i) => {
-      setTimeout(() => setVisible(prev => [...prev, i]), i * 60)
+      setTimeout(() => setVisible(prev => [...prev, i]), i * 50)
     })
   }, [])
 
@@ -66,7 +66,7 @@ export default function ModulesPage() {
       <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
         
         {/* Header + Save button */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>Модули</h1>
             <p style={{ color: '#94A3B8', fontSize: '13px' }}>Управляйте функциями бота</p>
@@ -80,34 +80,37 @@ export default function ModulesPage() {
           </button>
         </div>
 
-        {/* Modules List — растянут на всю ширину */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', width: '100%' }}>
+        {/* Modules Grid — 2 columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           {modules.map((mod, i) => (
             <div key={mod.id} style={{
-              display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px',
-              borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s ease',
-              border: '1px solid transparent', width: '100%', boxSizing: 'border-box',
+              display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '14px 18px', borderRadius: '14px',
+              cursor: 'pointer', transition: 'all 0.2s ease',
+              border: '1px solid transparent', background: '#16161F',
               opacity: visible.includes(i) ? 1 : 0,
-              transform: visible.includes(i) ? 'translateX(0)' : 'translateX(-10px)',
+              transform: visible.includes(i) ? 'translateY(0)' : 'translateY(8px)',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#111118'; e.currentTarget.style.borderColor = '#1F2937'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#1A1A26'; e.currentTarget.style.borderColor = '#1F2937'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#16161F'; e.currentTarget.style.borderColor = 'transparent'; }}
             >
+              {/* Icon */}
               <div style={{
-                width: '42px', height: '42px', minWidth: '42px',
+                width: '40px', height: '40px', minWidth: '40px',
                 background: mod.enabled ? 'rgba(0,229,255,0.08)' : '#111118',
                 borderRadius: '12px', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: '20px', transition: 'all 0.2s'
+                justifyContent: 'center', fontSize: '18px'
               }}>
                 {mod.icon}
               </div>
 
+              {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '1px' }}>
+                <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '2px' }}>
                   {mod.name}
                   {mod.link && (
                     <span onClick={(e) => { e.stopPropagation(); navigate(mod.link!) }} style={{
-                      color: '#00E5FF', fontSize: '11px', marginLeft: '6px', cursor: 'pointer',
+                      color: '#00E5FF', fontSize: '11px', marginLeft: '4px', cursor: 'pointer',
                       opacity: 0.7, transition: 'opacity 0.15s'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
@@ -115,16 +118,17 @@ export default function ModulesPage() {
                     >↗</span>
                   )}
                 </div>
-                <div style={{ fontSize: '12px', color: '#94A3B8' }}>{mod.desc}</div>
+                <div style={{ fontSize: '12px', color: '#94A3B8', lineHeight: '1.3' }}>{mod.desc}</div>
               </div>
 
+              {/* Toggle */}
               <div onClick={(e) => { e.stopPropagation(); toggle(mod.id); }} style={{
-                width: '40px', height: '24px', background: mod.enabled ? '#00E5FF' : '#374151',
-                borderRadius: '24px', cursor: 'pointer', transition: 'all 0.25s ease',
+                width: '38px', height: '22px', background: mod.enabled ? '#00E5FF' : '#374151',
+                borderRadius: '22px', cursor: 'pointer', transition: 'all 0.25s ease',
                 position: 'relative', flexShrink: 0
               }}>
                 <div style={{
-                  position: 'absolute', height: '18px', width: '18px',
+                  position: 'absolute', height: '16px', width: '16px',
                   left: mod.enabled ? '20px' : '3px', top: '3px',
                   background: mod.enabled ? '#000' : '#FFF',
                   borderRadius: '50%', transition: 'all 0.25s ease'
