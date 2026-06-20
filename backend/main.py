@@ -9,7 +9,7 @@ import os
 import secrets
 from datetime import datetime
 
-app = FastAPI(title="Nova API", version="0.6.0")
+app = FastAPI(title="Nova API", version="0.7.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,7 +24,7 @@ def startup():
 
 @app.get("/")
 def root():
-    return {"status": "ok", "version": "0.6.0"}
+    return {"status": "ok", "version": "0.7.0"}
 
 @app.get("/api/servers")
 def get_servers():
@@ -58,8 +58,10 @@ def create_server(
         db.close()
 
 
-def send_to_lolka(webhook_url: str, message: str):
-    payload = {"content": message}
+def send_to_lolka(webhook_url: str, message: str, username: str = "Нова", avatar_url: str = ""):
+    payload = {"content": message, "username": username}
+    if avatar_url:
+        payload["avatar_url"] = avatar_url
     try:
         resp = requests.post(webhook_url, json=payload, timeout=5)
         return {"status_code": resp.status_code, "ok": resp.ok}
@@ -76,6 +78,7 @@ def lolka_webhook(data: dict):
     channel = data.get("channel", "Неизвестный")
     server_id = data.get("server_id", "")
     webhook_url = data.get("webhook_url", "")
+    avatar_url = data.get("avatar_url", "")
     
     response = None
     
@@ -95,7 +98,7 @@ def lolka_webhook(data: dict):
         response = f"""**📊 Статистика:**
 👤 Пользователь: {user}
 💬 Канал: {channel}
-🤖 Бот: Нова v0.6.0
+🤖 Бот: Нова v0.7.0
 ⚡ Статус: Работает
 🌐 Сервер: {server_id or 'Неизвестный'}"""
     
@@ -121,7 +124,7 @@ def lolka_webhook(data: dict):
     
     if response and webhook_url:
         try:
-            send_result = send_to_lolka(webhook_url, response)
+            send_result = send_to_lolka(webhook_url, response, avatar_url=avatar_url)
             print(f"📤 Ответ отправлен: {send_result}")
             return {
                 "status": "ok",
@@ -359,11 +362,14 @@ def send_to_lolka_webhook(data: dict):
     webhook_url = data.get("webhook_url", "")
     message = data.get("message", "")
     username = data.get("username", "Нова")
+    avatar_url = data.get("avatar_url", "")
     
     if not webhook_url or not message:
         return {"status": "error", "message": "webhook_url и message обязательны"}
     
     payload = {"content": message, "username": username}
+    if avatar_url:
+        payload["avatar_url"] = avatar_url
     
     try:
         resp = requests.post(webhook_url, json=payload, timeout=10)
@@ -395,11 +401,12 @@ def send_to_vk(data: dict):
 def send_broadcast(data: dict):
     message = data.get("message", "")
     webhooks = data.get("webhooks", [])
+    avatar_url = data.get("avatar_url", "")
     
     results = []
     for wh in webhooks:
         if wh.get("platform") == "lolka":
-            r = send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": message})
+            r = send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": message, "avatar_url": avatar_url})
             results.append({"platform": "lolka", "sent": r.get("sent")})
         elif wh.get("platform") == "vk":
             r = send_to_vk({"group_id": wh.get("group_id"), "message": message})
@@ -453,7 +460,6 @@ def generate_ai_comment(url: str, content_type: str, platform: str = "Lolka", se
     }
     type_name = type_names.get(content_type, 'ссылка')
     
-    # Адаптируем промпт под платформу и сервер
     if server_name:
         if platform == "VK":
             platform_context = f"в сообществе ВКонтакте «{server_name}»"
@@ -518,7 +524,7 @@ def generate_ai_comment(url: str, content_type: str, platform: str = "Lolka", se
         except Exception as e:
             print(f"DeepSeek error: {e}")
     
-    # === Fallback (адаптирован под платформу и сервер) ===
+    # === Fallback ===
     if server_name:
         server_prefix = f"«{server_name}»"
     else:
@@ -526,59 +532,19 @@ def generate_ai_comment(url: str, content_type: str, platform: str = "Lolka", se
     
     if platform == "VK":
         fallback = {
-            'videos': [
-                f"Ребята из {server_prefix}, нашёл крутое видео!",
-                f"Подписчики {server_prefix}, гляньте какое видео — огонь!",
-                "ВК-шные, вот это находка — обязательно к просмотру!",
-            ],
-            'articles': [
-                f"Для {server_prefix} — полезная статья!",
-                f"Подписчикам {server_prefix} на заметку!",
-                "Читайте, это важно для нашего паблика!",
-            ],
-            'posts': [
-                f"Смотрите какой пост для {server_prefix}!",
-                "ВК не спит — делюсь интересным постом!",
-                "Для подписчиков — горячее обсуждение!",
-            ],
-            'music': [
-                f"Для {server_prefix} — отличный трек!",
-                "Подписчикам в плейлист — музыкальная находка!",
-                "ВК, послушайте что я нашёл!",
-            ],
-            'other': [
-                f"Для {server_prefix} — полезная ссылка!",
-                "Подписчикам пригодится!",
-                "ВК-паблик, смотрите что нашёл!",
-            ]
+            'videos': [f"Ребята из {server_prefix}, нашёл крутое видео!", f"Подписчики {server_prefix}, гляньте какое видео — огонь!", "ВК-шные, вот это находка — обязательно к просмотру!"],
+            'articles': [f"Для {server_prefix} — полезная статья!", f"Подписчикам {server_prefix} на заметку!", "Читайте, это важно для нашего паблика!"],
+            'posts': [f"Смотрите какой пост для {server_prefix}!", "ВК не спит — делюсь интересным постом!", "Для подписчиков — горячее обсуждение!"],
+            'music': [f"Для {server_prefix} — отличный трек!", "Подписчикам в плейлист — музыкальная находка!", "ВК, послушайте что я нашёл!"],
+            'other': [f"Для {server_prefix} — полезная ссылка!", "Подписчикам пригодится!", "ВК-паблик, смотрите что нашёл!"]
         }
     else:
         fallback = {
-            'videos': [
-                f"Эй, {server_prefix}, посмотрите какое видео!",
-                "Ребята, это видео просто огонь — рекомендую!",
-                "Вот это находка! Обязательно к просмотру.",
-            ],
-            'articles': [
-                f"{server_prefix}, нашёл статью которая стоит прочтения!",
-                "Полезный материал — рекомендую ознакомиться!",
-                "Статья дня — обязательно посмотрите!",
-            ],
-            'posts': [
-                f"{server_prefix}, смотрите какой интересный пост!",
-                "Вот это обсуждение — присоединяйтесь!",
-                "Делюсь постом который вызвал бурю эмоций!",
-            ],
-            'music': [
-                f"{server_prefix}, нашёл отличный трек для плейлиста!",
-                "Послушайте какая музыка мне попалась!",
-                "Этот трек сегодня в моём сердечке!",
-            ],
-            'other': [
-                f"{server_prefix}, смотрите что я нашёл!",
-                "Полезная ссылка для вас!",
-                "Делюсь находкой — пригодится!",
-            ]
+            'videos': [f"Эй, {server_prefix}, посмотрите какое видео!", "Ребята, это видео просто огонь — рекомендую!", "Вот это находка! Обязательно к просмотру."],
+            'articles': [f"{server_prefix}, нашёл статью которая стоит прочтения!", "Полезный материал — рекомендую ознакомиться!", "Статья дня — обязательно посмотрите!"],
+            'posts': [f"{server_prefix}, смотрите какой интересный пост!", "Вот это обсуждение — присоединяйтесь!", "Делюсь постом который вызвал бурю эмоций!"],
+            'music': [f"{server_prefix}, нашёл отличный трек для плейлиста!", "Послушайте какая музыка мне попалась!", "Этот трек сегодня в моём сердечке!"],
+            'other': [f"{server_prefix}, смотрите что я нашёл!", "Полезная ссылка для вас!", "Делюсь находкой — пригодится!"]
         }
     return random.choice(fallback.get(content_type, fallback['other']))
 
@@ -589,12 +555,12 @@ def forward_content(data: dict):
     webhooks = data.get("webhooks", [])
     platform = data.get("platform", "Lolka")
     server_name = data.get("serverName", "")
+    avatar_url = data.get("avatar_url", "")
     
     urls = extract_urls(message)
     if not urls:
         return {"status": "error", "message": "Ссылки не найдены"}
     
-    # Извлекаем комментарий
     comment = message
     for url in urls:
         comment = comment.replace(url, '').replace('/forward', '').replace('/перешли', '').strip()
@@ -619,7 +585,7 @@ def forward_content(data: dict):
         for wh in matching_webhooks:
             try:
                 if wh.get("platform") == "lolka":
-                    send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": full_message})
+                    send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": full_message, "avatar_url": avatar_url})
                 elif wh.get("platform") == "vk":
                     send_to_vk({"group_id": wh.get("group_id"), "message": full_message})
                 
@@ -661,6 +627,7 @@ def get_forward_stats():
         "recent": recent
     }
 
+
 # ==================== Сканирование контента ====================
 
 @app.post("/api/scan/content")
@@ -670,6 +637,7 @@ def scan_content(data: dict):
     min_likes = data.get("min_likes", 5)
     server_name = data.get("serverName", "")
     webhooks = data.get("webhooks", [])
+    avatar_url = data.get("avatar_url", "")
     
     if platform != "vk" or not group_id:
         return {"status": "ok", "found": 0, "sent": 0}
@@ -722,7 +690,7 @@ def scan_content(data: dict):
                     if wh.get("platform") == "vk":
                         send_to_vk({"group_id": wh.get("group_id"), "message": msg})
                     elif wh.get("platform") == "lolka":
-                        send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": msg})
+                        send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": msg, "avatar_url": avatar_url})
                     sent += 1
                 except:
                     pass
