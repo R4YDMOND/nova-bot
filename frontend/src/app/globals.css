@@ -1,5 +1,17 @@
 /* ========== Nova Bot — Единые стили и анимации ========== */
 
+/* Сброс отступов */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0A0A0F;
+  color: #F1F5F9;
+}
+
 /* Базовые переходы для всех интерактивных элементов */
 button, a, input, select, textarea {
   transition: all 0.2s ease;
