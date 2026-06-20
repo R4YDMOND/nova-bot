@@ -2,6 +2,16 @@
 
 import { useState } from 'react'
 
+// Защита от краша, эмодзи и спецсимволов
+const sanitize = (text: string): string => {
+  if (!text) return ''
+  return text
+    .replace(/[\u0000-\u001F]/g, '')
+    .replace(/[\u200B-\u200D]/g, '')
+    .replace(/[\uFEFF]/g, '')
+    .trim()
+}
+
 const TABS = [
   { id: 'settings', label: '⚙️ Настройки' },
   { id: 'rewards', label: '🎖️ Награды за уровни' },
@@ -17,15 +27,15 @@ export default function RankingPage() {
 
   // ===== Settings =====
   const [xpSources, setXpSources] = useState([
-    { name: 'Сообщение', value: 10, enabled: true },
-    { name: 'Голос (мин)', value: 5, enabled: true },
-    { name: 'Реакция', value: 2, enabled: false },
-    { name: 'Ивент', value: 50, enabled: false },
+    { name: '💬 Сообщение', value: 10, enabled: true },
+    { name: '🎤 Голос (мин)', value: 5, enabled: true },
+    { name: '👍 Реакция', value: 2, enabled: false },
+    { name: '🎉 Ивент', value: 50, enabled: false },
   ])
   const [multiplier, setMultiplier] = useState(2)
   const [boostChannels, setBoostChannels] = useState('#general, #чат')
-  const [boostRoles, setBoostRoles] = useState('@vip, @boost')
-  const [notifyChannel, setNotifyChannel] = useState('#уровни')
+  const [boostRoles, setBoostRoles] = useState('@vip, @boost ⭐')
+  const [notifyChannel, setNotifyChannel] = useState('#уровни 🏆')
   const [notifyMessage, setNotifyMessage] = useState('🎉 {user} достиг {level} уровня!')
   const [pingUser, setPingUser] = useState(true)
   const [blacklistChannels, setBlacklistChannels] = useState('#спам, #флуд')
@@ -41,10 +51,10 @@ export default function RankingPage() {
 
   // ===== Rewards =====
   const [rewards, setRewards] = useState([
-    { level: 5, role: '@новичок', color: '#22C55E', message: 'Добро пожаловать!' },
-    { level: 10, role: '@продвинутый', color: '#3B82F6' },
-    { level: 25, role: '@эксперт', color: '#F59E0B' },
-    { level: 50, role: '@легенда', color: '#EF4444' },
+    { level: 5, role: '@новичок 🌱', color: '#22C55E', message: 'Добро пожаловать!' },
+    { level: 10, role: '@продвинутый 📈', color: '#3B82F6' },
+    { level: 25, role: '@эксперт 🎯', color: '#F59E0B' },
+    { level: 50, role: '@легенда 👑', color: '#EF4444' },
   ])
   const [newRewLevel, setNewRewLevel] = useState('')
   const [newRewRole, setNewRewRole] = useState('')
@@ -54,15 +64,15 @@ export default function RankingPage() {
 
   const addReward = () => {
     if (!newRewLevel || !newRewRole) return
-    setRewards([...rewards, { level: parseInt(newRewLevel), role: newRewRole, color: COLORS[Math.floor(Math.random() * COLORS.length)], message: newRewMsg || undefined }])
+    setRewards([...rewards, { level: parseInt(newRewLevel), role: sanitize(newRewRole), color: COLORS[Math.floor(Math.random() * COLORS.length)], message: sanitize(newRewMsg) || undefined }])
     setNewRewLevel(''); setNewRewRole(''); setNewRewMsg(''); setShowAddRew(false)
   }
 
   // ===== Voice Rewards =====
   const [voiceRewards, setVoiceRewards] = useState([
-    { minutes: 60, role: '@меломан', color: '#3B82F6' },
-    { minutes: 300, role: '@аудиофил', color: '#F59E0B' },
-    { minutes: 1000, role: '@звукореж', color: '#A855F7' },
+    { minutes: 60, role: '@меломан 🎧', color: '#3B82F6' },
+    { minutes: 300, role: '@аудиофил 🎼', color: '#F59E0B' },
+    { minutes: 1000, role: '@звукореж 🎛️', color: '#A855F7' },
   ])
   const [newVoiceMin, setNewVoiceMin] = useState('')
   const [newVoiceRole, setNewVoiceRole] = useState('')
@@ -70,7 +80,7 @@ export default function RankingPage() {
 
   const addVoiceReward = () => {
     if (!newVoiceMin || !newVoiceRole) return
-    setVoiceRewards([...voiceRewards, { minutes: parseInt(newVoiceMin), role: newVoiceRole, color: COLORS[Math.floor(Math.random() * COLORS.length)] }])
+    setVoiceRewards([...voiceRewards, { minutes: parseInt(newVoiceMin), role: sanitize(newVoiceRole), color: COLORS[Math.floor(Math.random() * COLORS.length)] }])
     setNewVoiceMin(''); setNewVoiceRole(''); setShowAddVoice(false)
   }
 
@@ -84,28 +94,27 @@ export default function RankingPage() {
 
   // ===== Members =====
   const [members] = useState([
-    { name: 'Alice', level: 42, xp: 15420, avatar: '👩', rank: 1 },
-    { name: 'Bob', level: 38, xp: 12800, avatar: '👨', rank: 2 },
-    { name: 'Charlie', level: 27, xp: 7650, avatar: '🧑', rank: 3 },
-    { name: 'Diana', level: 55, xp: 23100, avatar: '👩‍🦰', rank: 4 },
-    { name: 'Eve', level: 15, xp: 3200, avatar: '👩‍🦱', rank: 5 },
-    { name: 'Frank', level: 61, xp: 28500, avatar: '👨‍🦰', rank: 6 },
+    { name: '👩 Alice', level: 42, xp: 15420, avatar: '👩', rank: 1 },
+    { name: '👨 Bob', level: 38, xp: 12800, avatar: '👨', rank: 2 },
+    { name: '🧑 Charlie', level: 27, xp: 7650, avatar: '🧑', rank: 3 },
+    { name: '👩‍🦰 Diana', level: 55, xp: 23100, avatar: '👩‍🦰', rank: 4 },
+    { name: '👩‍🦱 Eve', level: 15, xp: 3200, avatar: '👩‍🦱', rank: 5 },
+    { name: '👨‍🦰 Frank', level: 61, xp: 28500, avatar: '👨‍🦰', rank: 6 },
   ])
   const [searchMember, setSearchMember] = useState('')
   const filteredMembers = members.filter(m => m.name.toLowerCase().includes(searchMember.toLowerCase()))
 
   const resetAll = () => {
-    setXpSources([{ name: 'Сообщение', value: 10, enabled: true }, { name: 'Голос (мин)', value: 5, enabled: true }, { name: 'Реакция', value: 2, enabled: false }, { name: 'Ивент', value: 50, enabled: false }])
-    setMultiplier(2); setBoostChannels('#general, #чат'); setBoostRoles('@vip, @boost')
-    setRewards([{ level: 5, role: '@новичок', color: '#22C55E', message: 'Добро пожаловать!' }, { level: 10, role: '@продвинутый', color: '#3B82F6' }, { level: 25, role: '@эксперт', color: '#F59E0B' }, { level: 50, role: '@легенда', color: '#EF4444' }])
-    setVoiceRewards([{ minutes: 60, role: '@меломан', color: '#3B82F6' }, { minutes: 300, role: '@аудиофил', color: '#F59E0B' }, { minutes: 1000, role: '@звукореж', color: '#A855F7' }])
+    setXpSources([{ name: '💬 Сообщение', value: 10, enabled: true }, { name: '🎤 Голос (мин)', value: 5, enabled: true }, { name: '👍 Реакция', value: 2, enabled: false }, { name: '🎉 Ивент', value: 50, enabled: false }])
+    setMultiplier(2); setBoostChannels('#general, #чат'); setBoostRoles('@vip, @boost ⭐')
+    setRewards([{ level: 5, role: '@новичок 🌱', color: '#22C55E', message: 'Добро пожаловать!' }, { level: 10, role: '@продвинутый 📈', color: '#3B82F6' }, { level: 25, role: '@эксперт 🎯', color: '#F59E0B' }, { level: 50, role: '@легенда 👑', color: '#EF4444' }])
+    setVoiceRewards([{ minutes: 60, role: '@меломан 🎧', color: '#3B82F6' }, { minutes: 300, role: '@аудиофил 🎼', color: '#F59E0B' }, { minutes: 1000, role: '@звукореж 🎛️', color: '#A855F7' }])
     setDecayEnabled(false); setDecayDays(7); setDecayPercent(10)
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', color: '#F1F5F9' }}>
       
-      {/* Top Bar */}
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 40px', background: '#111118', borderBottom: '1px solid #1F2937', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
@@ -120,7 +129,6 @@ export default function RankingPage() {
         <button onClick={save} style={{ padding: '10px 22px', background: saved ? '#22C55E' : '#00E5FF', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', transition: 'all 0.25s' }}>{saved ? '✅ Сохранено!' : '💾 Сохранить'}</button>
       </header>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', padding: '16px 40px', background: '#0A0A0F', borderBottom: '1px solid #1F2937', overflowX: 'auto' }}>
         {TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
@@ -129,20 +137,18 @@ export default function RankingPage() {
             color: activeTab === tab.id ? '#FFF' : '#94A3B8',
             fontWeight: activeTab === tab.id ? '600' : '400',
             cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s', whiteSpace: 'nowrap'
-          }}>{tab.label}</button>
+          }}>{sanitize(tab.label)}</button>
         ))}
       </div>
 
       <main style={{ padding: '40px', maxWidth: '1100px', margin: '0 auto' }}>
 
-        {/* ========== TAB: SETTINGS ========== */}
         {activeTab === 'settings' && (
           <div>
             <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '6px' }}>⚙️ Настройки уровней</h1>
             <p style={{ color: '#94A3B8', fontSize: '15px', marginBottom: '32px' }}>Источники опыта, множители и ограничения</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-              {/* XP Sources */}
               <div style={{ background: '#16161F', borderRadius: '18px', padding: '24px', border: '1px solid #1F2937' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>📊 Источники XP</h3>
                 {xpSources.map((s, i) => (
@@ -152,7 +158,7 @@ export default function RankingPage() {
                         <div onClick={() => toggleSource(i)} style={{ width: '34px', height: '20px', background: s.enabled ? '#00E5FF' : '#374151', borderRadius: '20px', cursor: 'pointer', transition: '0.25s', position: 'relative' }}>
                           <div style={{ position: 'absolute', height: '14px', width: '14px', left: s.enabled ? '18px' : '3px', top: '3px', background: s.enabled ? '#000' : '#FFF', borderRadius: '50%', transition: '0.25s' }} />
                         </div>
-                        <span style={{ fontSize: '13px' }}>{s.name}</span>
+                        <span style={{ fontSize: '13px' }}>{sanitize(s.name)}</span>
                       </div>
                       <input type="number" value={s.value} onChange={(e) => { const arr = [...xpSources]; arr[i].value = parseInt(e.target.value) || 0; setXpSources(arr) }}
                         style={{ width: '50px', padding: '4px 6px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '6px', color: '#FFF', textAlign: 'center', fontSize: '12px' }} />
@@ -163,17 +169,16 @@ export default function RankingPage() {
                 ))}
               </div>
 
-              {/* Multipliers */}
               <div style={{ background: '#16161F', borderRadius: '18px', padding: '24px', border: '1px solid #1F2937' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>🎚️ Множители</h3>
                 <div style={{ marginBottom: '12px' }}>
                   <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Буст-каналы</label>
-                  <input type="text" value={boostChannels} onChange={(e) => setBoostChannels(e.target.value)}
+                  <input type="text" value={sanitize(boostChannels)} onChange={(e) => setBoostChannels(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
                 </div>
                 <div style={{ marginBottom: '12px' }}>
                   <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Буст-роли</label>
-                  <input type="text" value={boostRoles} onChange={(e) => setBoostRoles(e.target.value)}
+                  <input type="text" value={sanitize(boostRoles)} onChange={(e) => setBoostRoles(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
                 </div>
                 <div>
@@ -186,12 +191,11 @@ export default function RankingPage() {
                 </div>
               </div>
 
-              {/* Notifications & Limits */}
               <div style={{ background: '#16161F', borderRadius: '18px', padding: '24px', border: '1px solid #1F2937' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>🔔 Уведомления</h3>
-                <input type="text" value={notifyChannel} onChange={(e) => setNotifyChannel(e.target.value)} placeholder="#канал"
+                <input type="text" value={sanitize(notifyChannel)} onChange={(e) => setNotifyChannel(e.target.value)} placeholder="#канал"
                   style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }} />
-                <textarea value={notifyMessage} onChange={(e) => setNotifyMessage(e.target.value)} rows={2}
+                <textarea value={sanitize(notifyMessage)} onChange={(e) => setNotifyMessage(e.target.value)} rows={2}
                   style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '12px', marginBottom: '6px', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }} />
                 <p style={{ fontSize: '10px', color: '#64748B', marginBottom: '10px' }}>{'{user} {level} {role} {xp}'}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -202,7 +206,7 @@ export default function RankingPage() {
                 </div>
 
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px', marginTop: '16px' }}>🚫 Ограничения</h3>
-                <input type="text" value={blacklistChannels} onChange={(e) => setBlacklistChannels(e.target.value)} placeholder="Каналы без XP"
+                <input type="text" value={sanitize(blacklistChannels)} onChange={(e) => setBlacklistChannels(e.target.value)} placeholder="Каналы без XP"
                   style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }} />
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -224,7 +228,6 @@ export default function RankingPage() {
           </div>
         )}
 
-        {/* ========== TAB: REWARDS ========== */}
         {activeTab === 'rewards' && (
           <div>
             <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '6px' }}>🎖️ Награды за уровни</h1>
@@ -237,8 +240,8 @@ export default function RankingPage() {
             {showAddRew && (
               <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '16px', border: '1px solid #1F2937' }}>
                 <div><label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Уровень</label><input type="number" value={newRewLevel} onChange={(e) => setNewRewLevel(e.target.value)} placeholder="5" style={{ width: '70px', padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} /></div>
-                <div><label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Роль</label><input type="text" value={newRewRole} onChange={(e) => setNewRewRole(e.target.value)} placeholder="@роль" style={{ width: '140px', padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} /></div>
-                <div><label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Сообщение</label><input type="text" value={newRewMsg} onChange={(e) => setNewRewMsg(e.target.value)} placeholder="Поздравляем!" style={{ width: '180px', padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} /></div>
+                <div><label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Роль</label><input type="text" value={sanitize(newRewRole)} onChange={(e) => setNewRewRole(e.target.value)} placeholder="@роль" style={{ width: '140px', padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} /></div>
+                <div><label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Сообщение</label><input type="text" value={sanitize(newRewMsg)} onChange={(e) => setNewRewMsg(e.target.value)} placeholder="Поздравляем!" style={{ width: '180px', padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} /></div>
                 <button onClick={addReward} style={{ padding: '8px 20px', background: '#00E5FF', color: '#000', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Добавить</button>
               </div>
             )}
@@ -248,8 +251,8 @@ export default function RankingPage() {
                 <div key={i} style={{ background: '#16161F', borderRadius: '14px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', border: '1px solid #1F2937' }}>
                   <span style={{ background: r.color, color: '#000', fontWeight: 'bold', padding: '8px 14px', borderRadius: '10px', fontSize: '16px', minWidth: '60px', textAlign: 'center' }}>Ур. {r.level}</span>
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: '15px', fontWeight: '600' }}>{r.role}</span>
-                    {r.message && <p style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>💬 {r.message}</p>}
+                    <span style={{ fontSize: '15px', fontWeight: '600' }}>{sanitize(r.role)}</span>
+                    {r.message && <p style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>💬 {sanitize(r.message)}</p>}
                   </div>
                   <span onClick={() => setRewards(rewards.filter((_, j) => j !== i))} style={{ color: '#EF4444', cursor: 'pointer', fontSize: '18px' }}>✕</span>
                 </div>
@@ -258,7 +261,6 @@ export default function RankingPage() {
           </div>
         )}
 
-        {/* ========== TAB: VOICE ========== */}
         {activeTab === 'voice' && (
           <div>
             <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '6px' }}>🎤 Голосовые награды</h1>
@@ -271,7 +273,7 @@ export default function RankingPage() {
             {showAddVoice && (
               <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '16px', border: '1px solid #1F2937' }}>
                 <div><label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Минут</label><input type="number" value={newVoiceMin} onChange={(e) => setNewVoiceMin(e.target.value)} placeholder="60" style={{ width: '80px', padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} /></div>
-                <div><label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Роль</label><input type="text" value={newVoiceRole} onChange={(e) => setNewVoiceRole(e.target.value)} placeholder="@роль" style={{ width: '160px', padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} /></div>
+                <div><label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Роль</label><input type="text" value={sanitize(newVoiceRole)} onChange={(e) => setNewVoiceRole(e.target.value)} placeholder="@роль" style={{ width: '160px', padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} /></div>
                 <button onClick={addVoiceReward} style={{ padding: '8px 20px', background: '#00E5FF', color: '#000', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Добавить</button>
               </div>
             )}
@@ -280,7 +282,7 @@ export default function RankingPage() {
               {voiceRewards.map((r, i) => (
                 <div key={i} style={{ background: '#16161F', borderRadius: '14px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', border: '1px solid #1F2937' }}>
                   <span style={{ background: r.color, color: '#000', fontWeight: 'bold', padding: '8px 14px', borderRadius: '10px', fontSize: '16px', minWidth: '80px', textAlign: 'center' }}>{r.minutes} мин</span>
-                  <span style={{ fontSize: '15px', fontWeight: '600', flex: 1 }}>{r.role}</span>
+                  <span style={{ fontSize: '15px', fontWeight: '600', flex: 1 }}>{sanitize(r.role)}</span>
                   <span onClick={() => setVoiceRewards(voiceRewards.filter((_, j) => j !== i))} style={{ color: '#EF4444', cursor: 'pointer', fontSize: '18px' }}>✕</span>
                 </div>
               ))}
@@ -288,7 +290,6 @@ export default function RankingPage() {
           </div>
         )}
 
-        {/* ========== TAB: CARD ========== */}
         {activeTab === 'card' && (
           <div>
             <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '6px' }}>🪪 Карточка рейтинга</h1>
@@ -301,14 +302,14 @@ export default function RankingPage() {
                   <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Цвет фона</label>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input type="color" value={cardBgColor} onChange={(e) => setCardBgColor(e.target.value)} style={{ width: '36px', height: '36px', border: 'none', borderRadius: '8px', cursor: 'pointer' }} />
-                    <input type="text" value={cardBgColor} onChange={(e) => setCardBgColor(e.target.value)} style={{ flex: 1, padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} />
+                    <input type="text" value={sanitize(cardBgColor)} onChange={(e) => setCardBgColor(e.target.value)} style={{ flex: 1, padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} />
                   </div>
                 </div>
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Акцентный цвет</label>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <input type="color" value={cardAccentColor} onChange={(e) => setCardAccentColor(e.target.value)} style={{ width: '36px', height: '36px', border: 'none', borderRadius: '8px', cursor: 'pointer' }} />
-                    <input type="text" value={cardAccentColor} onChange={(e) => setCardAccentColor(e.target.value)} style={{ flex: 1, padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} />
+                    <input type="text" value={sanitize(cardAccentColor)} onChange={(e) => setCardAccentColor(e.target.value)} style={{ flex: 1, padding: '8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '14px' }} />
                   </div>
                 </div>
                 <div>
@@ -325,19 +326,18 @@ export default function RankingPage() {
               <div style={{ background: '#16161F', borderRadius: '18px', padding: '28px', border: '1px solid #1F2937' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>📋 Отображение</h3>
                 {[
-                  { key: 'cardShowAvatar', label: 'Аватар', value: cardShowAvatar, set: setCardShowAvatar },
-                  { key: 'cardShowXP', label: 'Прогресс XP', value: cardShowXP, set: setCardShowXP },
-                  { key: 'cardShowRank', label: 'Место в рейтинге', value: cardShowRank, set: setCardShowRank },
+                  { key: 'cardShowAvatar', label: '👤 Аватар', value: cardShowAvatar, set: setCardShowAvatar },
+                  { key: 'cardShowXP', label: '📊 Прогресс XP', value: cardShowXP, set: setCardShowXP },
+                  { key: 'cardShowRank', label: '🏆 Место в рейтинге', value: cardShowRank, set: setCardShowRank },
                 ].map((item, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: i < 2 ? '1px solid #1F2937' : 'none' }}>
-                    <span style={{ fontSize: '14px' }}>{item.label}</span>
+                    <span style={{ fontSize: '14px' }}>{sanitize(item.label)}</span>
                     <div onClick={() => item.set(!item.value)} style={{ width: '44px', height: '26px', background: item.value ? '#00E5FF' : '#374151', borderRadius: '26px', cursor: 'pointer', position: 'relative' }}>
                       <div style={{ position: 'absolute', height: '20px', width: '20px', left: item.value ? '22px' : '4px', top: '3px', background: item.value ? '#000' : '#FFF', borderRadius: '50%', transition: '0.25s' }} />
                     </div>
                   </div>
                 ))}
 
-                {/* Preview */}
                 <div style={{ marginTop: '20px', background: cardBgColor, borderRadius: '14px', padding: '20px', border: `2px solid ${cardAccentColor}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {cardShowAvatar && <div style={{ width: '48px', height: '48px', background: '#0A0A0F', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>👤</div>}
@@ -362,14 +362,13 @@ export default function RankingPage() {
           </div>
         )}
 
-        {/* ========== TAB: MEMBERS ========== */}
         {activeTab === 'members' && (
           <div>
             <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '6px' }}>👥 Участники</h1>
             <p style={{ color: '#94A3B8', fontSize: '15px', marginBottom: '24px' }}>Рейтинг участников сервера</p>
 
             <div style={{ marginBottom: '20px' }}>
-              <input type="text" value={searchMember} onChange={(e) => setSearchMember(e.target.value)}
+              <input type="text" value={sanitize(searchMember)} onChange={(e) => setSearchMember(e.target.value)}
                 placeholder="🔍 Поиск участника..."
                 style={{ width: '100%', padding: '10px 16px', background: '#16161F', border: '1px solid #1F2937', borderRadius: '12px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box', maxWidth: '400px' }} />
             </div>
@@ -395,7 +394,7 @@ export default function RankingPage() {
                       <td style={{ padding: '14px 20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <span style={{ fontSize: '20px' }}>{m.avatar}</span>
-                          <span style={{ fontWeight: '500' }}>{m.name}</span>
+                          <span style={{ fontWeight: '500' }}>{sanitize(m.name)}</span>
                         </div>
                       </td>
                       <td style={{ padding: '14px 20px' }}>
@@ -415,7 +414,6 @@ export default function RankingPage() {
           </div>
         )}
 
-        {/* Bottom buttons */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px' }}>
           <button onClick={() => window.location.href = '/dashboard/modules'} style={{
             padding: '12px 24px', background: 'transparent', color: '#94A3B8',
