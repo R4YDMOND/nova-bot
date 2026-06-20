@@ -65,6 +65,28 @@ export default function ModerationPage() {
   const toggle = (key: string) => update(key, !settings[key as keyof typeof settings])
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
 
+  // Журнал нарушений
+  const [logFilter, setLogFilter] = useState('all')
+  const [logSearch, setLogSearch] = useState('')
+  const [auditLog] = useState([
+    { id: 1, user: '👩 Alice', action: '⚠️ Предупреждение', reason: 'Спам', moderator: 'Нова 🛡️', time: '14:30', rule: '№1' },
+    { id: 2, user: '👨 Bob', action: '🔇 Мут 10м', reason: 'Оскорбления', moderator: 'Нова 🛡️', time: '15:45', rule: '№2' },
+    { id: 3, user: '🧑 Charlie', action: '⚠️ Предупреждение', reason: 'Капс', moderator: 'Авто 🤖', time: '16:20', rule: '№3' },
+    { id: 4, user: '👩‍🦰 Diana', action: '🔨 Бан 24ч', reason: 'Рейд', moderator: 'Admin', time: '17:00', rule: '№4' },
+    { id: 5, user: '👩‍🦱 Eve', action: '⚠️ Предупреждение', reason: 'Ссылки', moderator: 'Нова 🛡️', time: '18:10', rule: '№1' },
+    { id: 6, user: '👩 Alice', action: '🔇 Мут 30м', reason: 'Повторный спам', moderator: 'Нова 🛡️', time: '19:00', rule: '№1' },
+  ])
+
+  const filteredLog = auditLog.filter(entry => {
+    const matchType = logFilter === 'all' || 
+      (logFilter === 'warn' && entry.action.includes('Предупреждение')) ||
+      (logFilter === 'mute' && entry.action.includes('Мут')) ||
+      (logFilter === 'ban' && entry.action.includes('Бан'))
+    const matchSearch = entry.user.toLowerCase().includes(logSearch.toLowerCase()) ||
+      entry.reason.toLowerCase().includes(logSearch.toLowerCase())
+    return matchType && matchSearch
+  })
+
   const modAvatars = [
     { id: 'shield', icon: '🛡️', label: 'Щит', color: '#00E5FF' },
     { id: 'sword', icon: '⚔️', label: 'Меч', color: '#EF4444' },
@@ -102,7 +124,7 @@ export default function ModerationPage() {
       <main style={{ padding: '40px', maxWidth: '1100px', margin: '0 auto' }}>
         
         <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '6px' }}>🛡️ Модерация</h1>
-        <p style={{ color: '#94A3B8', fontSize: '15px', marginBottom: '24px' }}>Гибкая настройка защиты, AI-модератор и правила</p>
+        <p style={{ color: '#94A3B8', fontSize: '15px', marginBottom: '24px' }}>Гибкая настройка защиты, AI-модератор, правила и журнал</p>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -112,6 +134,7 @@ export default function ModerationPage() {
             { id: 'punish', label: '⚡ Наказания' },
             { id: 'rules', label: '📜 Правила' },
             { id: 'moderator', label: '👤 Модератор' },
+            { id: 'log', label: '📋 Журнал' },
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
               padding: '10px 18px', borderRadius: '10px', border: 'none',
@@ -272,7 +295,6 @@ export default function ModerationPage() {
                   style={{ width: '100%', padding: '12px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace', lineHeight: '1.6' }} />
               </div>
 
-              {/* Предпросмотр */}
               <div style={{ marginTop: '16px', background: '#111118', borderRadius: '12px', padding: '16px' }}>
                 <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '8px' }}>📝 Пример сообщения при нарушении:</div>
                 <div style={{ fontSize: '13px', color: '#94A3B8', fontStyle: 'italic', lineHeight: '1.6' }}>
@@ -288,7 +310,6 @@ export default function ModerationPage() {
         {/* Tab: Модератор */}
         {activeTab === 'moderator' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* Аватар и имя */}
             <div style={{ background: '#16161F', borderRadius: '18px', padding: '24px', border: '1px solid #1F2937' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>👤 Бот-модератор</h3>
               
@@ -358,6 +379,87 @@ export default function ModerationPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Журнал */}
+        {activeTab === 'log' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ background: '#16161F', borderRadius: '18px', padding: '24px', border: '1px solid #1F2937' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600' }}>📋 Журнал нарушений</h3>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <input type="text" value={sanitize(logSearch)} onChange={(e) => setLogSearch(e.target.value)}
+                    placeholder="🔍 Поиск..."
+                    style={{ padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '12px', outline: 'none', width: '160px' }} />
+                  {[
+                    { id: 'all', label: 'Все' },
+                    { id: 'warn', label: '⚠️ Варны' },
+                    { id: 'mute', label: '🔇 Муты' },
+                    { id: 'ban', label: '🔨 Баны' },
+                  ].map(f => (
+                    <button key={f.id} onClick={() => setLogFilter(f.id)} style={{
+                      padding: '6px 12px', borderRadius: '8px', border: '1px solid #1F2937',
+                      background: logFilter === f.id ? '#1F2937' : 'transparent',
+                      color: logFilter === f.id ? '#FFF' : '#94A3B8',
+                      cursor: 'pointer', fontSize: '11px', transition: 'all 0.15s'
+                    }}>{f.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
+                {[
+                  { label: 'Всего', value: auditLog.length, color: '#94A3B8' },
+                  { label: 'Варнов', value: auditLog.filter(e => e.action.includes('Предупреждение')).length, color: '#F59E0B' },
+                  { label: 'Мутов', value: auditLog.filter(e => e.action.includes('Мут')).length, color: '#F59E0B' },
+                  { label: 'Банов', value: auditLog.filter(e => e.action.includes('Бан')).length, color: '#EF4444' },
+                ].map((s, i) => (
+                  <div key={i} style={{ background: '#111118', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: '11px', color: '#64748B' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #1F2937' }}>
+                      {['Пользователь', 'Действие', 'Причина', 'Правило', 'Модератор', 'Время'].map((h, i) => (
+                        <th key={i} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLog.map(entry => (
+                      <tr key={entry.id} style={{ borderBottom: '1px solid #1F2937' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#1A1A24'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ padding: '10px 14px', fontWeight: '500' }}>{sanitize(entry.user)}</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '6px', fontSize: '11px',
+                            background: entry.action.includes('Бан') ? 'rgba(239,68,68,0.15)' : entry.action.includes('Мут') ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)',
+                            color: entry.action.includes('Бан') ? '#EF4444' : entry.action.includes('Мут') ? '#F59E0B' : '#3B82F6'
+                          }}>{sanitize(entry.action)}</span>
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#94A3B8' }}>{sanitize(entry.reason)}</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', background: '#0A0A0F', color: '#F59E0B' }}>{entry.rule}</span>
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#94A3B8' }}>{sanitize(entry.moderator)}</td>
+                        <td style={{ padding: '10px 14px', color: '#64748B', fontSize: '12px' }}>{entry.time}</td>
+                      </tr>
+                    ))}
+                    {filteredLog.length === 0 && (
+                      <tr><td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: '#64748B' }}>Записи не найдены</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
