@@ -31,6 +31,10 @@ export default function AIPage() {
     // Привязка к серверу
     serverName: '',
     platform: 'Lolka',
+    
+    // Аватар
+    avatarStyle: 'nova',
+    avatarUrl: '',
   })
 
   const [saved, setSaved] = useState(false)
