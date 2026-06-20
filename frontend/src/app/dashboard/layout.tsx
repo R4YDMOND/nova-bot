@@ -41,11 +41,11 @@ export default function DashboardLayout({
       {/* Сайдбар */}
       <aside
         style={{
-          width: collapsed ? 56 : 220,
-          minWidth: collapsed ? 56 : 220,
+          width: collapsed ? 56 : 250,
+          minWidth: collapsed ? 56 : 250,
           background: "#111118",
           borderRight: "1px solid #1F2937",
-          padding: collapsed ? "16px 8px" : "20px 14px",
+          padding: collapsed ? "16px 8px" : "22px 16px",
           display: "flex",
           flexDirection: "column",
           position: "sticky",
@@ -61,7 +61,7 @@ export default function DashboardLayout({
           style={{
             display: "flex",
             justifyContent: collapsed ? "center" : "flex-end",
-            marginBottom: 16,
+            marginBottom: 18,
           }}
         >
           <button
@@ -73,8 +73,8 @@ export default function DashboardLayout({
               color: "#94A3B8",
               borderRadius: 6,
               cursor: "pointer",
-              fontSize: 12,
-              padding: "3px 7px",
+              fontSize: 13,
+              padding: "4px 8px",
               transition: "transform 0.3s",
               transform: collapsed ? "rotate(180deg)" : "rotate(0deg)",
             }}
@@ -89,9 +89,9 @@ export default function DashboardLayout({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: collapsed ? 0 : 8,
+            gap: collapsed ? 0 : 10,
             textDecoration: "none",
-            marginBottom: 20,
+            marginBottom: 22,
             justifyContent: collapsed ? "center" : "flex-start",
             opacity: collapsed ? 0 : 1,
             transition: "opacity 0.2s",
@@ -101,9 +101,9 @@ export default function DashboardLayout({
         >
           <div
             style={{
-              width: 30,
-              height: 30,
-              minWidth: 30,
+              width: 34,
+              height: 34,
+              minWidth: 34,
               background: "#16161F",
               borderRadius: 8,
               display: "flex",
@@ -111,14 +111,14 @@ export default function DashboardLayout({
               justifyContent: "center",
               fontWeight: "bold",
               color: "#00E5FF",
-              fontSize: 15,
+              fontSize: 17,
             }}
           >
             N
           </div>
           <span
             style={{
-              fontSize: 17,
+              fontSize: 19,
               fontWeight: "bold",
               color: "#FFF",
               whiteSpace: "nowrap",
@@ -129,7 +129,7 @@ export default function DashboardLayout({
         </Link>
 
         {/* Навигация */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
           {NAV_ITEMS.map((item, i) => {
             const isActive = pathname === item.href;
             return (
@@ -138,12 +138,12 @@ export default function DashboardLayout({
                 onClick={() => navigate(item.href)}
                 title={collapsed ? item.label : undefined}
                 style={{
-                  padding: collapsed ? "8px 0" : "8px 10px",
-                  borderRadius: 6,
+                  padding: collapsed ? "11px 0" : "11px 14px",
+                  borderRadius: 8,
                   display: "flex",
                   alignItems: "center",
-                  gap: collapsed ? 0 : 8,
-                  fontSize: 13,
+                  gap: collapsed ? 0 : 12,
+                  fontSize: 14,
                   cursor: "pointer",
                   transition: "all 0.15s",
                   color: isActive ? "#FFF" : "#94A3B8",
@@ -153,7 +153,7 @@ export default function DashboardLayout({
                   whiteSpace: "nowrap",
                 }}
               >
-                <span style={{ fontSize: 14, width: 18, textAlign: "center" }}>
+                <span style={{ fontSize: 17, width: 22, textAlign: "center" }}>
                   {item.icon}
                 </span>
                 <span
