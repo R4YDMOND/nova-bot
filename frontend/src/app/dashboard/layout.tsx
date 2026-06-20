@@ -41,11 +41,11 @@ export default function DashboardLayout({
       {/* Сайдбар */}
       <aside
         style={{
-          width: collapsed ? "60px" : "230px",
-          minWidth: collapsed ? "60px" : "230px",
+          width: collapsed ? 56 : 220,
+          minWidth: collapsed ? 56 : 220,
           background: "#111118",
           borderRight: "1px solid #1F2937",
-          padding: collapsed ? "20px 10px" : "24px 16px",
+          padding: collapsed ? "16px 8px" : "20px 14px",
           display: "flex",
           flexDirection: "column",
           position: "sticky",
@@ -53,20 +53,28 @@ export default function DashboardLayout({
           height: "100vh",
           overflow: "hidden",
           transition: "all 0.3s ease",
+          zIndex: 10,
         }}
       >
         {/* Кнопка сворачивания */}
-        <div style={{ display: "flex", justifyContent: collapsed ? "center" : "flex-end", marginBottom: 20 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: collapsed ? "center" : "flex-end",
+            marginBottom: 16,
+          }}
+        >
           <button
             onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? "Развернуть меню" : "Свернуть меню"}
             style={{
               background: "transparent",
               border: "1px solid #1F2937",
               color: "#94A3B8",
               borderRadius: 6,
               cursor: "pointer",
-              fontSize: 14,
-              padding: "4px 8px",
+              fontSize: 12,
+              padding: "3px 7px",
               transition: "transform 0.3s",
               transform: collapsed ? "rotate(180deg)" : "rotate(0deg)",
             }}
@@ -81,20 +89,21 @@ export default function DashboardLayout({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: collapsed ? 0 : 10,
+            gap: collapsed ? 0 : 8,
             textDecoration: "none",
-            marginBottom: 24,
+            marginBottom: 20,
             justifyContent: collapsed ? "center" : "flex-start",
             opacity: collapsed ? 0 : 1,
             transition: "opacity 0.2s",
             pointerEvents: collapsed ? "none" : "auto",
+            overflow: "hidden",
           }}
         >
           <div
             style={{
-              width: 34,
-              height: 34,
-              minWidth: 34,
+              width: 30,
+              height: 30,
+              minWidth: 30,
               background: "#16161F",
               borderRadius: 8,
               display: "flex",
@@ -102,14 +111,14 @@ export default function DashboardLayout({
               justifyContent: "center",
               fontWeight: "bold",
               color: "#00E5FF",
-              fontSize: 17,
+              fontSize: 15,
             }}
           >
             N
           </div>
           <span
             style={{
-              fontSize: 19,
+              fontSize: 17,
               fontWeight: "bold",
               color: "#FFF",
               whiteSpace: "nowrap",
@@ -129,11 +138,11 @@ export default function DashboardLayout({
                 onClick={() => navigate(item.href)}
                 title={collapsed ? item.label : undefined}
                 style={{
-                  padding: collapsed ? "10px 0" : "9px 12px",
-                  borderRadius: 8,
+                  padding: collapsed ? "8px 0" : "8px 10px",
+                  borderRadius: 6,
                   display: "flex",
                   alignItems: "center",
-                  gap: collapsed ? 0 : 10,
+                  gap: collapsed ? 0 : 8,
                   fontSize: 13,
                   cursor: "pointer",
                   transition: "all 0.15s",
@@ -141,16 +150,16 @@ export default function DashboardLayout({
                   background: isActive ? "#1F2937" : "transparent",
                   fontWeight: isActive ? 500 : 400,
                   justifyContent: collapsed ? "center" : "flex-start",
+                  whiteSpace: "nowrap",
                 }}
               >
-                <span style={{ fontSize: 15, width: 20, textAlign: "center" }}>
+                <span style={{ fontSize: 14, width: 18, textAlign: "center" }}>
                   {item.icon}
                 </span>
                 <span
                   style={{
-                    whiteSpace: "nowrap",
                     opacity: collapsed ? 0 : 1,
-                    transition: "opacity 0.2s",
+                    transition: "opacity 0.15s",
                     display: collapsed ? "none" : "inline",
                   }}
                 >
@@ -163,7 +172,16 @@ export default function DashboardLayout({
       </aside>
 
       {/* Контент */}
-      <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
+      <main
+        style={{
+          flex: 1,
+          overflow: "auto",
+          minWidth: 0,
+          animation: "fadeIn 0.2s ease",
+        }}
+      >
+        {children}
+      </main>
     </div>
   );
 }
