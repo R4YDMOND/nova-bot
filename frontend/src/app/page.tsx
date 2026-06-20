@@ -21,10 +21,10 @@ export default function Home() {
       })
       .then((data) => {
         setStats({
-          servers: data.servers || 0,
-          users: data.users || 0,
-          responseTime: data.responseTime || 0.8,
-          webhooksOnline: data.webhooksOnline ?? true,
+          servers: data.servers ?? 0,
+          users: data.users ?? 0,
+          responseTime: data.responseTime ?? 0.8,
+          webhooksOnline: data.webhooksOnline ?? false,
         });
         setLoading(false);
       })
@@ -36,6 +36,7 @@ export default function Home() {
   }, []);
 
   const formatNumber = (num: number): string => {
+    if (num === 0) return "0";
     if (num >= 1000000) return (num / 1000000).toFixed(1) + "M+";
     if (num >= 1000) return (num / 1000).toFixed(0) + "K+";
     return num.toString() + "+";
