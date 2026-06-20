@@ -20,39 +20,41 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [timeframe, setTimeframe] = useState('7d')
 
+  // Динамическая статистика из API
+  const [stats, setStats] = useState({
+    totalMessages: 0, activeUsers: 0, commandsUsed: 0, voiceHours: 0,
+    onlineNow: 0, newUsers: 0, messagesChart: [0,0,0,0,0,0,0]
+  })
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [topCommands, setTopCommands] = useState<any[]>([])
+  const [dashLoading, setDashLoading] = useState(true)
+
   useEffect(() => {
+    // Загрузка серверов
     fetch(`${API_URL}/api/servers`)
       .then(res => res.json())
       .then(data => { setServers(data.servers || []); setLoading(false) })
       .catch(() => setLoading(false))
+
+    // Загрузка статистики дашборда
+    fetch(`${API_URL}/api/stats/dashboard`)
+      .then(res => res.json())
+      .then(data => {
+        setStats({
+          totalMessages: data.totalMessages || 0,
+          activeUsers: data.activeUsers || 0,
+          commandsUsed: data.commandsUsed || 0,
+          voiceHours: data.voiceHours || 0,
+          onlineNow: data.onlineNow || 0,
+          newUsers: data.newUsers || 0,
+          messagesChart: data.messagesChart || [0,0,0,0,0,0,0]
+        })
+        setRecentActivity(data.recentActivity || [])
+        setTopCommands(data.topCommands || [])
+        setDashLoading(false)
+      })
+      .catch(() => setDashLoading(false))
   }, [])
-
-  const stats = {
-    totalMessages: 125430,
-    activeUsers: 342,
-    commandsUsed: 8940,
-    voiceHours: 1560,
-    growth: 12.5,
-    messagesChart: [30, 45, 28, 60, 52, 70, 65],
-    onlineNow: 87,
-    newUsers: 24,
-  }
-
-  const recentActivity = [
-    { user: '👩 Alice', action: 'достигла 42 уровня 🏆', time: '2 мин назад', icon: '📊', color: '#22C55E' },
-    { user: '👨 Bob', action: 'использовал /play 🎵', time: '5 мин назад', icon: '🎵', color: '#3B82F6' },
-    { user: '🧑 Charlie', action: 'получил предупреждение ⚠️', time: '12 мин назад', icon: '⚠️', color: '#F59E0B' },
-    { user: '👩‍🦰 Diana', action: 'присоединилась к серверу 🎉', time: '28 мин назад', icon: '👋', color: '#A855F7' },
-    { user: '👩‍🦱 Eve', action: 'создала команду /meme ⚡', time: '45 мин назад', icon: '⚡', color: '#EC4899' },
-  ]
-
-  const topCommands = [
-    { name: '🏓 /ping', uses: 2340, color: '#00E5FF' },
-    { name: '🏆 /rank', uses: 1820, color: '#22C55E' },
-    { name: '❓ /help', uses: 1560, color: '#3B82F6' },
-    { name: '🤖 /ai', uses: 1200, color: '#A855F7' },
-    { name: '🎵 /play', uses: 890, color: '#F59E0B' },
-  ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
@@ -141,40 +143,52 @@ export default function Dashboard() {
               <h3 style={{ fontSize: '14px', fontWeight: '600' }}>📈 Сообщения</h3>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>За неделю</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '120px' }}>
-              {stats.messagesChart.map((val, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ fontSize: '10px', color: '#64748B', opacity: 0 }}>{val}</span>
-                  <div style={{
-                    width: '100%', background: 'linear-gradient(180deg, #00E5FF 0%, #7B5EFF 100%)',
-                    borderRadius: '4px 4px 0 0', height: `${val * 1.2}px`, maxHeight: '100px',
-                    transition: 'all 0.3s', opacity: 0.85, cursor: 'pointer'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.filter = 'brightness(1.2)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.filter = 'none'; }}
-                  />
-                  <span style={{ fontSize: '10px', color: '#64748B' }}>{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][i]}</span>
-                </div>
-              ))}
-            </div>
+            {stats.messagesChart.every(v => v === 0) ? (
+              <div style={{ height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '13px' }}>
+                📊 Нет данных о сообщениях
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '120px' }}>
+                {stats.messagesChart.map((val, i) => (
+                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', color: '#64748B', opacity: 0 }}>{val}</span>
+                    <div style={{
+                      width: '100%', background: 'linear-gradient(180deg, #00E5FF 0%, #7B5EFF 100%)',
+                      borderRadius: '4px 4px 0 0', height: `${Math.max(val * 1.2, 2)}px`, maxHeight: '100px',
+                      transition: 'all 0.3s', opacity: 0.85, cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.filter = 'brightness(1.2)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.filter = 'none'; }}
+                    />
+                    <span style={{ fontSize: '10px', color: '#64748B' }}>{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][i]}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
             <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🕐 Активность</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              {recentActivity.map((act, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0',
-                  borderBottom: i < recentActivity.length - 1 ? '1px solid #1A1A24' : 'none'
-                }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: act.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}>{act.icon}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontWeight: '500', fontSize: '13px' }}>{sanitize(act.user)}</span>
-                    <span style={{ color: '#94A3B8', fontSize: '12px' }}> {sanitize(act.action)}</span>
-                  </div>
-                  <span style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap' }}>{act.time}</span>
+              {recentActivity.length === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>
+                  🕐 Нет недавней активности
                 </div>
-              ))}
+              ) : (
+                recentActivity.map((act, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0',
+                    borderBottom: i < recentActivity.length - 1 ? '1px solid #1A1A24' : 'none'
+                  }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: (act.color || '#00E5FF') + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}>{act.icon || '📌'}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontWeight: '500', fontSize: '13px' }}>{sanitize(act.user)}</span>
+                      <span style={{ color: '#94A3B8', fontSize: '12px' }}> {sanitize(act.action)}</span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap' }}>{act.time}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -184,16 +198,22 @@ export default function Dashboard() {
           <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
             <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🔥 Популярные команды</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {topCommands.map((cmd, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0' }}>
-                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: cmd.color }} />
-                  <code style={{ fontSize: '12px', fontFamily: 'monospace', color: '#FFF', minWidth: '60px' }}>{sanitize(cmd.name)}</code>
-                  <div style={{ flex: 1, height: '4px', background: '#1A1A24', borderRadius: '2px' }}>
-                    <div style={{ width: `${(cmd.uses / 2340) * 100}%`, height: '100%', background: cmd.color, borderRadius: '2px' }} />
-                  </div>
-                  <span style={{ fontSize: '11px', color: '#94A3B8', minWidth: '40px', textAlign: 'right' }}>{cmd.uses}</span>
+              {topCommands.length === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>
+                  ⚡ Нет данных о командах
                 </div>
-              ))}
+              ) : (
+                topCommands.map((cmd, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0' }}>
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: cmd.color || '#00E5FF' }} />
+                    <code style={{ fontSize: '12px', fontFamily: 'monospace', color: '#FFF', minWidth: '60px' }}>{sanitize(cmd.name)}</code>
+                    <div style={{ flex: 1, height: '4px', background: '#1A1A24', borderRadius: '2px' }}>
+                      <div style={{ width: `${Math.min(100, ((cmd.uses || 0) / Math.max(...topCommands.map(c => c.uses || 1))) * 100)}%`, height: '100%', background: cmd.color || '#00E5FF', borderRadius: '2px' }} />
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#94A3B8', minWidth: '40px', textAlign: 'right' }}>{cmd.uses || 0}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
