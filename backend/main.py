@@ -884,6 +884,133 @@ def send_report(data: dict):
         db.close()
 
 
+# ==================== События (Events) ====================
+
+EVENT_TEMPLATES = {
+    "raid": {"name": "⚔️ Рейд", "icon": "⚔️", "duration_hours": 2, "max_players": 20, "color": "#EF4444"},
+    "farm": {"name": "🎯 Фарм", "icon": "🎯", "duration_hours": 1, "max_players": 10, "color": "#F59E0B"},
+    "meeting": {"name": "🤝 Встреча", "icon": "🤝", "duration_hours": 1, "max_players": 0, "color": "#3B82F6"},
+    "event": {"name": "🎉 Ивент", "icon": "🎉", "duration_hours": 3, "max_players": 0, "color": "#A855F7"},
+    "tournament": {"name": "🏆 Турнир", "icon": "🏆", "duration_hours": 4, "max_players": 32, "color": "#F59E0B"},
+    "custom": {"name": "📝 Своё", "icon": "📝", "duration_hours": 1, "max_players": 0, "color": "#00E5FF"},
+}
+
+
+@app.get("/api/events")
+def get_events(server_id: str = Query("default")):
+    """Список событий"""
+    db = SessionLocal()
+    try:
+        events = db.query(Event).filter(
+            Event.server_id == server_id,
+            Event.event_date >= datetime.utcnow()
+        ).order_by(Event.event_date.asc()).all()
+        
+        return {
+            "events": [
+                {
+                    "id": e.id,
+                    "title": e.title,
+                    "description": e.description,
+                    "event_date": e.event_date.isoformat(),
+                    "template": e.template,
+                    "channel": e.channel,
+                    "max_participants": e.max_participants,
+                    "created_by": e.created_by,
+                    "participants": 0,
+                }
+                for e in events
+            ],
+            "templates": [
+                {"value": k, "name": v["name"], "icon": v["icon"], "max_players": v["max_players"], "duration_hours": v["duration_hours"]}
+                for k, v in EVENT_TEMPLATES.items()
+            ]
+        }
+    finally:
+        db.close()
+
+
+@app.post("/api/events")
+def create_event(data: dict):
+    """Создать событие"""
+    db = SessionLocal()
+    try:
+        event = Event(
+            server_id=data.get("server_id", "default"),
+            title=data["title"],
+            description=data.get("description", ""),
+            event_date=datetime.fromisoformat(data["event_date"].replace("Z", "+00:00")),
+            template=data.get("template", "custom"),
+            channel=data.get("channel", ""),
+            webhook_url=data.get("webhook_url", ""),
+            max_participants=data.get("max_participants", 0),
+            created_by=data.get("created_by", "Admin"),
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        return {"status": "created", "id": event.id}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.delete("/api/events/{event_id}")
+def delete_event(event_id: int):
+    """Удалить событие"""
+    db = SessionLocal()
+    try:
+        db.query(Event).filter(Event.id == event_id).delete()
+        db.commit()
+        return {"status": "deleted"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/events/{event_id}/notify")
+def notify_event(event_id: int, data: dict):
+    """Отправить уведомление о событии в канал"""
+    db = SessionLocal()
+    try:
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            return {"error": "Event not found"}
+        
+        webhook_url = data.get("webhook_url", event.webhook_url)
+        if not webhook_url:
+            return {"error": "webhook_url required"}
+        
+        template = EVENT_TEMPLATES.get(event.template, EVENT_TEMPLATES["custom"])
+        date_str = event.event_date.strftime("%d.%m.%Y в %H:%M")
+        
+        message = f"""**{template['icon']} {event.title}**
+
+📅 **Дата:** {date_str}
+⏱️ **Длительность:** {template['duration_hours']} ч
+{f"👥 **Мест:** {event.max_participants}" if event.max_participants > 0 else "👥 **Безлимит**"}
+📋 **Канал:** {event.channel or 'Не указан'}
+
+{event.description}
+
+⚡ **Организатор:** {event.created_by}"""
+        
+        resp = requests.post(webhook_url, json={
+            "content": message,
+            "username": "Нова 🗓️"
+        }, timeout=10)
+        
+        return {"status": "ok", "sent": resp.ok}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
 # ==================== Статистика ====================
 
 @app.get("/api/stats")
