@@ -1,4 +1,4 @@
-"use client" 
+"use client"
 
 import { useState, useEffect } from 'react'
 
@@ -122,6 +122,11 @@ export default function RankingPage() {
 
   const firstMember = members[0] || {}
 
+  const shareCard = function() {
+    var text = '🏆 ' + (sanitize(cardNickname).length>25?sanitize(cardNickname).slice(0,25)+'...':sanitize(cardNickname)) + '\n📊 Уровень: ' + (firstMember.level||42) + '\n⭐ XP: ' + ((firstMember.xp||15420).toLocaleString()) + '\n💬 Сообщений: ' + ((firstMember.messages||2400).toLocaleString()) + '\n🎤 Голос: ' + (firstMember.voiceHours||120) + 'ч\n🚀 Создано в Nova Bot'
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(function() { alert('✅ Текст карточки скопирован!') }) } else { alert(text) }
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', color: '#F1F5F9' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 40px', background: '#111118', borderBottom: '1px solid #1F2937', position: 'sticky', top: 0, zIndex: 50 }}>
@@ -179,7 +184,7 @@ export default function RankingPage() {
                   </div>
                   {cardShowAchievements&&(<div style={{ display: 'flex', gap: '6px', marginTop: '14px' }}>{['🏅','⭐','💎','🔥','👑'].map((a,i)=><div key={i} style={{ width: '28px', height: '28px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>{a}</div>)}</div>)}
                   <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}><div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '6px 10px', textAlign: 'center' }}><div style={{ fontSize: '10px', color: '#94A3B8' }}>💬 Сообщений</div><div style={{ fontSize: '14px', fontWeight: 'bold', color: cardAccentColor }}>{(firstMember.messages||2400).toLocaleString()}</div></div><div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '6px 10px', textAlign: 'center' }}><div style={{ fontSize: '10px', color: '#94A3B8' }}>🎤 Голос</div><div style={{ fontSize: '14px', fontWeight: 'bold', color: cardAccentColor }}>{firstMember.voiceHours||120}ч</div></div><div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '6px 10px', textAlign: 'center' }}><div style={{ fontSize: '10px', color: '#94A3B8' }}>⭐ Реакций</div><div style={{ fontSize: '14px', fontWeight: 'bold', color: cardAccentColor }}>{(firstMember.reactions||856).toLocaleString()}</div></div></div>
-                  {cardShowShare&&(<div style={{ marginTop: '12px', textAlign: 'center' }}><button style={{ padding: '6px 16px', background: cardAccentColor, color: '#000', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>🔗 Поделиться карточкой</button></div>)}
+                  {cardShowShare&&(<div style={{ marginTop: '12px', textAlign: 'center' }}><button onClick={shareCard} style={{ padding: '6px 16px', background: cardAccentColor, color: '#000', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>🔗 Поделиться карточкой</button></div>)}
                 </div>
               </div>
             </div>
