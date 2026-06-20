@@ -459,5 +459,3 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: "600",
   },
 };
-
-export default MusicPage;
