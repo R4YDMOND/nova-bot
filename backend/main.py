@@ -641,4 +641,4 @@ def get_ranking_members():
             {"name": "⭐ StarUser", "level": 27, "xp": 7650, "rank": 3, "avatar": "⭐", "messages": 1200, "voiceHours": 60, "reactions": 340}
         ],
         "total": 3
-    }" внеси изменения в код
+    }"
