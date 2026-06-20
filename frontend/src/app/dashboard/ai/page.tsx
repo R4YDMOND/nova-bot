@@ -1,11 +1,21 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+
+// Защита от краша, эмодзи и спецсимволов
+const sanitize = (text: string): string => {
+  if (!text) return ''
+  return text
+    .replace(/[\u0000-\u001F]/g, '')
+    .replace(/[\u200B-\u200D]/g, '')
+    .replace(/[\uFEFF]/g, '')
+    .trim()
+}
 
 export default function AIPage() {
   const [settings, setSettings] = useState({
     // Основные
-    botName: 'Нова',
+    botName: 'Нова ✨',
     language: 'ru',
     activeModel: 'auto',
     
@@ -24,8 +34,8 @@ export default function AIPage() {
     // Общие
     useContext: true,
     contextMessages: 10,
-    systemPrompt: 'Ты — дружелюбный AI-помощник. Отвечай на русском языке.',
-    forbiddenTopics: 'политика, религия, NSFW',
+    systemPrompt: 'Ты — дружелюбный AI-помощник. Отвечай на русском языке. 🤖',
+    forbiddenTopics: 'политика, религия, NSFW 🚫',
     autoModeration: false,
     
     // Привязка к серверу
@@ -74,7 +84,7 @@ export default function AIPage() {
           <span style={{ color: '#374151' }}>|</span>
           <a href="/dashboard/modules" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}>← Модули</a>
           <span style={{ color: '#374151' }}>/</span>
-          <span style={{ color: '#00E5FF', fontSize: '14px', fontWeight: '500' }}>AI-Настройки</span>
+          <span style={{ color: '#00E5FF', fontSize: '14px', fontWeight: '500' }}>✨ AI-Настройки</span>
         </div>
         <button onClick={save} style={{
           padding: '10px 22px', background: saved ? '#22C55E' : '#00E5FF', color: '#000',
@@ -86,7 +96,7 @@ export default function AIPage() {
       <main style={{ padding: '32px 40px', maxWidth: '1000px', margin: '0 auto' }}>
         
         <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '4px' }}>✨ AI-Настройки</h1>
-        <p style={{ color: '#94A3B8', fontSize: '13px', marginBottom: '24px' }}>Гибкая настройка моделей и стилей общения</p>
+        <p style={{ color: '#94A3B8', fontSize: '13px', marginBottom: '24px' }}>Гибкая настройка моделей и стилей общения 🤖</p>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '4px', marginBottom: '24px' }}>
@@ -102,7 +112,7 @@ export default function AIPage() {
               color: activeTab === tab.id ? '#FFF' : '#94A3B8',
               fontWeight: activeTab === tab.id ? '600' : '400',
               cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s'
-            }}>{tab.label}</button>
+            }}>{sanitize(tab.label)}</button>
           ))}
         </div>
 
@@ -125,8 +135,8 @@ export default function AIPage() {
                     border: `2px solid ${settings.activeModel === m.value ? '#00E5FF' : '#1F2937'}`,
                     transition: 'all 0.2s'
                   }}>
-                    <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>{m.label}</div>
-                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>{m.desc}</div>
+                    <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>{sanitize(m.label)}</div>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>{sanitize(m.desc)}</div>
                   </div>
                 ))}
               </div>
@@ -135,12 +145,12 @@ export default function AIPage() {
             {/* Имя и язык */}
             <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Имя бота</label>
-                <input type="text" value={settings.botName} onChange={(e) => update('botName', e.target.value)}
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>🤖 Имя бота</label>
+                <input type="text" value={sanitize(settings.botName)} onChange={(e) => update('botName', e.target.value)}
                   style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Язык</label>
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>🌐 Язык</label>
                 <select value={settings.language} onChange={(e) => update('language', e.target.value)}
                   style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', cursor: 'pointer' }}>
                   <option value="ru">🇷🇺 Русский</option>
@@ -152,7 +162,7 @@ export default function AIPage() {
             {/* Системный промпт */}
             <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '8px' }}>📝 Системный промпт</h3>
-              <textarea value={settings.systemPrompt} onChange={(e) => update('systemPrompt', e.target.value)} rows={3}
+              <textarea value={sanitize(settings.systemPrompt)} onChange={(e) => update('systemPrompt', e.target.value)} rows={3}
                 style={{ width: '100%', padding: '12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }} />
             </div>
 
@@ -160,13 +170,13 @@ export default function AIPage() {
             <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '14px' }}>⚙️ Дополнительно</h3>
               {[
-                { key: 'useContext', label: 'Запоминать контекст', desc: 'Помнить последние сообщения' },
-                { key: 'autoModeration', label: 'Автомодерация AI', desc: 'Фильтровать ответы бота' },
+                { key: 'useContext', label: '🧠 Запоминать контекст', desc: 'Помнить последние сообщения' },
+                { key: 'autoModeration', label: '🛡️ Автомодерация AI', desc: 'Фильтровать ответы бота' },
               ].map((item, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i === 0 ? '1px solid #1F2937' : 'none' }}>
                   <div>
-                    <div style={{ fontSize: '14px', fontWeight: '500' }}>{item.label}</div>
-                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>{item.desc}</div>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>{sanitize(item.label)}</div>
+                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>{sanitize(item.desc)}</div>
                   </div>
                   <div onClick={() => toggle(item.key)} style={{ width: '44px', height: '26px', background: settings[item.key as keyof typeof settings] ? '#00E5FF' : '#374151', borderRadius: '26px', cursor: 'pointer', position: 'relative' }}>
                     <div style={{ position: 'absolute', height: '20px', width: '20px', left: settings[item.key as keyof typeof settings] ? '22px' : '4px', top: '3px', background: settings[item.key as keyof typeof settings] ? '#000' : '#FFF', borderRadius: '50%', transition: '0.25s' }} />
@@ -175,7 +185,7 @@ export default function AIPage() {
               ))}
               {settings.useContext && (
                 <div style={{ marginTop: '12px' }}>
-                  <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Сообщений для контекста</label>
+                  <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>💬 Сообщений для контекста</label>
                   <input type="number" value={settings.contextMessages} onChange={(e) => update('contextMessages', parseInt(e.target.value) || 10)}
                     style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
@@ -200,7 +210,7 @@ export default function AIPage() {
                 <>
                   <div style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '13px', color: '#94A3B8' }}>Температура</span>
+                      <span style={{ fontSize: '13px', color: '#94A3B8' }}>🌡️ Температура</span>
                       <span style={{ color: '#3B82F6', fontWeight: '600' }}>{settings.geminiTemperature}</span>
                     </div>
                     <input type="range" min="0" max="1" step="0.1" value={settings.geminiTemperature}
@@ -217,16 +227,16 @@ export default function AIPage() {
                         border: `2px solid ${settings.geminiStyle === style.value ? '#3B82F6' : '#1F2937'}`,
                         transition: 'all 0.2s'
                       }}>
-                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{style.label}</div>
-                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>{style.desc}</div>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{sanitize(style.label)}</div>
+                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>{sanitize(style.desc)}</div>
                       </div>
                     ))}
                   </div>
 
                   <div style={{ marginTop: '16px' }}>
-                    <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Кастомный промпт для Gemini</label>
-                    <textarea value={settings.geminiCustomPrompt} onChange={(e) => update('geminiCustomPrompt', e.target.value)} rows={2}
-                      placeholder="Дополнительные инструкции для Gemini..."
+                    <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>📝 Кастомный промпт для Gemini</label>
+                    <textarea value={sanitize(settings.geminiCustomPrompt)} onChange={(e) => update('geminiCustomPrompt', e.target.value)} rows={2}
+                      placeholder="Дополнительные инструкции..."
                       style={{ width: '100%', padding: '10px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }} />
                   </div>
                 </>
@@ -251,7 +261,7 @@ export default function AIPage() {
                 <>
                   <div style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '13px', color: '#94A3B8' }}>Температура</span>
+                      <span style={{ fontSize: '13px', color: '#94A3B8' }}>🌡️ Температура</span>
                       <span style={{ color: '#A855F7', fontWeight: '600' }}>{settings.deepseekTemperature}</span>
                     </div>
                     <input type="range" min="0" max="1" step="0.1" value={settings.deepseekTemperature}
@@ -268,16 +278,16 @@ export default function AIPage() {
                         border: `2px solid ${settings.deepseekStyle === style.value ? '#A855F7' : '#1F2937'}`,
                         transition: 'all 0.2s'
                       }}>
-                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{style.label}</div>
-                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>{style.desc}</div>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{sanitize(style.label)}</div>
+                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>{sanitize(style.desc)}</div>
                       </div>
                     ))}
                   </div>
 
                   <div style={{ marginTop: '16px' }}>
-                    <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Кастомный промпт для DeepSeek</label>
-                    <textarea value={settings.deepseekCustomPrompt} onChange={(e) => update('deepseekCustomPrompt', e.target.value)} rows={2}
-                      placeholder="Дополнительные инструкции для DeepSeek..."
+                    <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>📝 Кастомный промпт для DeepSeek</label>
+                    <textarea value={sanitize(settings.deepseekCustomPrompt)} onChange={(e) => update('deepseekCustomPrompt', e.target.value)} rows={2}
+                      placeholder="Дополнительные инструкции..."
                       style={{ width: '100%', padding: '10px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }} />
                   </div>
                 </>
@@ -290,7 +300,6 @@ export default function AIPage() {
         {activeTab === 'server' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             
-            {/* Платформа и название */}
             <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>🖥️ Привязка к серверу</h3>
               
@@ -305,7 +314,7 @@ export default function AIPage() {
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Название сервера/группы</label>
-                  <input type="text" value={settings.serverName} onChange={(e) => update('serverName', e.target.value)}
+                  <input type="text" value={sanitize(settings.serverName)} onChange={(e) => update('serverName', e.target.value)}
                     placeholder="Phoenix Gaming"
                     style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
@@ -321,11 +330,11 @@ export default function AIPage() {
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
                 {[
-                  { id: 'nova', icon: 'N', label: 'Нова', color: '#00E5FF', bg: '#0A0A0F' },
+                  { id: 'nova', icon: 'N', label: 'Нова ✨', color: '#00E5FF', bg: '#0A0A0F' },
                   { id: 'star', icon: '⭐', label: 'Звезда', color: '#F59E0B', bg: '#0A0A0F' },
                   { id: 'robot', icon: '🤖', label: 'Робот', color: '#3B82F6', bg: '#0A0A0F' },
                   { id: 'cat', icon: '🐱', label: 'Кот', color: '#EC4899', bg: '#0A0A0F' },
-                  { id: 'fox', icon: '🦊', label: 'Лис', color: '#F97316', bg: '#0A0A0F' },
+                  { id: 'fox', icon: '🦊', label: 'Лис 🦊', color: '#F97316', bg: '#0A0A0F' },
                   { id: 'dragon', icon: '🐉', label: 'Дракон', color: '#EF4444', bg: '#0A0A0F' },
                   { id: 'crystal', icon: '💎', label: 'Кристалл', color: '#A855F7', bg: '#0A0A0F' },
                   { id: 'fire', icon: '🔥', label: 'Огонь', color: '#F59E0B', bg: '#0A0A0F' },
@@ -342,7 +351,7 @@ export default function AIPage() {
                       justifyContent: 'center', fontSize: '26px', margin: '0 auto 8px',
                       border: `2px solid ${avatar.color}40`
                     }}>{avatar.icon}</div>
-                    <div style={{ fontSize: '11px', fontWeight: '500' }}>{avatar.label}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '500' }}>{sanitize(avatar.label)}</div>
                   </div>
                 ))}
               </div>
@@ -351,7 +360,7 @@ export default function AIPage() {
                 <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>
                   Или укажите свой URL аватара
                 </label>
-                <input type="text" value={settings.avatarUrl} onChange={(e) => update('avatarUrl', e.target.value)}
+                <input type="text" value={sanitize(settings.avatarUrl)} onChange={(e) => update('avatarUrl', e.target.value)}
                   placeholder="https://example.com/avatar.png"
                   style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
@@ -378,16 +387,16 @@ export default function AIPage() {
                      settings.avatarStyle === 'fire' ? '🔥' : 'N'}
                   </div>
                   <div>
-                    <div style={{ fontWeight: '600', fontSize: '13px' }}>{settings.botName}</div>
+                    <div style={{ fontWeight: '600', fontSize: '13px' }}>{sanitize(settings.botName)}</div>
                     <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-                      {settings.platform === 'VK' ? 'ВКонтакте' : 'Lolka'} • {settings.serverName || 'Сервер'}
+                      {settings.platform === 'VK' ? 'ВКонтакте' : 'Lolka'} • {sanitize(settings.serverName) || 'Сервер'}
                     </div>
                   </div>
                 </div>
                 <div style={{ fontSize: '13px', color: '#94A3B8', fontStyle: 'italic', padding: '8px 12px', background: '#0A0A0F', borderRadius: '8px' }}>
                   {settings.platform === 'VK' 
-                    ? `«Привет, подписчики ${settings.serverName || 'нашего паблика'}! ${settings.botName} на связи!»`
-                    : `«Всем привет с сервера ${settings.serverName || 'Lolka'}! Я ${settings.botName}, ваш помощник!»`
+                    ? `«Привет, подписчики ${sanitize(settings.serverName) || 'нашего паблика'}! ${sanitize(settings.botName)} на связи!»`
+                    : `«Всем привет с сервера ${sanitize(settings.serverName) || 'Lolka'}! Я ${sanitize(settings.botName)}, ваш помощник!»`
                   }
                 </div>
               </div>
