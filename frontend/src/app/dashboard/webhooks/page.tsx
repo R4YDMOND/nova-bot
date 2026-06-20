@@ -31,6 +31,8 @@ export default function WebhooksPage() {
   const [showAdd, setShowAdd] = useState(false)
   const [showBroadcast, setShowBroadcast] = useState(false)
   const [showForward, setShowForward] = useState(false)
+  const [showLogs, setShowLogs] = useState(false)
+  const [showAutoForward, setShowAutoForward] = useState(false)
   const [editingRules, setEditingRules] = useState<string | null>(null)
   const [editingScan, setEditingScan] = useState<string | null>(null)
   const [editingChannel, setEditingChannel] = useState<string | null>(null)
@@ -46,6 +48,9 @@ export default function WebhooksPage() {
   const [forwardType, setForwardType] = useState('posts')
   const [forwardComment, setForwardComment] = useState('')
   const [forwardResult, setForwardResult] = useState('')
+  const [logs, setLogs] = useState<any[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [autoForward, setAutoForward] = useState({ enabled: false, from_lolka_to_vk: true, from_vk_to_lolka: true })
 
   const save = function() { setSaved(true); setTimeout(function() { setSaved(false) }, 2000) }
   const toggle = function(id: string) { setWebhooks(webhooks.map(function(w) { return w.id === id ? { ...w, active: !w.active } : w })) }
@@ -72,6 +77,13 @@ export default function WebhooksPage() {
   }
 
   const scanAll = function() { webhooks.filter(function(w) { return w.active }).forEach(function(wh, i) { setTimeout(function() { scanWebhook(wh) }, i * 500) }) }
+
+  const loadLogs = async function() {
+    setLogsLoading(true);
+    var data = await apiCall(API_BASE + '/api/webhooks/logs?limit=50');
+    setLogs(data.logs || []);
+    setLogsLoading(false);
+  }
 
   const sendBroadcast = async function() {
     if (!broadcastMsg.trim()) return; setSending(true)
@@ -102,6 +114,8 @@ export default function WebhooksPage() {
       <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}><div><h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>🔗 Вебхуки</h1><p style={{ color: '#94A3B8', fontSize: '13px' }}>Автоопределение, каналы, автосканирование, пересылка</p></div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button onClick={function() { setShowLogs(!showLogs); if (!showLogs) loadLogs() }} style={{ padding: '10px 16px', background: showLogs ? '#1F2937' : '#F59E0B', color: showLogs ? '#FFF' : '#000', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showLogs ? '✕' : '📋 Логи'}</button>
+            <button onClick={function() { setShowAutoForward(!showAutoForward) }} style={{ padding: '10px 16px', background: showAutoForward ? '#1F2937' : '#10B981', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showAutoForward ? '✕' : '🔄 Авто-форвард'}</button>
             <button onClick={scanAll} disabled={scanning} style={{ padding: '10px 16px', background: scanning ? '#374151' : '#10B981', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: scanning ? 'wait' : 'pointer' }}>{scanning ? '⏳' : '🔍 Сканировать всё'}</button>
             <button onClick={function() { setShowForward(!showForward) }} style={{ padding: '10px 16px', background: showForward ? '#1F2937' : '#EC4899', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showForward ? '✕' : '↗'}</button>
             <button onClick={function() { setShowBroadcast(!showBroadcast) }} style={{ padding: '10px 16px', background: showBroadcast ? '#1F2937' : '#A855F7', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showBroadcast ? '✕' : '📢'}</button>
@@ -110,6 +124,50 @@ export default function WebhooksPage() {
           </div>
         </div>
         {scanResult && <div style={{ background: '#10B98120', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', border: '1px solid #10B98140' }}><span style={{ fontSize: '13px', color: '#10B981' }}>{scanResult}</span></div>}
+
+        {/* Логи */}
+        {showLogs && (
+          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', marginBottom: '16px', border: '1px solid #F59E0B20' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>📋 Логи отправленных сообщений</h3>
+            {logsLoading ? <p style={{ color: '#94A3B8', fontSize: '13px' }}>⏳ Загрузка...</p> :
+              logs.length === 0 ? <p style={{ color: '#64748B', fontSize: '13px' }}>Логов пока нет</p> :
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflow: 'auto' }}>
+                {logs.map(function(log: any, i: number) {
+                  return (
+                    <div key={i} style={{ display: 'flex', gap: '10px', padding: '8px 12px', background: '#111118', borderRadius: '8px', fontSize: '12px', alignItems: 'center' }}>
+                      <span style={{ color: '#00E5FF', whiteSpace: 'nowrap' }}>{new Date(log.timestamp).toLocaleString('ru-RU')}</span>
+                      <span style={{ color: log.platform === 'lolka' ? '#5865F2' : '#0077FF' }}>{log.platform.toUpperCase()}</span>
+                      <span style={{ color: '#94A3B8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.message}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            }
+          </div>
+        )}
+
+        {/* Авто-форвард */}
+        {showAutoForward && (
+          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', marginBottom: '16px', border: '1px solid #10B98120' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>🔄 Авто-форвард между платформами</h3>
+            <p style={{ color: '#94A3B8', fontSize: '12px', marginBottom: '16px' }}>Сообщения автоматически пересылаются между VK и Lolka</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px' }}>Включить авто-форвард</span>
+                <div onClick={function() { setAutoForward({ ...autoForward, enabled: !autoForward.enabled }) }} style={{ width: '44px', height: '26px', background: autoForward.enabled ? '#10B981' : '#374151', borderRadius: '26px', cursor: 'pointer', position: 'relative' }}><div style={{ position: 'absolute', height: '20px', width: '20px', left: autoForward.enabled ? '22px' : '4px', top: '3px', background: '#FFF', borderRadius: '50%', transition: '0.25s' }} /></div>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                <input type="checkbox" checked={autoForward.from_lolka_to_vk} onChange={function(e) { setAutoForward({ ...autoForward, from_lolka_to_vk: e.target.checked }) }} style={{ accentColor: '#5865F2' }} />
+                🎮 Lolka → 💙 VK
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                <input type="checkbox" checked={autoForward.from_vk_to_lolka} onChange={function(e) { setAutoForward({ ...autoForward, from_vk_to_lolka: e.target.checked }) }} style={{ accentColor: '#0077FF' }} />
+                💙 VK → 🎮 Lolka
+              </label>
+              <button onClick={save} style={{ padding: '10px 20px', background: '#10B981', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '14px', marginTop: '6px' }}>💾 Сохранить</button>
+            </div>
+          </div>
+        )}
 
         {showForward && (
           <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', marginBottom: '16px', border: '1px solid #EC489920' }}><h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>↗ Переслать контент</h3><div style={{ display: 'flex', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}><input type="text" value={forwardUrl} onChange={function(e) { setForwardUrl(e.target.value) }} placeholder="https://ссылка..." style={{ flex: 1, minWidth: '250px', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none' }} /><select value={forwardType} onChange={function(e) { setForwardType(e.target.value) }} style={{ padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px' }}><option value="posts">📝 Пост</option><option value="videos">🎬 Видео</option><option value="articles">📄 Статья</option><option value="music">🎵 Музыка</option><option value="other">📎 Другое</option></select></div><div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}><input type="text" value={forwardComment} onChange={function(e) { setForwardComment(e.target.value) }} placeholder="💬 Комментарий" style={{ flex: 1, padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none' }} /><button onClick={forwardContent} disabled={sending || !forwardUrl.trim()} style={{ padding: '10px 20px', background: sending ? '#374151' : '#EC4899', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: sending ? 'wait' : 'pointer', fontSize: '13px' }}>{sending ? '⏳' : '🚀'}</button></div>{forwardResult && <div style={{ marginTop: '8px', fontSize: '13px', color: forwardResult.includes('✅') ? '#22C55E' : '#EF4444' }}>{forwardResult}</div>}</div>
