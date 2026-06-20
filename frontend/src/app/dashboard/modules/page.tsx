@@ -4,14 +4,24 @@ import { useState, useEffect } from 'react'
 
 const navigate = (url: string) => window.location.href = url
 
+// Защита от краша, эмодзи и спецсимволов
+const sanitize = (text: string): string => {
+  if (!text) return ''
+  return text
+    .replace(/[\u0000-\u001F]/g, '')
+    .replace(/[\u200B-\u200D]/g, '')
+    .replace(/[\uFEFF]/g, '')
+    .trim()
+}
+
 export default function ModulesPage() {
   const [modules, setModules] = useState([
-    { id: 'moderation', name: 'Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов', enabled: true, link: '/dashboard/moderation' },
-    { id: 'levels', name: 'Система уровней', icon: '📊', desc: 'Опыт за активность, награды, лидерборд', enabled: true, link: '/dashboard/ranking' },
-    { id: 'ai', name: 'AI-помощник', icon: '🤖', desc: 'Умные ответы, генерация контента', enabled: false, link: '/dashboard/ai' },
-    { id: 'music', name: 'Музыка', icon: '🎵', desc: 'Воспроизведение треков', enabled: false, link: '/dashboard/music' },
-    { id: 'commands', name: 'Команды', icon: '⚡', desc: 'Кастомные команды и автопостинг', enabled: true, link: '/dashboard/commands' },
-    { id: 'analytics', name: 'Аналитика', icon: '📈', desc: 'Статистика, отчёты, графики', enabled: false, link: '/dashboard/analytics' },
+    { id: 'moderation', name: '🛡️ Модерация', icon: '🛡️', desc: 'Антиспам, антимат, защита от рейдов 🚫', enabled: true, link: '/dashboard/moderation' },
+    { id: 'levels', name: '📊 Система уровней', icon: '📊', desc: 'Опыт за активность, награды, лидерборд 🏆', enabled: true, link: '/dashboard/ranking' },
+    { id: 'ai', name: '🤖 AI-помощник', icon: '🤖', desc: 'Умные ответы, генерация контента ✨', enabled: false, link: '/dashboard/ai' },
+    { id: 'music', name: '🎵 Музыка', icon: '🎵', desc: 'Воспроизведение треков в голосовых 🎧', enabled: false, link: '/dashboard/music' },
+    { id: 'commands', name: '⚡ Команды', icon: '⚡', desc: 'Кастомные команды и автопостинг 📢', enabled: true, link: '/dashboard/commands' },
+    { id: 'analytics', name: '📈 Аналитика', icon: '📈', desc: 'Статистика, отчёты, графики 📊', enabled: false, link: '/dashboard/analytics' },
   ])
 
   const [saved, setSaved] = useState(false)
@@ -33,7 +43,6 @@ export default function ModulesPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
       
-      {/* Sidebar */}
       <aside style={{ width: '240px', minWidth: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '32px' }}>
           <div style={{ width: '34px', height: '34px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '17px' }}>N</div>
@@ -56,17 +65,15 @@ export default function ModulesPage() {
                 transition: 'all 0.15s'
               }}>
                 <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{item.icon}</span>
-                {item.label}
+                {sanitize(item.label)}
               </span>
             )
           })}
         </nav>
       </aside>
 
-      {/* Main */}
       <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
         
-        {/* Header + Save button */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>Модули</h1>
@@ -81,7 +88,6 @@ export default function ModulesPage() {
           </button>
         </div>
 
-        {/* Modules Grid — 2 columns */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           {modules.map((mod, i) => (
             <div key={mod.id} style={{
@@ -95,7 +101,6 @@ export default function ModulesPage() {
             onMouseEnter={(e) => { e.currentTarget.style.background = '#1A1A26'; e.currentTarget.style.borderColor = '#1F2937'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = '#16161F'; e.currentTarget.style.borderColor = 'transparent'; }}
             >
-              {/* Icon */}
               <div style={{
                 width: '40px', height: '40px', minWidth: '40px',
                 background: mod.enabled ? 'rgba(0,229,255,0.08)' : '#111118',
@@ -105,10 +110,9 @@ export default function ModulesPage() {
                 {mod.icon}
               </div>
 
-              {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '2px' }}>
-                  {mod.name}
+                  {sanitize(mod.name)}
                   {mod.link && (
                     <span onClick={(e) => { e.stopPropagation(); navigate(mod.link!) }} style={{
                       color: '#00E5FF', fontSize: '11px', marginLeft: '4px', cursor: 'pointer',
@@ -119,10 +123,9 @@ export default function ModulesPage() {
                     >↗</span>
                   )}
                 </div>
-                <div style={{ fontSize: '12px', color: '#94A3B8', lineHeight: '1.3' }}>{mod.desc}</div>
+                <div style={{ fontSize: '12px', color: '#94A3B8', lineHeight: '1.3' }}>{sanitize(mod.desc)}</div>
               </div>
 
-              {/* Toggle */}
               <div onClick={(e) => { e.stopPropagation(); toggle(mod.id); }} style={{
                 width: '38px', height: '22px', background: mod.enabled ? '#00E5FF' : '#374151',
                 borderRadius: '22px', cursor: 'pointer', transition: 'all 0.25s ease',
@@ -139,7 +142,6 @@ export default function ModulesPage() {
           ))}
         </div>
 
-        {/* Toast */}
         {saved && (
           <div style={{
             position: 'fixed', bottom: '24px', right: '24px',
