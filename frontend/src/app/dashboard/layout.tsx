@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navigate = (url: string) => {
   window.location.href = url;
@@ -24,9 +25,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Определяем текущий путь
-  const currentPath =
-    typeof window !== "undefined" ? window.location.pathname : "";
+  const pathname = usePathname();
 
   return (
     <div
@@ -35,8 +34,7 @@ export default function DashboardLayout({
         background: "#0A0A0F",
         display: "flex",
         color: "#F1F5F9",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif",
       }}
     >
       {/* Сайдбар */}
@@ -55,7 +53,6 @@ export default function DashboardLayout({
           overflow: "auto",
         }}
       >
-        {/* Лого */}
         <Link
           href="/"
           style={{
@@ -82,28 +79,14 @@ export default function DashboardLayout({
           >
             N
           </div>
-          <span
-            style={{
-              fontSize: "19px",
-              fontWeight: "bold",
-              color: "#FFF",
-            }}
-          >
+          <span style={{ fontSize: "19px", fontWeight: "bold", color: "#FFF" }}>
             Нова
           </span>
         </Link>
 
-        {/* Навигация */}
-        <nav
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "2px",
-            flex: 1,
-          }}
-        >
+        <nav style={{ display: "flex", flexDirection: "column", gap: "2px", flex: 1 }}>
           {NAV_ITEMS.map((item, i) => {
-            const isActive = currentPath === item.href;
+            const isActive = pathname === item.href;
             return (
               <span
                 key={i}
@@ -122,13 +105,7 @@ export default function DashboardLayout({
                   fontWeight: isActive ? "500" : "400",
                 }}
               >
-                <span
-                  style={{
-                    fontSize: "15px",
-                    width: "20px",
-                    textAlign: "center",
-                  }}
-                >
+                <span style={{ fontSize: "15px", width: "20px", textAlign: "center" }}>
                   {item.icon}
                 </span>
                 {item.label}
@@ -138,7 +115,6 @@ export default function DashboardLayout({
         </nav>
       </aside>
 
-      {/* Контент */}
       <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
     </div>
   );
