@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const navigate = (url: string) => {
   window.location.href = url;
@@ -10,7 +11,6 @@ const navigate = (url: string) => {
 const NAV_ITEMS = [
   { icon: "📊", label: "Обзор", href: "/dashboard" },
   { icon: "🖥️", label: "Серверы", href: "/dashboard/servers" },
-  { icon: "🧩", label: "Модули", href: "/dashboard/modules" },
   { icon: "🎵", label: "Музыка", href: "/dashboard/music" },
   { icon: "🏆", label: "Рейтинг", href: "/dashboard/ranking" },
   { icon: "🛡️", label: "Модерация", href: "/dashboard/moderation" },
@@ -26,6 +26,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div
@@ -40,81 +41,128 @@ export default function DashboardLayout({
       {/* Сайдбар */}
       <aside
         style={{
-          width: "230px",
-          minWidth: "230px",
+          width: collapsed ? "60px" : "230px",
+          minWidth: collapsed ? "60px" : "230px",
           background: "#111118",
           borderRight: "1px solid #1F2937",
-          padding: "24px 16px",
+          padding: collapsed ? "20px 10px" : "24px 16px",
           display: "flex",
           flexDirection: "column",
           position: "sticky",
           top: 0,
           height: "100vh",
-          overflow: "auto",
+          overflow: "hidden",
+          transition: "all 0.3s ease",
         }}
       >
+        {/* Кнопка сворачивания */}
+        <div style={{ display: "flex", justifyContent: collapsed ? "center" : "flex-end", marginBottom: 20 }}>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            style={{
+              background: "transparent",
+              border: "1px solid #1F2937",
+              color: "#94A3B8",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 14,
+              padding: "4px 8px",
+              transition: "transform 0.3s",
+              transform: collapsed ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          >
+            ◀
+          </button>
+        </div>
+
+        {/* Лого */}
         <Link
           href="/"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "10px",
+            gap: collapsed ? 0 : 10,
             textDecoration: "none",
-            marginBottom: "28px",
+            marginBottom: 24,
+            justifyContent: collapsed ? "center" : "flex-start",
+            opacity: collapsed ? 0 : 1,
+            transition: "opacity 0.2s",
+            pointerEvents: collapsed ? "none" : "auto",
           }}
         >
           <div
             style={{
-              width: "34px",
-              height: "34px",
+              width: 34,
+              height: 34,
+              minWidth: 34,
               background: "#16161F",
-              borderRadius: "8px",
+              borderRadius: 8,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontWeight: "bold",
               color: "#00E5FF",
-              fontSize: "17px",
+              fontSize: 17,
             }}
           >
             N
           </div>
-          <span style={{ fontSize: "19px", fontWeight: "bold", color: "#FFF" }}>
+          <span
+            style={{
+              fontSize: 19,
+              fontWeight: "bold",
+              color: "#FFF",
+              whiteSpace: "nowrap",
+            }}
+          >
             Нова
           </span>
         </Link>
 
-        <nav style={{ display: "flex", flexDirection: "column", gap: "2px", flex: 1 }}>
+        {/* Навигация */}
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
           {NAV_ITEMS.map((item, i) => {
             const isActive = pathname === item.href;
             return (
               <span
                 key={i}
                 onClick={() => navigate(item.href)}
+                title={collapsed ? item.label : undefined}
                 style={{
-                  padding: "9px 12px",
-                  borderRadius: "8px",
+                  padding: collapsed ? "10px 0" : "9px 12px",
+                  borderRadius: 8,
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
-                  fontSize: "13px",
+                  gap: collapsed ? 0 : 10,
+                  fontSize: 13,
                   cursor: "pointer",
                   transition: "all 0.15s",
                   color: isActive ? "#FFF" : "#94A3B8",
                   background: isActive ? "#1F2937" : "transparent",
-                  fontWeight: isActive ? "500" : "400",
+                  fontWeight: isActive ? 500 : 400,
+                  justifyContent: collapsed ? "center" : "flex-start",
                 }}
               >
-                <span style={{ fontSize: "15px", width: "20px", textAlign: "center" }}>
+                <span style={{ fontSize: 15, width: 20, textAlign: "center" }}>
                   {item.icon}
                 </span>
-                {item.label}
+                <span
+                  style={{
+                    whiteSpace: "nowrap",
+                    opacity: collapsed ? 0 : 1,
+                    transition: "opacity 0.2s",
+                    display: collapsed ? "none" : "inline",
+                  }}
+                >
+                  {item.label}
+                </span>
               </span>
             );
           })}
         </nav>
       </aside>
 
+      {/* Контент */}
       <main style={{ flex: 1, overflow: "auto" }}>{children}</main>
     </div>
   );
