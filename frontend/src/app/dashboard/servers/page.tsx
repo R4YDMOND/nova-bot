@@ -32,7 +32,7 @@ export default function ServersPage() {
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
             { icon: '🔗', label: 'Вебхуки', href: '/dashboard/webhooks' },
           ].map((item, i) => {
-            const isActive = item.label === 'Мои серверы'
+             const isActive = item.label === 'Серверы'
             return (
               <span key={i} onClick={() => navigate(item.href)} style={{
                 padding: '10px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center',
