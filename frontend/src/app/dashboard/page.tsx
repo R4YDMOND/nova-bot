@@ -5,6 +5,16 @@ import { useState, useEffect } from 'react'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const navigate = (url: string) => window.location.href = url
 
+// Защита от краша, эмодзи и спецсимволов
+const sanitize = (text: string): string => {
+  if (!text) return ''
+  return text
+    .replace(/[\u0000-\u001F]/g, '')
+    .replace(/[\u200B-\u200D]/g, '')
+    .replace(/[\uFEFF]/g, '')
+    .trim()
+}
+
 export default function Dashboard() {
   const [servers, setServers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,25 +39,24 @@ export default function Dashboard() {
   }
 
   const recentActivity = [
-    { user: 'Alice', action: 'достигла 42 уровня', time: '2 мин назад', icon: '📊', color: '#22C55E' },
-    { user: 'Bob', action: 'использовал /play', time: '5 мин назад', icon: '🎵', color: '#3B82F6' },
-    { user: 'Charlie', action: 'получил предупреждение', time: '12 мин назад', icon: '⚠️', color: '#F59E0B' },
-    { user: 'Diana', action: 'присоединилась к серверу', time: '28 мин назад', icon: '👋', color: '#A855F7' },
-    { user: 'Eve', action: 'создала команду /meme', time: '45 мин назад', icon: '⚡', color: '#EC4899' },
+    { user: '👩 Alice', action: 'достигла 42 уровня 🏆', time: '2 мин назад', icon: '📊', color: '#22C55E' },
+    { user: '👨 Bob', action: 'использовал /play 🎵', time: '5 мин назад', icon: '🎵', color: '#3B82F6' },
+    { user: '🧑 Charlie', action: 'получил предупреждение ⚠️', time: '12 мин назад', icon: '⚠️', color: '#F59E0B' },
+    { user: '👩‍🦰 Diana', action: 'присоединилась к серверу 🎉', time: '28 мин назад', icon: '👋', color: '#A855F7' },
+    { user: '👩‍🦱 Eve', action: 'создала команду /meme ⚡', time: '45 мин назад', icon: '⚡', color: '#EC4899' },
   ]
 
   const topCommands = [
-    { name: '/ping', uses: 2340, color: '#00E5FF' },
-    { name: '/rank', uses: 1820, color: '#22C55E' },
-    { name: '/help', uses: 1560, color: '#3B82F6' },
-    { name: '/ai', uses: 1200, color: '#A855F7' },
-    { name: '/play', uses: 890, color: '#F59E0B' },
+    { name: '🏓 /ping', uses: 2340, color: '#00E5FF' },
+    { name: '🏆 /rank', uses: 1820, color: '#22C55E' },
+    { name: '❓ /help', uses: 1560, color: '#3B82F6' },
+    { name: '🤖 /ai', uses: 1200, color: '#A855F7' },
+    { name: '🎵 /play', uses: 890, color: '#F59E0B' },
   ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
       
-      {/* Sidebar */}
       <aside style={{ width: '240px', minWidth: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '32px' }}>
           <div style={{ width: '34px', height: '34px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '17px' }}>N</div>
@@ -70,7 +79,7 @@ export default function Dashboard() {
                 transition: 'all 0.15s'
               }}>
                 <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{item.icon}</span>
-                {item.label}
+                {sanitize(item.label)}
               </span>
             )
           })}
@@ -82,13 +91,11 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* Main */}
       <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
         
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
           <div>
-            <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>Обзор</h1>
+            <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>📊 Обзор</h1>
             <p style={{ color: '#94A3B8', fontSize: '13px' }}>Сводка активности сервера</p>
           </div>
           <div style={{ display: 'flex', gap: '4px', background: '#111118', borderRadius: '10px', padding: '3px' }}>
@@ -103,13 +110,12 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stats Row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
           {[
-            { label: 'Сообщений', value: stats.totalMessages.toLocaleString(), change: '+12%', icon: '💬', color: '#00E5FF' },
-            { label: 'Онлайн', value: stats.onlineNow, change: '+5%', icon: '🟢', color: '#22C55E' },
-            { label: 'Команд', value: stats.commandsUsed.toLocaleString(), change: '+8%', icon: '⚡', color: '#A855F7' },
-            { label: 'Новых', value: stats.newUsers, change: '+18%', icon: '👋', color: '#F59E0B' },
+            { label: '💬 Сообщений', value: stats.totalMessages.toLocaleString(), change: '+12%', icon: '💬', color: '#00E5FF' },
+            { label: '🟢 Онлайн', value: stats.onlineNow, change: '+5%', icon: '🟢', color: '#22C55E' },
+            { label: '⚡ Команд', value: stats.commandsUsed.toLocaleString(), change: '+8%', icon: '⚡', color: '#A855F7' },
+            { label: '👋 Новых', value: stats.newUsers, change: '+18%', icon: '👋', color: '#F59E0B' },
           ].map((stat, i) => (
             <div key={i} style={{
               background: '#16161F', borderRadius: '14px', padding: '20px',
@@ -119,7 +125,7 @@ export default function Dashboard() {
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1F2937'; e.currentTarget.style.background = '#16161F'; }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '13px', color: '#94A3B8' }}>{stat.label}</span>
+                <span style={{ fontSize: '13px', color: '#94A3B8' }}>{sanitize(stat.label)}</span>
                 <span style={{ fontSize: '18px' }}>{stat.icon}</span>
               </div>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#FFF', marginBottom: '4px' }}>{stat.value}</div>
@@ -128,10 +134,8 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Charts + Activity Row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '14px', marginBottom: '24px' }}>
           
-          {/* Chart */}
           <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: '600' }}>📈 Сообщения</h3>
@@ -155,7 +159,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Activity */}
           <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
             <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🕐 Активность</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
@@ -166,8 +169,8 @@ export default function Dashboard() {
                 }}>
                   <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: act.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}>{act.icon}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontWeight: '500', fontSize: '13px' }}>{act.user}</span>
-                    <span style={{ color: '#94A3B8', fontSize: '12px' }}> {act.action}</span>
+                    <span style={{ fontWeight: '500', fontSize: '13px' }}>{sanitize(act.user)}</span>
+                    <span style={{ color: '#94A3B8', fontSize: '12px' }}> {sanitize(act.action)}</span>
                   </div>
                   <span style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap' }}>{act.time}</span>
                 </div>
@@ -176,17 +179,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Top Commands + Servers */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           
-          {/* Top Commands */}
           <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
             <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🔥 Популярные команды</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {topCommands.map((cmd, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0' }}>
                   <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: cmd.color }} />
-                  <code style={{ fontSize: '12px', fontFamily: 'monospace', color: '#FFF', minWidth: '50px' }}>{cmd.name}</code>
+                  <code style={{ fontSize: '12px', fontFamily: 'monospace', color: '#FFF', minWidth: '60px' }}>{sanitize(cmd.name)}</code>
                   <div style={{ flex: 1, height: '4px', background: '#1A1A24', borderRadius: '2px' }}>
                     <div style={{ width: `${(cmd.uses / 2340) * 100}%`, height: '100%', background: cmd.color, borderRadius: '2px' }} />
                   </div>
@@ -196,7 +197,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Servers Preview */}
           <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: '600' }}>🖥️ Серверы</h3>
@@ -207,7 +207,7 @@ export default function Dashboard() {
             </div>
             
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '13px' }}>Загрузка...</div>
+              <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '13px' }}>⏳ Загрузка...</div>
             ) : servers.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>
                 <div style={{ fontSize: '28px', marginBottom: '8px' }}>🖥️</div>
@@ -225,7 +225,7 @@ export default function Dashboard() {
                     background: '#111118', borderRadius: '10px'
                   }}>
                     <div style={{ width: '32px', height: '32px', background: '#0A0A0F', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🖥️</div>
-                    <span style={{ fontSize: '13px', fontWeight: '500', flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '500', flex: 1 }}>{sanitize(s.name)}</span>
                     <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '10px', background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>🟢</span>
                   </div>
                 ))}
