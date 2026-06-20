@@ -45,11 +45,13 @@ export default function ModerationPage() {
     
     // Правила
     rulesChannel: '#правила 📜',
+    rulesUrl: '',
     rulesText: '1. Без спама\n2. Без оскорблений\n3. Без рекламы\n4. Уважать участников',
     
     // AI-модератор
     modBotName: 'Нова Модератор 🛡️',
     modAvatarStyle: 'shield',
+    modAvatarUrl: '',
     useAIResponses: true,
     aiModel: 'auto',
     
@@ -282,7 +284,21 @@ export default function ModerationPage() {
               </p>
               
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>📢 Канал с правилами</label>
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>🔗 Ссылка на канал с правилами (автоопределение)</label>
+                <input type="text" value={sanitize(settings.rulesUrl)} onChange={(e) => {
+                  const value = e.target.value
+                  update('rulesUrl', value)
+                  if (value.includes('#')) {
+                    const channelName = value.split('#').pop()?.split('/')[0]
+                    if (channelName) update('rulesChannel', '#' + channelName)
+                  }
+                }}
+                  placeholder="https://lolka.app/.../rules или https://vk.com/..."
+                  style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>📢 Название канала (авто или вручную)</label>
                 <input type="text" value={sanitize(settings.rulesChannel)} onChange={(e) => update('rulesChannel', e.target.value)}
                   style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
@@ -334,6 +350,22 @@ export default function ModerationPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Свой URL аватара */}
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>
+                  Или укажите URL своего аватара
+                </label>
+                <input type="text" value={sanitize(settings.modAvatarUrl)} onChange={(e) => update('modAvatarUrl', e.target.value)}
+                  placeholder="https://example.com/mod-avatar.png"
+                  style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                {settings.modAvatarUrl && (
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src={settings.modAvatarUrl} alt="Аватар" style={{ width: '48px', height: '48px', borderRadius: '14px', objectFit: 'cover', border: '2px solid #00E5FF40' }} />
+                    <span style={{ fontSize: '12px', color: '#22C55E' }}>✅ Аватар загружен</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -481,8 +513,8 @@ export default function ModerationPage() {
                 autoModEmoji: false, maxEmoji: 10, autoModCaps: true, capsThreshold: 70,
                 autoModRepeats: true, repeatThreshold: 3, deleteAfterWarn: true, dmOnWarn: true,
                 dmOnMute: true, appealChannel: '',
-                rulesChannel: '#правила 📜', rulesText: '1. Без спама\n2. Без оскорблений\n3. Без рекламы\n4. Уважать участников',
-                modBotName: 'Нова Модератор 🛡️', modAvatarStyle: 'shield',
+                rulesChannel: '#правила 📜', rulesUrl: '', rulesText: '1. Без спама\n2. Без оскорблений\n3. Без рекламы\n4. Уважать участников',
+                modBotName: 'Нова Модератор 🛡️', modAvatarStyle: 'shield', modAvatarUrl: '',
                 useAIResponses: true, aiModel: 'auto',
                 warnMessage: '{user}, вы нарушили правило {rule}. Предупреждение {count}/{max}.',
                 muteMessage: '{user}, вы замьючены на {duration} минут. Причина: {reason}',
