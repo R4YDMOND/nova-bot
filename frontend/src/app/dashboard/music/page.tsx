@@ -18,10 +18,9 @@ export default function MusicPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [animBtn, setAnimBtn] = useState("");
 
-  useEffect(() => {
-    loadProviders();
-  }, []);
+  useEffect(() => { loadProviders(); }, []);
 
   const loadProviders = async () => {
     try {
@@ -29,25 +28,19 @@ export default function MusicPage() {
       const data = await res.json();
       setProviders(data.providers || []);
       setAvailableTypes(data.available_types || []);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const addProvider = async () => {
     await fetch(`${API_BASE}/api/music/providers`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        server_id: "default",
-        type: newProvider.type,
-        name: newProvider.name || newProvider.type,
-        api_key: newProvider.api_key,
-        webhook_url: newProvider.webhook_url,
-      }),
+      body: JSON.stringify({ server_id: "default", type: newProvider.type, name: newProvider.name || newProvider.type, api_key: newProvider.api_key, webhook_url: newProvider.webhook_url }),
     });
     setShowAdd(false);
     setNewProvider({ type: "youtube", name: "", api_key: "", webhook_url: "" });
+    setAnimBtn("saved");
+    setTimeout(() => setAnimBtn(""), 1500);
     loadProviders();
   };
 
@@ -63,17 +56,11 @@ export default function MusicPage() {
       const res = await fetch(`${API_BASE}/api/music/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: selectedProvider.type,
-          query: searchQuery,
-          api_key: selectedProvider.apiKey || "",
-        }),
+        body: JSON.stringify({ type: selectedProvider.type, query: searchQuery, api_key: selectedProvider.apiKey || "" }),
       });
       const data = await res.json();
       setSearchResults(data.tracks || []);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
     setLoading(false);
   };
 
@@ -99,363 +86,94 @@ export default function MusicPage() {
   };
 
   return (
-    <div style={styles.wrapper}>
-      <header style={styles.header}>
-        <div style={styles.headerLeft}>
-          <a href="/" style={styles.logoLink}>
-            <div style={styles.logoIcon}>N</div>
-            <span style={styles.logoText}>Нова</span>
-          </a>
-          <span style={styles.separator}>|</span>
-          <a href="/dashboard/modules" style={styles.backLink}>← Модули</a>
-          <span style={styles.separator}>/</span>
-          <span style={styles.currentPage}>🎵 Музыка</span>
+    <div style={{ padding: "32px 40px", maxWidth: "1000px" }}>
+      <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>🎵 Музыка</h1>
+      <p style={{ color: "#94A3B8", fontSize: 14, marginBottom: 32 }}>Поиск треков и радиостанции для вашего сервера</p>
+
+      {/* Провайдеры */}
+      <div style={styles.section}>
+        <div style={styles.sectionHeader}>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>🔌 Подключённые сервисы</h3>
+          <button onClick={() => setShowAdd(!showAdd)} style={{ ...styles.btn, background: showAdd ? "#1F2937" : "#00E5FF", color: showAdd ? "#FFF" : "#000" }}>
+            {showAdd ? "✕" : "+ Добавить"}
+          </button>
         </div>
-      </header>
 
-      <div style={styles.content}>
-        <h1 style={styles.title}>🎵 Музыка</h1>
-        <p style={styles.subtitle}>Поиск треков и радиостанции для вашего сервера</p>
-
-        {/* Провайдеры */}
-        <div style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h3>🔌 Подключённые сервисы</h3>
-            <button onClick={() => setShowAdd(!showAdd)} style={styles.addBtn}>
-              {showAdd ? "✕" : "+ Добавить"}
+        {showAdd && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+            <select value={newProvider.type} onChange={(e) => setNewProvider({ ...newProvider, type: e.target.value })} style={styles.input}>
+              {availableTypes.map((t: any) => (<option key={t.value} value={t.value}>{t.icon} {t.label}</option>))}
+            </select>
+            <input type="text" placeholder="Название" value={newProvider.name} onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })} style={styles.input} />
+            {!["yandex_radio", "record", "dfm", "europa_plus", "nashe", "relax_fm", "like_fm", "shanson"].includes(newProvider.type) && (
+              <input type="text" placeholder={newProvider.type === "custom" ? "Webhook URL" : "API Ключ"} value={newProvider.type === "custom" ? newProvider.webhook_url : newProvider.api_key}
+                onChange={(e) => newProvider.type === "custom" ? setNewProvider({ ...newProvider, webhook_url: e.target.value }) : setNewProvider({ ...newProvider, api_key: e.target.value })} style={styles.input} />
+            )}
+            <button onClick={addProvider} style={{ ...styles.btn, background: animBtn === "saved" ? "#22C55E" : "#10B981", color: "#FFF", transition: "all 0.3s", transform: animBtn === "saved" ? "scale(1.05)" : "scale(1)" }}>
+              {animBtn === "saved" ? "✅" : "💾 Сохранить"}
             </button>
           </div>
+        )}
 
-          {showAdd && (
-            <div style={styles.addForm}>
-              <select
-                value={newProvider.type}
-                onChange={(e) => setNewProvider({ ...newProvider, type: e.target.value })}
-                style={styles.input}
-              >
-                {availableTypes.map((t: any) => (
-                  <option key={t.value} value={t.value}>
-                    {t.icon} {t.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Название"
-                value={newProvider.name}
-                onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
-                style={styles.input}
-              />
-              {newProvider.type !== "yandex_radio" && newProvider.type !== "record" && newProvider.type !== "dfm" && newProvider.type !== "europa_plus" && newProvider.type !== "nashe" && newProvider.type !== "relax_fm" && newProvider.type !== "like_fm" && newProvider.type !== "shanson" && (
-                <input
-                  type="text"
-                  placeholder={newProvider.type === "custom" ? "Webhook URL" : "API Ключ"}
-                  value={newProvider.type === "custom" ? newProvider.webhook_url : newProvider.api_key}
-                  onChange={(e) =>
-                    newProvider.type === "custom"
-                      ? setNewProvider({ ...newProvider, webhook_url: e.target.value })
-                      : setNewProvider({ ...newProvider, api_key: e.target.value })
-                  }
-                  style={styles.input}
-                />
-              )}
-              <button onClick={addProvider} style={styles.saveBtn}>
-                💾 Сохранить
-              </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {providers.map((p: any) => (
+            <div key={p.id} style={styles.card}>
+              <span style={{ fontSize: 24 }}>{getTypeIcon(p.type)}</span>
+              <div style={{ flex: 1 }}>
+                <strong style={{ fontSize: 13 }}>{p.name || getTypeLabel(p.type)}</strong>
+                <div style={{ fontSize: 11, color: "#64748B" }}>{getTypeLabel(p.type)}</div>
+              </div>
+              <span style={{ color: p.enabled ? "#22C55E" : "#EF4444", fontSize: 12 }}>{p.enabled ? "🟢" : "🔴"}</span>
+              <button onClick={() => deleteProvider(p.id)} style={styles.delBtn}>✕</button>
+            </div>
+          ))}
+          {providers.length === 0 && <p style={{ color: "#64748B", textAlign: "center", padding: 20, fontSize: 14 }}>Нет подключённых сервисов. Добавьте первый!</p>}
+        </div>
+      </div>
+
+      {/* Поиск */}
+      {providers.length > 0 && (
+        <div style={styles.section}>
+          <h3 style={{ margin: "0 0 12px 0", fontSize: 15, fontWeight: 600 }}>🔍 Поиск треков</h3>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <select value={selectedProvider?.id || ""} onChange={(e) => { const p = providers.find((pr) => pr.id === parseInt(e.target.value)); setSelectedProvider(p); }} style={styles.input}>
+              <option value="">Выберите сервис...</option>
+              {providers.map((p: any) => (<option key={p.id} value={p.id}>{getTypeIcon(p.type)} {p.name || getTypeLabel(p.type)}</option>))}
+            </select>
+            <input type="text" placeholder="Название трека..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && searchMusic()} style={{ ...styles.input, flex: 1 }} />
+            <button onClick={searchMusic} disabled={loading} style={{ ...styles.btn, background: loading ? "#374151" : "#00E5FF", color: "#000" }}>{loading ? "⏳" : "🔍"}</button>
+          </div>
+          {searchResults.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {searchResults.map((track: any, i: number) => (
+                <div key={i} style={styles.card}>
+                  <span style={{ color: "#64748B", fontSize: 14, width: 24, textAlign: "center" }}>{i + 1}</span>
+                  <div style={{ flex: 1 }}>
+                    <strong style={{ fontSize: 13 }}>{track.title}</strong>
+                    <div style={{ fontSize: 11, color: "#94A3B8" }}>{track.artist}</div>
+                  </div>
+                  <a href={track.url} target="_blank" style={{ padding: "6px 12px", background: "#22C55E", color: "#FFF", borderRadius: 6, textDecoration: "none", fontSize: 14, fontWeight: 600 }}>▶</a>
+                </div>
+              ))}
             </div>
           )}
-
-          <div style={styles.providersList}>
-            {providers.map((p: any) => (
-              <div key={p.id} style={styles.providerCard}>
-                <span style={styles.providerIcon}>{getTypeIcon(p.type)}</span>
-                <div style={styles.providerInfo}>
-                  <strong>{p.name || getTypeLabel(p.type)}</strong>
-                  <span style={styles.providerType}>{getTypeLabel(p.type)}</span>
-                </div>
-                <span style={{ ...styles.status, color: p.enabled ? "#22C55E" : "#EF4444" }}>
-                  {p.enabled ? "🟢" : "🔴"}
-                </span>
-                <button onClick={() => deleteProvider(p.id)} style={styles.deleteBtn}>
-                  ✕
-                </button>
-              </div>
-            ))}
-            {providers.length === 0 && (
-              <p style={styles.empty}>Нет подключённых сервисов. Добавьте первый!</p>
-            )}
-          </div>
         </div>
-
-        {/* Поиск */}
-        {providers.length > 0 && (
-          <div style={styles.section}>
-            <h3>🔍 Поиск треков</h3>
-            <div style={styles.searchRow}>
-              <select
-                value={selectedProvider?.id || ""}
-                onChange={(e) => {
-                  const p = providers.find((pr) => pr.id === parseInt(e.target.value));
-                  setSelectedProvider(p);
-                }}
-                style={styles.input}
-              >
-                <option value="">Выберите сервис...</option>
-                {providers.map((p: any) => (
-                  <option key={p.id} value={p.id}>
-                    {getTypeIcon(p.type)} {p.name || getTypeLabel(p.type)}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Название трека..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && searchMusic()}
-                style={{ ...styles.input, flex: 1 }}
-              />
-              <button onClick={searchMusic} disabled={loading} style={styles.searchBtn}>
-                {loading ? "⏳" : "🔍"}
-              </button>
-            </div>
-
-            {searchResults.length > 0 && (
-              <div style={styles.results}>
-                {searchResults.map((track: any, i: number) => (
-                  <div key={i} style={styles.trackCard}>
-                    <span style={styles.trackNum}>{i + 1}</span>
-                    <div style={styles.trackInfo}>
-                      <strong>{track.title}</strong>
-                      <span style={styles.trackArtist}>{track.artist}</span>
-                    </div>
-                    <a href={track.url} target="_blank" style={styles.playBtn}>
-                      ▶
-                    </a>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      )}
+      <style>{animStyles}</style>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  wrapper: {
-    minHeight: "100vh",
-    background: "#0A0A0F",
-    color: "#F1F5F9",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "14px 40px",
-    background: "#111118",
-    borderBottom: "1px solid #1F2937",
-  },
-  headerLeft: {
-    display: "flex",
-    alignItems: "center",
-    gap: "16px",
-  },
-  logoLink: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    textDecoration: "none",
-  },
-  logoIcon: {
-    width: "32px",
-    height: "32px",
-    background: "#16161F",
-    borderRadius: "8px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "bold",
-    color: "#00E5FF",
-    fontSize: "16px",
-  },
-  logoText: {
-    fontSize: "18px",
-    fontWeight: "bold",
-    color: "#FFF",
-  },
-  separator: {
-    color: "#374151",
-  },
-  backLink: {
-    color: "#94A3B8",
-    textDecoration: "none",
-    fontSize: "14px",
-  },
-  currentPage: {
-    color: "#00E5FF",
-    fontSize: "14px",
-    fontWeight: "500",
-  },
-  content: {
-    padding: "32px 40px",
-    maxWidth: "900px",
-  },
-  title: {
-    fontSize: "26px",
-    fontWeight: "700",
-    marginBottom: "4px",
-  },
-  subtitle: {
-    color: "#94A3B8",
-    fontSize: "14px",
-    marginBottom: "32px",
-  },
-  section: {
-    background: "#16161F",
-    borderRadius: "14px",
-    padding: "20px",
-    marginBottom: "16px",
-    border: "1px solid #1F2937",
-  },
-  sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "16px",
-  },
-  addBtn: {
-    padding: "8px 16px",
-    background: "#00E5FF",
-    color: "#000",
-    border: "none",
-    borderRadius: "8px",
-    fontWeight: "600",
-    cursor: "pointer",
-    fontSize: "13px",
-  },
-  addForm: {
-    display: "flex",
-    gap: "8px",
-    marginBottom: "16px",
-    flexWrap: "wrap" as const,
-  },
-  input: {
-    padding: "8px 12px",
-    background: "#0A0A0F",
-    border: "1px solid #1F2937",
-    borderRadius: "8px",
-    color: "#FFF",
-    fontSize: "13px",
-    outline: "none",
-  },
-  saveBtn: {
-    padding: "8px 16px",
-    background: "#22C55E",
-    color: "#000",
-    border: "none",
-    borderRadius: "8px",
-    fontWeight: "600",
-    cursor: "pointer",
-    fontSize: "13px",
-  },
-  providersList: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "8px",
-  },
-  providerCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "12px",
-    background: "#111118",
-    borderRadius: "10px",
-    border: "1px solid #1F2937",
-  },
-  providerIcon: {
-    fontSize: "24px",
-  },
-  providerInfo: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
-  },
-  providerType: {
-    fontSize: "11px",
-    color: "#64748B",
-  },
-  status: {
-    fontSize: "12px",
-  },
-  deleteBtn: {
-    padding: "4px 8px",
-    background: "transparent",
-    color: "#EF4444",
-    border: "1px solid #374151",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "12px",
-  },
-  empty: {
-    color: "#64748B",
-    textAlign: "center" as const,
-    padding: "20px",
-    fontSize: "14px",
-  },
-  searchRow: {
-    display: "flex",
-    gap: "8px",
-    marginBottom: "16px",
-  },
-  searchBtn: {
-    padding: "8px 16px",
-    background: "#00E5FF",
-    color: "#000",
-    border: "none",
-    borderRadius: "8px",
-    fontWeight: "600",
-    cursor: "pointer",
-    fontSize: "13px",
-  },
-  results: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "6px",
-  },
-  trackCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "10px",
-    background: "#111118",
-    borderRadius: "8px",
-  },
-  trackNum: {
-    color: "#64748B",
-    fontSize: "14px",
-    width: "24px",
-    textAlign: "center" as const,
-  },
-  trackInfo: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
-  },
-  trackArtist: {
-    fontSize: "11px",
-    color: "#94A3B8",
-  },
-  playBtn: {
-    padding: "6px 12px",
-    background: "#22C55E",
-    color: "#FFF",
-    borderRadius: "6px",
-    textDecoration: "none",
-    fontSize: "14px",
-    fontWeight: "600",
-  },
+  section: { background: "#16161F", borderRadius: 14, padding: 20, marginBottom: 16, border: "1px solid #1F2937" },
+  sectionHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  btn: { padding: "8px 16px", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13, transition: "all 0.2s" },
+  input: { padding: "8px 12px", background: "#0A0A0F", border: "1px solid #1F2937", borderRadius: 8, color: "#FFF", fontSize: 13, outline: "none" },
+  card: { display: "flex", alignItems: "center", gap: 12, padding: 12, background: "#111118", borderRadius: 10, border: "1px solid #1F2937" },
+  delBtn: { padding: "4px 8px", background: "transparent", color: "#EF4444", border: "1px solid #374151", borderRadius: 6, cursor: "pointer", fontSize: 12 },
 };
+
+const animStyles = `
+  @keyframes popIn { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes fadeIn { 0% { opacity: 0; transform: translateY(8px); } 100% { opacity: 1; transform: translateY(0); } }
+`;
