@@ -43,3 +43,15 @@ class Member(Base):
     reactions = Column(Integer, default=0)
     last_active = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class MusicProvider(Base):
+    __tablename__ = "music_providers"
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    provider_type = Column(String(50), nullable=False)
+    name = Column(String(255), default="Мой провайдер")
+    api_key = Column(String(1024), default="")
+    webhook_url = Column(String(1024), default="")
+    stream_url = Column(String(1024), default="")
+    is_enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
