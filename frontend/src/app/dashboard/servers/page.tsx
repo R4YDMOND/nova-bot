@@ -1,131 +1,107 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const navigate = (url: string) => window.location.href = url
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nova-bot-rpsy.onrender.com";
+const navigate = (url: string) => (window.location.href = url);
 
-// Защита от краша, эмодзи и спецсимволов
 const sanitize = (text: string): string => {
-  if (!text) return ''
+  if (!text) return "";
   return text
-    .replace(/[\u0000-\u001F]/g, '')
-    .replace(/[\u200B-\u200D]/g, '')
-    .replace(/[\uFEFF]/g, '')
-    .trim()
-}
+    .replace(/[\u0000-\u001F]/g, "")
+    .replace(/[\u200B-\u200D]/g, "")
+    .replace(/[\uFEFF]/g, "")
+    .trim();
+};
 
 export default function ServersPage() {
-  const [servers, setServers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [servers, setServers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch(`${API_URL}/api/servers`)
-      .then(res => res.json())
-      .then(data => { setServers(data.servers || []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+      .then((res) => res.json())
+      .then((data) => {
+        setServers(data.servers || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
-      
-      <aside style={{ width: '240px', minWidth: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
-        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '32px' }}>
-          <div style={{ width: '34px', height: '34px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '17px' }}>N</div>
-          <span style={{ fontSize: '19px', fontWeight: 'bold', color: '#FFF' }}>Нова</span>
-        </a>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-          {[
-            { icon: '📊', label: 'Обзор', href: '/dashboard' },
-            { icon: '🖥️', label: 'Серверы', href: '/dashboard/servers' },
-            { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
-            { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
-            { icon: '🔗', label: 'Вебхуки', href: '/dashboard/webhooks' },
-          ].map((item, i) => {
-            const isActive = item.label === 'Серверы'
-            return (
-              <span key={i} onClick={() => navigate(item.href)} style={{
-                padding: '10px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center',
-                gap: '10px', fontSize: '14px', cursor: 'pointer', fontWeight: isActive ? '500' : '400',
-                color: isActive ? '#FFF' : '#94A3B8', background: isActive ? '#1F2937' : 'transparent',
-                transition: 'all 0.15s'
-              }}>
-                <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{item.icon}</span>
-                {sanitize(item.label)}
-              </span>
-            )
-          })}
-        </nav>
-      </aside>
+    <div style={{ padding: "32px 40px", maxWidth: "1000px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>🖥️ Мои серверы</h1>
+          <p style={{ color: "#94A3B8", fontSize: 14 }}>Управляйте подключёнными серверами</p>
+        </div>
+        <button
+          onClick={() => navigate("/login")}
+          style={{ padding: "12px 24px", background: "#00E5FF", color: "#000", border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer", whiteSpace: "nowrap" }}
+        >
+          + Добавить сервер
+        </button>
+      </div>
 
-      <main style={{ flex: 1, padding: '40px 48px', overflow: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
-          <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>🖥️ Мои серверы</h1>
-            <p style={{ color: '#94A3B8', fontSize: '14px' }}>Управляйте подключёнными серверами 🌐</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 32 }}>
+        {[
+          { label: "Всего серверов", value: servers.length, color: "#00E5FF", icon: "🖥️" },
+          { label: "Активных", value: servers.length, color: "#22C55E", icon: "🟢" },
+          { label: "Модулей доступно", value: "9", color: "#A855F7", icon: "🧩" },
+          { label: "Время ответа", value: "<0.8s", color: "#F59E0B", icon: "⚡" },
+        ].map((stat, i) => (
+          <div key={i} style={{ background: "#16161F", borderRadius: 14, padding: 20, border: `1px solid #1F2937`, borderTop: `3px solid ${stat.color}`, display: "flex", alignItems: "center", gap: 14 }}>
+            <span style={{ fontSize: 28 }}>{stat.icon}</span>
+            <div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#FFF", lineHeight: 1.1 }}>{stat.value}</div>
+              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{stat.label}</div>
+            </div>
           </div>
-          <button onClick={() => navigate('/login')} style={{
-            padding: '10px 22px', background: '#00E5FF', color: '#000',
-            border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '14px', cursor: 'pointer'
-          }}>+ Добавить сервер</button>
-        </div>
+        ))}
+      </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-          {[
-            { label: '📊 Всего серверов', value: servers.length, color: '#00E5FF' },
-            { label: '🟢 Активных', value: servers.length, color: '#22C55E' },
-            { label: '🧩 Модулей доступно', value: '6', color: '#A855F7' },
-            { label: '⚡ Время ответа', value: '<0.8s', color: '#F59E0B' },
-          ].map((stat, i) => (
-            <div key={i} style={{ background: '#16161F', borderRadius: '14px', padding: '20px 24px', border: '1px solid #1F2937' }}>
-              <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '6px' }}>{sanitize(stat.label)}</div>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: stat.color }}>{stat.value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ background: '#16161F', borderRadius: '14px', border: '1px solid #1F2937', overflow: 'hidden' }}>
-          {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#94A3B8' }}>⏳ Загрузка...</div>
-          ) : servers.length === 0 ? (
-            <div style={{ padding: '60px', textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🖥️</div>
-              <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>Нет серверов</h3>
-              <p style={{ color: '#94A3B8', marginBottom: '20px' }}>Добавьте первый сервер чтобы начать 🚀</p>
-              <button onClick={() => navigate('/login')} style={{
-                padding: '12px 24px', background: '#00E5FF', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer'
-              }}>⭐ Интегрировать Нова</button>
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #1F2937' }}>
-                  {['Сервер', 'ID', 'Статус', 'Действия'].map((h, i) => (
-                    <th key={i} style={{ padding: '14px 20px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {servers.map((s: any) => (
-                  <tr key={s.id} style={{ borderBottom: '1px solid #1F2937' }}>
-                    <td style={{ padding: '16px 20px', fontWeight: '500' }}>🖥️ {sanitize(s.name)}</td>
-                    <td style={{ padding: '16px 20px', color: '#94A3B8', fontSize: '13px' }}>{s.id}</td>
-                    <td style={{ padding: '16px 20px' }}>
-                      <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>🟢 Активен</span>
-                    </td>
-                    <td style={{ padding: '16px 20px' }}>
-                      <button onClick={() => navigate('/dashboard/modules')} style={{
-                        padding: '8px 14px', background: 'transparent', color: '#00E5FF',
-                        border: '1px solid #1F2937', borderRadius: '8px', cursor: 'pointer', fontSize: '12px'
-                      }}>⚙️ Настроить</button>
-                    </td>
-                  </tr>
+      <div style={{ background: "#16161F", borderRadius: 14, border: "1px solid #1F2937", overflow: "hidden" }}>
+        {loading ? (
+          <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>⏳ Загрузка...</div>
+        ) : servers.length === 0 ? (
+          <div style={{ padding: 60, textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🖥️</div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Нет серверов</h3>
+            <p style={{ color: "#94A3B8", marginBottom: 20 }}>Добавьте первый сервер чтобы начать 🚀</p>
+            <button onClick={() => navigate("/login")} style={{ padding: "12px 24px", background: "#00E5FF", color: "#000", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" }}>
+              ⭐ Интегрировать Нова
+            </button>
+          </div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #1F2937" }}>
+                {["Сервер", "ID", "Статус", "Действия"].map((h, i) => (
+                  <th key={i} style={{ padding: "14px 20px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" }}>
+                    {h}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </main>
+              </tr>
+            </thead>
+            <tbody>
+              {servers.map((s: any) => (
+                <tr key={s.id} style={{ borderBottom: "1px solid #1F2937" }}>
+                  <td style={{ padding: "16px 20px", fontWeight: 500 }}>🖥️ {sanitize(s.name)}</td>
+                  <td style={{ padding: "16px 20px", color: "#94A3B8", fontSize: 13 }}>{s.id}</td>
+                  <td style={{ padding: "16px 20px" }}>
+                    <span style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "rgba(34,197,94,0.15)", color: "#22C55E" }}>🟢 Активен</span>
+                  </td>
+                  <td style={{ padding: "16px 20px" }}>
+                    <button onClick={() => navigate("/dashboard/modules")} style={{ padding: "8px 14px", background: "transparent", color: "#00E5FF", border: "1px solid #1F2937", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>
+                      ⚙️ Настроить
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
-  )
+  );
 }
