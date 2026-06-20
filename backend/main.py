@@ -588,6 +588,135 @@ def auto_scan():
     return {"status": "ok", "message": "Автосканирование работает", "timestamp": datetime.utcnow().isoformat()}
 
 
+# ==================== Отчёты ====================
+
+@app.get("/api/analytics/reports")
+def get_reports_config(server_id: str = Query("default")):
+    """Получить настройки отчётов"""
+    db = SessionLocal()
+    try:
+        config = db.query(ModuleConfig).filter(
+            ModuleConfig.server_id == server_id,
+            ModuleConfig.module_name == "reports"
+        ).first()
+        
+        if config:
+            import json
+            try:
+                return {"config": json.loads(config.config)}
+            except:
+                pass
+        
+        return {"config": {
+            "enabled": False,
+            "channel": "",
+            "webhook_url": "",
+            "daily_time": "09:00",
+            "weekly_day": "monday",
+            "weekly_time": "10:00",
+            "monthly_day": 1,
+            "monthly_time": "10:00",
+            "include_servers": True,
+            "include_users": True,
+            "include_messages": True,
+            "include_top_commands": True,
+        }}
+    finally:
+        db.close()
+
+
+@app.post("/api/analytics/reports")
+def save_reports_config(data: dict):
+    """Сохранить настройки отчётов"""
+    db = SessionLocal()
+    try:
+        server_id = data.get("server_id", "default")
+        config_data = data.get("config", {})
+        
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            server = Server(name="Auto-created", server_id=server_id)
+            db.add(server)
+            db.commit()
+            db.refresh(server)
+        
+        existing = db.query(ModuleConfig).filter(
+            ModuleConfig.server_id == server.id,
+            ModuleConfig.module_name == "reports"
+        ).first()
+        
+        import json
+        config_json = json.dumps(config_data)
+        
+        if existing:
+            existing.config = config_json
+        else:
+            new_config = ModuleConfig(
+                server_id=server.id,
+                module_name="reports",
+                is_enabled=True,
+                config=config_json
+            )
+            db.add(new_config)
+        
+        db.commit()
+        return {"status": "saved"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/analytics/reports/send")
+def send_report(data: dict):
+    """Отправить отчёт вручную (тест) или по крону"""
+    webhook_url = data.get("webhook_url", "")
+    report_type = data.get("type", "daily")
+    
+    if not webhook_url:
+        return {"error": "webhook_url required"}
+    
+    db = SessionLocal()
+    try:
+        servers_count = db.query(Server).count()
+        users_count = 0
+        try:
+            from models import Member
+            users_count = db.query(Member).count()
+        except:
+            pass
+        
+        today = datetime.utcnow().strftime("%d.%m.%Y")
+        
+        if report_type == "daily":
+            title = f"📊 Ежедневный отчёт • {today}"
+        elif report_type == "weekly":
+            title = f"📈 Еженедельный отчёт • {today}"
+        else:
+            title = f"📅 Ежемесячный отчёт • {today}"
+        
+        message = f"""**{title}**
+
+🖥️ **Серверы:** {servers_count}
+👥 **Пользователи:** {users_count}
+💬 **Сообщений за период:** 0
+⭐ **Новых пользователей:** 0
+
+⚡ **Powered by Nova Bot**"""
+        
+        resp = requests.post(webhook_url, json={
+            "content": message,
+            "username": "Нова 📊"
+        }, timeout=10)
+        
+        return {"status": "ok", "sent": resp.ok}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
 # ==================== Статистика ====================
 
 @app.get("/api/stats")
