@@ -1,104 +1,463 @@
-"use client"
+"use client";
 
-import { useState } from 'react'
+import { useState, useEffect } from "react";
 
-// Защита от краша, эмодзи и спецсимволов
-const sanitize = (text: string): string => {
-  if (!text) return ''
-  return text
-    .replace(/[\u0000-\u001F]/g, '')
-    .replace(/[\u200B-\u200D]/g, '')
-    .replace(/[\uFEFF]/g, '')
-    .trim()
-}
+const API_BASE = "https://nova-bot-rpsy.onrender.com";
 
 export default function MusicPage() {
-  const [settings, setSettings] = useState({
-    defaultVolume: 50, autoPlay: true, djOnly: false, djRole: '🎧 DJ',
-    maxQueue: 50, autoDisconnect: 30, allowPlaylists: true, announceTrack: true, historyLimit: 20,
-  })
-  const [saved, setSaved] = useState(false)
-  const update = (key: string, value: any) => setSettings({ ...settings, [key]: value })
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  const [providers, setProviders] = useState<any[]>([]);
+  const [availableTypes, setAvailableTypes] = useState<any[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newProvider, setNewProvider] = useState({
+    type: "youtube",
+    name: "",
+    api_key: "",
+    webhook_url: "",
+  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadProviders();
+  }, []);
+
+  const loadProviders = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/music/providers?server_id=default`);
+      const data = await res.json();
+      setProviders(data.providers || []);
+      setAvailableTypes(data.available_types || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const addProvider = async () => {
+    await fetch(`${API_BASE}/api/music/providers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        server_id: "default",
+        type: newProvider.type,
+        name: newProvider.name || newProvider.type,
+        api_key: newProvider.api_key,
+        webhook_url: newProvider.webhook_url,
+      }),
+    });
+    setShowAdd(false);
+    setNewProvider({ type: "youtube", name: "", api_key: "", webhook_url: "" });
+    loadProviders();
+  };
+
+  const deleteProvider = async (id: number) => {
+    await fetch(`${API_BASE}/api/music/providers/${id}`, { method: "DELETE" });
+    loadProviders();
+  };
+
+  const searchMusic = async () => {
+    if (!searchQuery.trim() || !selectedProvider) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/music/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: selectedProvider.type,
+          query: searchQuery,
+          api_key: selectedProvider.apiKey || "",
+        }),
+      });
+      const data = await res.json();
+      setSearchResults(data.tracks || []);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  const getTypeIcon = (type: string) => {
+    const icons: Record<string, string> = {
+      youtube: "▶️", yandex: "🎧", vk: "💙", soundcloud: "☁️",
+      yandex_radio: "📻", record: "🎵", dfm: "📡",
+      europa_plus: "📻", nashe: "🎸", relax_fm: "🎧",
+      like_fm: "🔊", shanson: "🎹", custom: "🔗",
+    };
+    return icons[type] || "🎵";
+  };
+
+  const getTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      youtube: "YouTube Music", yandex: "Яндекс.Музыка", vk: "VK Музыка",
+      soundcloud: "SoundCloud", yandex_radio: "Яндекс.Радио",
+      record: "Radio Record", dfm: "DFM", europa_plus: "Европа Плюс",
+      nashe: "Наше Радио", relax_fm: "Relax FM", like_fm: "Like FM",
+      shanson: "Радио Шансон", custom: "Свой Webhook",
+    };
+    return labels[type] || type;
+  };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A0A0F', color: '#F1F5F9' }}>
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 40px', background: '#111118', borderBottom: '1px solid #1F2937' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-            <div style={{ width: '32px', height: '32px', background: '#16161F', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '16px' }}>N</div>
-            <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#FFF' }}>Нова</span>
+    <div style={styles.wrapper}>
+      <header style={styles.header}>
+        <div style={styles.headerLeft}>
+          <a href="/" style={styles.logoLink}>
+            <div style={styles.logoIcon}>N</div>
+            <span style={styles.logoText}>Нова</span>
           </a>
-          <span style={{ color: '#374151' }}>|</span>
-          <a href="/dashboard/modules" style={{ color: '#94A3B8', textDecoration: 'none', fontSize: '14px' }}>← Модули</a>
-          <span style={{ color: '#374151' }}>/</span>
-          <span style={{ color: '#00E5FF', fontSize: '14px', fontWeight: '500' }}>🎵 Музыка</span>
+          <span style={styles.separator}>|</span>
+          <a href="/dashboard/modules" style={styles.backLink}>← Модули</a>
+          <span style={styles.separator}>/</span>
+          <span style={styles.currentPage}>🎵 Музыка</span>
         </div>
-        <button onClick={save} style={{ padding: '10px 22px', background: saved ? '#22C55E' : '#00E5FF', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', transition: 'all 0.25s' }}>{saved ? '✅ Сохранено' : '💾 Сохранить'}</button>
       </header>
 
-      <main style={{ padding: '40px 48px', maxWidth: '800px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>🎵 Музыка</h1>
-        <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '32px' }}>Настройте музыкального бота 🎧</p>
+      <div style={styles.content}>
+        <h1 style={styles.title}>🎵 Музыка</h1>
+        <p style={styles.subtitle}>Поиск треков и радиостанции для вашего сервера</p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px 24px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>🔊 Основные</h3>
-            {[
-              { label: '🔈 Громкость', key: 'defaultVolume', min: 10, max: 100, suffix: '%' },
-              { label: '⏱️ Автоотключение (мин)', key: 'autoDisconnect', min: 5, max: 120, step: 5, suffix: '' },
-              { label: '📋 Макс. очередь', key: 'maxQueue', min: 10, max: 200, step: 10, suffix: '' },
-            ].map((s, i) => (
-              <div key={i} style={{ marginBottom: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>{sanitize(s.label)}</span>
-                  <span style={{ color: '#00E5FF', fontWeight: '600' }}>{settings[s.key as keyof typeof settings]}{s.suffix}</span>
-                </div>
-                <input type="range" min={s.min} max={s.max} step={s.step || 1} value={settings[s.key as keyof typeof settings] as number} onChange={(e) => update(s.key, parseInt(e.target.value))} style={{ width: '100%', accentColor: '#00E5FF' }} />
-              </div>
-            ))}
-            <div>
-              <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>📜 Лимит истории</label>
-              <input type="number" value={settings.historyLimit} onChange={(e) => update('historyLimit', parseInt(e.target.value) || 20)} style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
-            </div>
+        {/* Провайдеры */}
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <h3>🔌 Подключённые сервисы</h3>
+            <button onClick={() => setShowAdd(!showAdd)} style={styles.addBtn}>
+              {showAdd ? "✕" : "+ Добавить"}
+            </button>
           </div>
 
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px 24px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>⚙️ Дополнительно</h3>
-            {[
-              { key: 'autoPlay', label: '▶️ Автовоспроизведение', desc: 'Следующий трек автоматически' },
-              { key: 'djOnly', label: '🎧 Только DJ', desc: 'Управление только у DJ-роли' },
-              { key: 'allowPlaylists', label: '📂 Плейлисты', desc: 'Разрешить плейлисты' },
-              { key: 'announceTrack', label: '📢 Объявлять трек', desc: 'Писать название перед воспроизведением' },
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px solid #1F2937' : 'none' }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{sanitize(item.label)}</div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8' }}>{sanitize(item.desc)}</div>
+          {showAdd && (
+            <div style={styles.addForm}>
+              <select
+                value={newProvider.type}
+                onChange={(e) => setNewProvider({ ...newProvider, type: e.target.value })}
+                style={styles.input}
+              >
+                {availableTypes.map((t: any) => (
+                  <option key={t.value} value={t.value}>
+                    {t.icon} {t.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Название"
+                value={newProvider.name}
+                onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
+                style={styles.input}
+              />
+              {newProvider.type !== "yandex_radio" && newProvider.type !== "record" && newProvider.type !== "dfm" && newProvider.type !== "europa_plus" && newProvider.type !== "nashe" && newProvider.type !== "relax_fm" && newProvider.type !== "like_fm" && newProvider.type !== "shanson" && (
+                <input
+                  type="text"
+                  placeholder={newProvider.type === "custom" ? "Webhook URL" : "API Ключ"}
+                  value={newProvider.type === "custom" ? newProvider.webhook_url : newProvider.api_key}
+                  onChange={(e) =>
+                    newProvider.type === "custom"
+                      ? setNewProvider({ ...newProvider, webhook_url: e.target.value })
+                      : setNewProvider({ ...newProvider, api_key: e.target.value })
+                  }
+                  style={styles.input}
+                />
+              )}
+              <button onClick={addProvider} style={styles.saveBtn}>
+                💾 Сохранить
+              </button>
+            </div>
+          )}
+
+          <div style={styles.providersList}>
+            {providers.map((p: any) => (
+              <div key={p.id} style={styles.providerCard}>
+                <span style={styles.providerIcon}>{getTypeIcon(p.type)}</span>
+                <div style={styles.providerInfo}>
+                  <strong>{p.name || getTypeLabel(p.type)}</strong>
+                  <span style={styles.providerType}>{getTypeLabel(p.type)}</span>
                 </div>
-                <div onClick={() => update(item.key, !settings[item.key as keyof typeof settings])} style={{ width: '44px', height: '26px', background: settings[item.key as keyof typeof settings] ? '#00E5FF' : '#374151', borderRadius: '26px', cursor: 'pointer', transition: '0.25s', position: 'relative', flexShrink: 0 }}>
-                  <div style={{ position: 'absolute', height: '20px', width: '20px', left: settings[item.key as keyof typeof settings] ? '22px' : '4px', top: '3px', background: settings[item.key as keyof typeof settings] ? '#000' : '#FFF', borderRadius: '50%', transition: '0.25s' }} />
-                </div>
+                <span style={{ ...styles.status, color: p.enabled ? "#22C55E" : "#EF4444" }}>
+                  {p.enabled ? "🟢" : "🔴"}
+                </span>
+                <button onClick={() => deleteProvider(p.id)} style={styles.deleteBtn}>
+                  ✕
+                </button>
               </div>
             ))}
-            {settings.djOnly && (
-              <div style={{ marginTop: '12px' }}>
-                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>🎧 DJ-роль</label>
-                <input type="text" value={sanitize(settings.djRole)} onChange={(e) => update('djRole', e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
-              </div>
+            {providers.length === 0 && (
+              <p style={styles.empty}>Нет подключённых сервисов. Добавьте первый!</p>
             )}
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px' }}>
-          <button onClick={() => window.location.href = '/dashboard/modules'} style={{ padding: '12px 24px', background: 'transparent', color: '#94A3B8', border: '1px solid #1F2937', borderRadius: '12px', fontWeight: '600', cursor: 'pointer', fontSize: '14px' }}>← Назад</button>
-          <button onClick={save} style={{ padding: '12px 28px', background: '#00E5FF', color: '#000', border: 'none', borderRadius: '12px', fontWeight: '600', cursor: 'pointer', fontSize: '14px' }}>💾 Сохранить</button>
-        </div>
+        {/* Поиск */}
+        {providers.length > 0 && (
+          <div style={styles.section}>
+            <h3>🔍 Поиск треков</h3>
+            <div style={styles.searchRow}>
+              <select
+                value={selectedProvider?.id || ""}
+                onChange={(e) => {
+                  const p = providers.find((pr) => pr.id === parseInt(e.target.value));
+                  setSelectedProvider(p);
+                }}
+                style={styles.input}
+              >
+                <option value="">Выберите сервис...</option>
+                {providers.map((p: any) => (
+                  <option key={p.id} value={p.id}>
+                    {getTypeIcon(p.type)} {p.name || getTypeLabel(p.type)}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Название трека..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchMusic()}
+                style={{ ...styles.input, flex: 1 }}
+              />
+              <button onClick={searchMusic} disabled={loading} style={styles.searchBtn}>
+                {loading ? "⏳" : "🔍"}
+              </button>
+            </div>
 
-        {saved && <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: '#22C55E', color: '#000', padding: '12px 24px', borderRadius: '12px', fontWeight: '600', fontSize: '14px', zIndex: 1000, boxShadow: '0 4px 20px rgba(34,197,94,0.3)', animation: 'slideUp 0.3s ease' }}>✅ Сохранено</div>}
-        <style>{`@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
-      </main>
+            {searchResults.length > 0 && (
+              <div style={styles.results}>
+                {searchResults.map((track: any, i: number) => (
+                  <div key={i} style={styles.trackCard}>
+                    <span style={styles.trackNum}>{i + 1}</span>
+                    <div style={styles.trackInfo}>
+                      <strong>{track.title}</strong>
+                      <span style={styles.trackArtist}>{track.artist}</span>
+                    </div>
+                    <a href={track.url} target="_blank" style={styles.playBtn}>
+                      ▶
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
-  )
+  );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  wrapper: {
+    minHeight: "100vh",
+    background: "#0A0A0F",
+    color: "#F1F5F9",
+  },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "14px 40px",
+    background: "#111118",
+    borderBottom: "1px solid #1F2937",
+  },
+  headerLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  },
+  logoLink: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    textDecoration: "none",
+  },
+  logoIcon: {
+    width: "32px",
+    height: "32px",
+    background: "#16161F",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "bold",
+    color: "#00E5FF",
+    fontSize: "16px",
+  },
+  logoText: {
+    fontSize: "18px",
+    fontWeight: "bold",
+    color: "#FFF",
+  },
+  separator: {
+    color: "#374151",
+  },
+  backLink: {
+    color: "#94A3B8",
+    textDecoration: "none",
+    fontSize: "14px",
+  },
+  currentPage: {
+    color: "#00E5FF",
+    fontSize: "14px",
+    fontWeight: "500",
+  },
+  content: {
+    padding: "32px 40px",
+    maxWidth: "900px",
+  },
+  title: {
+    fontSize: "26px",
+    fontWeight: "700",
+    marginBottom: "4px",
+  },
+  subtitle: {
+    color: "#94A3B8",
+    fontSize: "14px",
+    marginBottom: "32px",
+  },
+  section: {
+    background: "#16161F",
+    borderRadius: "14px",
+    padding: "20px",
+    marginBottom: "16px",
+    border: "1px solid #1F2937",
+  },
+  sectionHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "16px",
+  },
+  addBtn: {
+    padding: "8px 16px",
+    background: "#00E5FF",
+    color: "#000",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "600",
+    cursor: "pointer",
+    fontSize: "13px",
+  },
+  addForm: {
+    display: "flex",
+    gap: "8px",
+    marginBottom: "16px",
+    flexWrap: "wrap" as const,
+  },
+  input: {
+    padding: "8px 12px",
+    background: "#0A0A0F",
+    border: "1px solid #1F2937",
+    borderRadius: "8px",
+    color: "#FFF",
+    fontSize: "13px",
+    outline: "none",
+  },
+  saveBtn: {
+    padding: "8px 16px",
+    background: "#22C55E",
+    color: "#000",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "600",
+    cursor: "pointer",
+    fontSize: "13px",
+  },
+  providersList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "8px",
+  },
+  providerCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "12px",
+    background: "#111118",
+    borderRadius: "10px",
+    border: "1px solid #1F2937",
+  },
+  providerIcon: {
+    fontSize: "24px",
+  },
+  providerInfo: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "2px",
+  },
+  providerType: {
+    fontSize: "11px",
+    color: "#64748B",
+  },
+  status: {
+    fontSize: "12px",
+  },
+  deleteBtn: {
+    padding: "4px 8px",
+    background: "transparent",
+    color: "#EF4444",
+    border: "1px solid #374151",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "12px",
+  },
+  empty: {
+    color: "#64748B",
+    textAlign: "center" as const,
+    padding: "20px",
+    fontSize: "14px",
+  },
+  searchRow: {
+    display: "flex",
+    gap: "8px",
+    marginBottom: "16px",
+  },
+  searchBtn: {
+    padding: "8px 16px",
+    background: "#00E5FF",
+    color: "#000",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "600",
+    cursor: "pointer",
+    fontSize: "13px",
+  },
+  results: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "6px",
+  },
+  trackCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "10px",
+    background: "#111118",
+    borderRadius: "8px",
+  },
+  trackNum: {
+    color: "#64748B",
+    fontSize: "14px",
+    width: "24px",
+    textAlign: "center" as const,
+  },
+  trackInfo: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "2px",
+  },
+  trackArtist: {
+    fontSize: "11px",
+    color: "#94A3B8",
+  },
+  playBtn: {
+    padding: "6px 12px",
+    background: "#22C55E",
+    color: "#FFF",
+    borderRadius: "6px",
+    textDecoration: "none",
+    fontSize: "14px",
+    fontWeight: "600",
+  },
+};
+
+export default MusicPage;
