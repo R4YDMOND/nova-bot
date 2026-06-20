@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
-from models import Server, ModuleConfig, AISettings, Member
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event
 import requests
 import random
 import re
