@@ -592,28 +592,29 @@ def auto_scan():
 
 @app.get("/api/stats")
 def get_public_stats():
-    """Публичная статистика для лендинга"""
+    """Публичная статистика для лендинга — только реальные данные"""
     db = SessionLocal()
     try:
         servers_count = db.query(Server).count()
+        users_count = 0
         
         try:
             from models import Member
             users_count = db.query(Member).count()
-        except ImportError:
-            users_count = 85000
+        except Exception:
+            pass
         
         return {
-            "servers": servers_count or 1,
-            "users": users_count or 85000,
+            "servers": servers_count or 0,
+            "users": users_count,
             "responseTime": 0.8,
             "webhooksOnline": True
         }
     except Exception as e:
-        print(f"Stats error (using fallback): {e}")
+        print(f"Stats error: {e}")
         return {
-            "servers": 128,
-            "users": 85200,
+            "servers": 0,
+            "users": 0,
             "responseTime": 0.8,
             "webhooksOnline": True
         }
