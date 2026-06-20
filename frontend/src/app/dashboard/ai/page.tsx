@@ -1,34 +1,58 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function AIPage() {
   const [settings, setSettings] = useState({
-    botName: 'Нова', personality: 'friendly', temperature: 0.7, maxLength: 500,
-    useEmoji: true, useContext: true, contextMessages: 10,
-    systemPrompt: 'Ты — дружелюбный AI-помощник сервера. Отвечай на русском языке.',
-    forbiddenTopics: 'политика, религия, NSFW', autoModeration: false, language: 'ru',
-    responseStyle: 'detailed', creativityLevel: 0.6, respectRoles: true,
-    ignoredRoles: '', allowedChannels: '', cooldownSeconds: 5,
-    maxTokensPerUser: 1000, dailyLimit: 50, greetingMessage: '', customInstructions: '',
+    // Основные
+    botName: 'Нова',
+    language: 'ru',
+    activeModel: 'auto',
+    
+    // Gemini
+    geminiEnabled: true,
+    geminiTemperature: 0.8,
+    geminiStyle: 'friendly',
+    geminiCustomPrompt: '',
+    
+    // DeepSeek
+    deepseekEnabled: true,
+    deepseekTemperature: 0.7,
+    deepseekStyle: 'creative',
+    deepseekCustomPrompt: '',
+    
+    // Общие
+    useContext: true,
+    contextMessages: 10,
+    systemPrompt: 'Ты — дружелюбный AI-помощник. Отвечай на русском языке.',
+    forbiddenTopics: 'политика, религия, NSFW',
+    autoModeration: false,
+    
+    // Привязка к серверу
+    serverName: '',
+    platform: 'Lolka',
   })
 
   const [saved, setSaved] = useState(false)
+  const [activeTab, setActiveTab] = useState('general')
+
   const update = (key: string, value: any) => setSettings({ ...settings, [key]: value })
   const toggle = (key: string) => update(key, !settings[key as keyof typeof settings])
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
 
-  const resetAll = () => {
-    setSettings({
-      botName: 'Нова', personality: 'friendly', temperature: 0.7, maxLength: 500,
-      useEmoji: true, useContext: true, contextMessages: 10,
-      systemPrompt: 'Ты — дружелюбный AI-помощник сервера. Отвечай на русском языке.',
-      forbiddenTopics: 'политика, религия, NSFW', autoModeration: false, language: 'ru',
-      responseStyle: 'detailed', creativityLevel: 0.6, respectRoles: true,
-      ignoredRoles: '', allowedChannels: '', cooldownSeconds: 5,
-      maxTokensPerUser: 1000, dailyLimit: 50, greetingMessage: '', customInstructions: '',
-    })
-  }
+  // Стили для Gemini
+  const geminiStyles = [
+    { value: 'friendly', label: '😊 Дружелюбный', desc: 'Тёплое, приветливое общение' },
+    { value: 'gaming', label: '🎮 Игровой', desc: 'Энергичный, с игровым сленгом' },
+    { value: 'professional', label: '💼 Профессиональный', desc: 'Серьёзный, деловой тон' },
+  ]
+
+  // Стили для DeepSeek
+  const deepseekStyles = [
+    { value: 'creative', label: '🎨 Креативный', desc: 'Нестандартные, яркие ответы' },
+    { value: 'humorous', label: '😂 Юмористический', desc: 'С шутками и мемами' },
+    { value: 'anime', label: '🌸 Аниме', desc: 'В стиле аниме-персонажа' },
+  ]
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', color: '#F1F5F9' }}>
@@ -58,96 +82,257 @@ export default function AIPage() {
       <main style={{ padding: '32px 40px', maxWidth: '1000px', margin: '0 auto' }}>
         
         <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '4px' }}>✨ AI-Настройки</h1>
-        <p style={{ color: '#94A3B8', fontSize: '13px', marginBottom: '28px' }}>Тонкая настройка искусственного интеллекта</p>
+        <p style={{ color: '#94A3B8', fontSize: '13px', marginBottom: '24px' }}>Гибкая настройка моделей и стилей общения</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-
-          {/* Личность */}
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🤖 Личность</h3>
-            <div style={{ marginBottom: '10px' }}>
-              <label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Имя</label>
-              <input type="text" value={settings.botName} onChange={(e) => update('botName', e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Стиль</label>
-              <select value={settings.personality} onChange={(e) => update('personality', e.target.value)}
-                style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', cursor: 'pointer' }}>
-                <option value="friendly">😊 Дружественный</option>
-                <option value="gaming">🎮 Игровой</option>
-                <option value="serious">🤵 Серьёзный</option>
-                <option value="funny">😂 Юмористический</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Параметры */}
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🌡️ Генерация</h3>
-            {[
-              { label: 'Температура', key: 'temperature', min: 0, max: 1, step: 0.1 },
-              { label: 'Длина ответа', key: 'maxLength', min: 100, max: 2000, step: 100 },
-            ].map((s, i) => (
-              <div key={i} style={{ marginBottom: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '12px', color: '#94A3B8' }}>{s.label}</span>
-                  <span style={{ fontSize: '12px', color: '#00E5FF', fontWeight: '600' }}>{settings[s.key as keyof typeof settings]}</span>
-                </div>
-                <input type="range" min={s.min} max={s.max} step={s.step} value={settings[s.key as keyof typeof settings] as number}
-                  onChange={(e) => update(s.key, parseFloat(e.target.value))} style={{ width: '100%', accentColor: '#00E5FF' }} />
-              </div>
-            ))}
-          </div>
-
-          {/* Контекст */}
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🧠 Контекст</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '13px' }}>Запоминать контекст</span>
-              <div onClick={() => toggle('useContext')} style={{ width: '38px', height: '22px', background: settings.useContext ? '#00E5FF' : '#374151', borderRadius: '22px', cursor: 'pointer', position: 'relative' }}>
-                <div style={{ position: 'absolute', height: '16px', width: '16px', left: settings.useContext ? '20px' : '3px', top: '3px', background: settings.useContext ? '#000' : '#FFF', borderRadius: '50%', transition: '0.25s' }} />
-              </div>
-            </div>
-            {settings.useContext && (
-              <input type="number" value={settings.contextMessages} onChange={(e) => update('contextMessages', parseInt(e.target.value) || 10)}
-                style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
-            )}
-          </div>
-
-          {/* Квоты */}
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>📋 Квоты</h3>
-            <div style={{ marginBottom: '10px' }}>
-              <label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Кулдаун (сек)</label>
-              <input type="number" value={settings.cooldownSeconds} onChange={(e) => update('cooldownSeconds', parseInt(e.target.value) || 5)}
-                style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
-            </div>
-            <div>
-              <label style={{ fontSize: '11px', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Дневной лимит</label>
-              <input type="number" value={settings.dailyLimit} onChange={(e) => update('dailyLimit', parseInt(e.target.value) || 50)}
-                style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', boxSizing: 'border-box' }} />
-            </div>
-          </div>
-
-          {/* Промпт (на всю ширину) */}
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937', gridColumn: '1 / 3' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>📝 Системный промпт</h3>
-            <textarea value={settings.systemPrompt} onChange={(e) => update('systemPrompt', e.target.value)} rows={3}
-              style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }} />
-          </div>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '24px' }}>
+          {[
+            { id: 'general', label: '⚙️ Общие' },
+            { id: 'gemini', label: '🔵 Gemini' },
+            { id: 'deepseek', label: '🟣 DeepSeek' },
+            { id: 'server', label: '🖥️ Сервер' },
+          ].map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+              padding: '10px 18px', borderRadius: '10px', border: 'none',
+              background: activeTab === tab.id ? '#1F2937' : 'transparent',
+              color: activeTab === tab.id ? '#FFF' : '#94A3B8',
+              fontWeight: activeTab === tab.id ? '600' : '400',
+              cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s'
+            }}>{tab.label}</button>
+          ))}
         </div>
 
-        {/* Нижние кнопки */}
+        {/* Tab: General */}
+        {activeTab === 'general' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            
+            {/* Модель */}
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '14px' }}>🤖 Активная модель</h3>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {[
+                  { value: 'auto', label: '🔄 Авто', desc: 'Gemini → DeepSeek' },
+                  { value: 'gemini', label: '🔵 Gemini', desc: 'Google AI' },
+                  { value: 'deepseek', label: '🟣 DeepSeek', desc: 'DeepSeek AI' },
+                ].map(m => (
+                  <div key={m.value} onClick={() => update('activeModel', m.value)} style={{
+                    flex: 1, padding: '14px', borderRadius: '12px', cursor: 'pointer',
+                    background: settings.activeModel === m.value ? 'rgba(0,229,255,0.08)' : '#111118',
+                    border: `2px solid ${settings.activeModel === m.value ? '#00E5FF' : '#1F2937'}`,
+                    transition: 'all 0.2s'
+                  }}>
+                    <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '4px' }}>{m.label}</div>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>{m.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Имя и язык */}
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Имя бота</label>
+                <input type="text" value={settings.botName} onChange={(e) => update('botName', e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Язык</label>
+                <select value={settings.language} onChange={(e) => update('language', e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', cursor: 'pointer' }}>
+                  <option value="ru">🇷🇺 Русский</option>
+                  <option value="en">🇬🇧 English</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Системный промпт */}
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '8px' }}>📝 Системный промпт</h3>
+              <textarea value={settings.systemPrompt} onChange={(e) => update('systemPrompt', e.target.value)} rows={3}
+                style={{ width: '100%', padding: '12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+            </div>
+
+            {/* Переключатели */}
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '14px' }}>⚙️ Дополнительно</h3>
+              {[
+                { key: 'useContext', label: 'Запоминать контекст', desc: 'Помнить последние сообщения' },
+                { key: 'autoModeration', label: 'Автомодерация AI', desc: 'Фильтровать ответы бота' },
+              ].map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i === 0 ? '1px solid #1F2937' : 'none' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>{item.label}</div>
+                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>{item.desc}</div>
+                  </div>
+                  <div onClick={() => toggle(item.key)} style={{ width: '44px', height: '26px', background: settings[item.key as keyof typeof settings] ? '#00E5FF' : '#374151', borderRadius: '26px', cursor: 'pointer', position: 'relative' }}>
+                    <div style={{ position: 'absolute', height: '20px', width: '20px', left: settings[item.key as keyof typeof settings] ? '22px' : '4px', top: '3px', background: settings[item.key as keyof typeof settings] ? '#000' : '#FFF', borderRadius: '50%', transition: '0.25s' }} />
+                  </div>
+                </div>
+              ))}
+              {settings.useContext && (
+                <div style={{ marginTop: '12px' }}>
+                  <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Сообщений для контекста</label>
+                  <input type="number" value={settings.contextMessages} onChange={(e) => update('contextMessages', parseInt(e.target.value) || 10)}
+                    style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Gemini */}
+        {activeTab === 'gemini' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '600' }}>🔵 Google Gemini</h3>
+                <div onClick={() => toggle('geminiEnabled')} style={{ width: '44px', height: '26px', background: settings.geminiEnabled ? '#00E5FF' : '#374151', borderRadius: '26px', cursor: 'pointer', position: 'relative' }}>
+                  <div style={{ position: 'absolute', height: '20px', width: '20px', left: settings.geminiEnabled ? '22px' : '4px', top: '3px', background: settings.geminiEnabled ? '#000' : '#FFF', borderRadius: '50%', transition: '0.25s' }} />
+                </div>
+              </div>
+
+              {settings.geminiEnabled && (
+                <>
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '13px', color: '#94A3B8' }}>Температура</span>
+                      <span style={{ color: '#3B82F6', fontWeight: '600' }}>{settings.geminiTemperature}</span>
+                    </div>
+                    <input type="range" min="0" max="1" step="0.1" value={settings.geminiTemperature}
+                      onChange={(e) => update('geminiTemperature', parseFloat(e.target.value))}
+                      style={{ width: '100%', accentColor: '#3B82F6' }} />
+                  </div>
+
+                  <h4 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '10px', color: '#94A3B8' }}>🎨 Стили общения (3 шаблона)</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {geminiStyles.map(style => (
+                      <div key={style.value} onClick={() => update('geminiStyle', style.value)} style={{
+                        padding: '14px', borderRadius: '12px', cursor: 'pointer',
+                        background: settings.geminiStyle === style.value ? 'rgba(59,130,246,0.1)' : '#111118',
+                        border: `2px solid ${settings.geminiStyle === style.value ? '#3B82F6' : '#1F2937'}`,
+                        transition: 'all 0.2s'
+                      }}>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{style.label}</div>
+                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>{style.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: '16px' }}>
+                    <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Кастомный промпт для Gemini</label>
+                    <textarea value={settings.geminiCustomPrompt} onChange={(e) => update('geminiCustomPrompt', e.target.value)} rows={2}
+                      placeholder="Дополнительные инструкции для Gemini..."
+                      style={{ width: '100%', padding: '10px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: DeepSeek */}
+        {activeTab === 'deepseek' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '600' }}>🟣 DeepSeek AI</h3>
+                <div onClick={() => toggle('deepseekEnabled')} style={{ width: '44px', height: '26px', background: settings.deepseekEnabled ? '#A855F7' : '#374151', borderRadius: '26px', cursor: 'pointer', position: 'relative' }}>
+                  <div style={{ position: 'absolute', height: '20px', width: '20px', left: settings.deepseekEnabled ? '22px' : '4px', top: '3px', background: settings.deepseekEnabled ? '#000' : '#FFF', borderRadius: '50%', transition: '0.25s' }} />
+                </div>
+              </div>
+
+              {settings.deepseekEnabled && (
+                <>
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '13px', color: '#94A3B8' }}>Температура</span>
+                      <span style={{ color: '#A855F7', fontWeight: '600' }}>{settings.deepseekTemperature}</span>
+                    </div>
+                    <input type="range" min="0" max="1" step="0.1" value={settings.deepseekTemperature}
+                      onChange={(e) => update('deepseekTemperature', parseFloat(e.target.value))}
+                      style={{ width: '100%', accentColor: '#A855F7' }} />
+                  </div>
+
+                  <h4 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '10px', color: '#94A3B8' }}>🎨 Стили общения (3 шаблона)</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {deepseekStyles.map(style => (
+                      <div key={style.value} onClick={() => update('deepseekStyle', style.value)} style={{
+                        padding: '14px', borderRadius: '12px', cursor: 'pointer',
+                        background: settings.deepseekStyle === style.value ? 'rgba(168,85,247,0.1)' : '#111118',
+                        border: `2px solid ${settings.deepseekStyle === style.value ? '#A855F7' : '#1F2937'}`,
+                        transition: 'all 0.2s'
+                      }}>
+                        <div style={{ fontWeight: '600', fontSize: '14px' }}>{style.label}</div>
+                        <div style={{ fontSize: '12px', color: '#94A3B8' }}>{style.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: '16px' }}>
+                    <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Кастомный промпт для DeepSeek</label>
+                    <textarea value={settings.deepseekCustomPrompt} onChange={(e) => update('deepseekCustomPrompt', e.target.value)} rows={2}
+                      placeholder="Дополнительные инструкции для DeepSeek..."
+                      style={{ width: '100%', padding: '10px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }} />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Server */}
+        {activeTab === 'server' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>🖥️ Привязка к серверу</h3>
+              <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '16px' }}>
+                AI будет адаптировать стиль общения под название сервера или группы
+              </p>
+              
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Платформа</label>
+                <select value={settings.platform} onChange={(e) => update('platform', e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', cursor: 'pointer' }}>
+                  <option value="Lolka">🎮 Lolka</option>
+                  <option value="VK">💙 VK</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Название сервера/группы</label>
+                <input type="text" value={settings.serverName} onChange={(e) => update('serverName', e.target.value)}
+                  placeholder="Например: Phoenix Gaming"
+                  style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+
+              {/* Предпросмотр */}
+              <div style={{ marginTop: '16px', background: '#111118', borderRadius: '12px', padding: '16px' }}>
+                <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '8px' }}>📝 Пример обращения:</div>
+                <div style={{ fontSize: '14px', color: '#00E5FF', fontStyle: 'italic' }}>
+                  {settings.platform === 'VK' 
+                    ? `«Привет, подписчики ${settings.serverName || 'нашего паблика'}! ${settings.botName} на связи!»`
+                    : `«Всем привет с сервера ${settings.serverName || 'Lolka'}! Я ${settings.botName}, ваш помощник!»`
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Кнопки */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
           <button onClick={() => window.location.href = '/dashboard/modules'} style={{
             padding: '10px 20px', background: 'transparent', color: '#94A3B8',
             border: '1px solid #1F2937', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '13px'
           }}>← Назад</button>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={resetAll} style={{ padding: '10px 18px', background: 'transparent', color: '#EF4444', border: '1px solid #374151', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}>🔄 Сбросить</button>
-            <button onClick={save} style={{ padding: '10px 24px', background: saved ? '#22C55E' : '#00E5FF', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '13px', transition: 'all 0.3s', boxShadow: saved ? '0 0 15px rgba(34,197,94,0.3)' : 'none' }}>{saved ? '✅ Сохранено!' : '💾 Сохранить'}</button>
-          </div>
+          <button onClick={save} style={{
+            padding: '10px 24px', background: saved ? '#22C55E' : '#00E5FF', color: '#000',
+            border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '13px',
+            transition: 'all 0.3s', boxShadow: saved ? '0 0 15px rgba(34,197,94,0.3)' : 'none'
+          }}>{saved ? '✅ Сохранено!' : '💾 Сохранить'}</button>
         </div>
 
         {saved && (
