@@ -5,6 +5,16 @@ import { useState, useEffect } from 'react'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const navigate = (url: string) => window.location.href = url
 
+// Защита от краша, эмодзи и спецсимволов
+const sanitize = (text: string): string => {
+  if (!text) return ''
+  return text
+    .replace(/[\u0000-\u001F]/g, '')
+    .replace(/[\u200B-\u200D]/g, '')
+    .replace(/[\uFEFF]/g, '')
+    .trim()
+}
+
 export default function ServersPage() {
   const [servers, setServers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,7 +42,7 @@ export default function ServersPage() {
             { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
             { icon: '🔗', label: 'Вебхуки', href: '/dashboard/webhooks' },
           ].map((item, i) => {
-             const isActive = item.label === 'Серверы'
+            const isActive = item.label === 'Серверы'
             return (
               <span key={i} onClick={() => navigate(item.href)} style={{
                 padding: '10px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center',
@@ -41,7 +51,7 @@ export default function ServersPage() {
                 transition: 'all 0.15s'
               }}>
                 <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{item.icon}</span>
-                {item.label}
+                {sanitize(item.label)}
               </span>
             )
           })}
@@ -52,7 +62,7 @@ export default function ServersPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
           <div>
             <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>🖥️ Мои серверы</h1>
-            <p style={{ color: '#94A3B8', fontSize: '14px' }}>Управляйте подключёнными серверами</p>
+            <p style={{ color: '#94A3B8', fontSize: '14px' }}>Управляйте подключёнными серверами 🌐</p>
           </div>
           <button onClick={() => navigate('/login')} style={{
             padding: '10px 22px', background: '#00E5FF', color: '#000',
@@ -62,13 +72,13 @@ export default function ServersPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
           {[
-            { label: 'Всего серверов', value: servers.length, color: '#00E5FF' },
-            { label: 'Активных', value: servers.length, color: '#22C55E' },
-            { label: 'Модулей доступно', value: '6', color: '#A855F7' },
-            { label: 'Время ответа', value: '<0.8s', color: '#F59E0B' },
+            { label: '📊 Всего серверов', value: servers.length, color: '#00E5FF' },
+            { label: '🟢 Активных', value: servers.length, color: '#22C55E' },
+            { label: '🧩 Модулей доступно', value: '6', color: '#A855F7' },
+            { label: '⚡ Время ответа', value: '<0.8s', color: '#F59E0B' },
           ].map((stat, i) => (
             <div key={i} style={{ background: '#16161F', borderRadius: '14px', padding: '20px 24px', border: '1px solid #1F2937' }}>
-              <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '6px' }}>{stat.label}</div>
+              <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '6px' }}>{sanitize(stat.label)}</div>
               <div style={{ fontSize: '24px', fontWeight: 'bold', color: stat.color }}>{stat.value}</div>
             </div>
           ))}
@@ -76,12 +86,12 @@ export default function ServersPage() {
 
         <div style={{ background: '#16161F', borderRadius: '14px', border: '1px solid #1F2937', overflow: 'hidden' }}>
           {loading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#94A3B8' }}>Загрузка...</div>
+            <div style={{ padding: '60px', textAlign: 'center', color: '#94A3B8' }}>⏳ Загрузка...</div>
           ) : servers.length === 0 ? (
             <div style={{ padding: '60px', textAlign: 'center' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🖥️</div>
               <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>Нет серверов</h3>
-              <p style={{ color: '#94A3B8', marginBottom: '20px' }}>Добавьте первый сервер</p>
+              <p style={{ color: '#94A3B8', marginBottom: '20px' }}>Добавьте первый сервер чтобы начать 🚀</p>
               <button onClick={() => navigate('/login')} style={{
                 padding: '12px 24px', background: '#00E5FF', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer'
               }}>⭐ Интегрировать Нова</button>
@@ -98,7 +108,7 @@ export default function ServersPage() {
               <tbody>
                 {servers.map((s: any) => (
                   <tr key={s.id} style={{ borderBottom: '1px solid #1F2937' }}>
-                    <td style={{ padding: '16px 20px', fontWeight: '500' }}>🖥️ {s.name}</td>
+                    <td style={{ padding: '16px 20px', fontWeight: '500' }}>🖥️ {sanitize(s.name)}</td>
                     <td style={{ padding: '16px 20px', color: '#94A3B8', fontSize: '13px' }}>{s.id}</td>
                     <td style={{ padding: '16px 20px' }}>
                       <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>🟢 Активен</span>
@@ -107,7 +117,7 @@ export default function ServersPage() {
                       <button onClick={() => navigate('/dashboard/modules')} style={{
                         padding: '8px 14px', background: 'transparent', color: '#00E5FF',
                         border: '1px solid #1F2937', borderRadius: '8px', cursor: 'pointer', fontSize: '12px'
-                      }}>Настроить</button>
+                      }}>⚙️ Настроить</button>
                     </td>
                   </tr>
                 ))}
