@@ -660,3 +660,135 @@ def get_forward_stats():
         "by_platform": by_platform,
         "recent": recent
     }
+
+# ==================== Сканирование контента ====================
+
+
+# ==================== Сканирование контента ====================
+
+@app.post("/api/scan/content")
+def scan_content(data: dict):
+    """
+    Сканирует группу VK на новый контент.
+    Фильтрует по лайкам и пересылает подходящее.
+    """
+    platform = data.get("platform", "vk")
+    group_id = data.get("group_id", "")
+    min_likes = data.get("min_likes", 5)
+    server_name = data.get("serverName", "")
+    webhooks = data.get("webhooks", [])
+    
+    if platform != "vk":
+        return {"status": "ok", "message": "Пока поддерживается только VK", "found": 0, "sent": 0}
+    
+    if not group_id:
+        return {"status": "ok", "message": "group_id не указан", "found": 0, "sent": 0}
+    
+    access_token = os.getenv("VK_ACCESS_TOKEN", "")
+    if not access_token:
+        return {"status": "ok", "message": "VK_ACCESS_TOKEN не настроен", "found": 0, "sent": 0}
+    
+    try:
+        resp = requests.get("https://api.vk.com/method/wall.get", params={
+            "owner_id": f"-{group_id}",
+            "count": 10,
+            "filter": "owner",
+            "access_token": access_token,
+            "v": "5.199"
+        }, timeout=10)
+        data_resp = resp.json()
+        
+        if "error" in data_resp:
+            return {"status": "ok", "message": f"Ошибка VK: {data_resp['error'].get('error_msg', '')}", "found": 0, "sent": 0}
+        
+        posts = data_resp.get("response", {}).get("items", [])
+    except Exception as e:
+        return {"status": "ok", "message": f"Ошибка получения: {str(e)}", "found": 0, "sent": 0}
+    
+    found = 0
+    sent = 0
+    
+    for post in posts:
+        likes = post.get("likes", {}).get("count", 0)
+        reposts = post.get("reposts", {}).get("count", 0)
+        total_engagement = likes + reposts
+        
+        if total_engagement < min_likes:
+            continue
+        
+        found += 1
+        
+        post_text = post.get("text", "")
+        post_url = f"https://vk.com/wall-{group_id}_{post.get('id')}"
+        
+        attachments = post.get("attachments", [])
+        content_type = "posts"
+        
+        for att in attachments:
+            att_type = att.get("type", "")
+            if att_type == "video":
+                content_type = "videos"
+            elif att_type == "link":
+                content_type = "articles"
+            elif att_type == "audio":
+                content_type = "music"
+        
+        if len(post_text) > 100:
+            post_text = post_text[:100] + "..."
+        
+        matching = [w for w in webhooks if w.get("rules", {}).get(content_type, False)]
+        
+        if matching:
+            ai_comment = generate_ai_comment(post_url, content_type, platform.upper(), server_name)
+            full_msg = f"🔥 Популярное ({likes}👍 {reposts}🔄):\n{ai_comment}\n{post_url}"
+            
+            for wh in matching:
+                try:
+                    if wh.get("platform") == "lolka":
+                        send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": full_msg})
+                    elif wh.get("platform") == "vk":
+                        send_to_vk({"group_id": wh.get("group_id"), "message": full_msg})
+                    
+                    forward_stats.append({
+                        "url": post_url, "type": content_type,
+                        "platform": wh.get("platform"), "channel": wh.get("channel", ""),
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                    sent += 1
+                except Exception as e:
+                    pass
+    
+    return {
+        "status": "ok",
+        "found": found,
+        "sent": sent,
+        "total_posts": len(posts),
+        "min_likes": min_likes
+    }
+
+
+@app.get("/api/scan/auto")
+def auto_scan():
+    """
+    Эндпоинт для cron-job.org.
+    Вызывается каждые 30 минут для автосканирования.
+    """
+    access_token = os.getenv("VK_ACCESS_TOKEN", "")
+    group_id = os.getenv("VK_GROUP_ID", "")
+    
+    if not access_token or not group_id:
+        return {"status": "ok", "message": "Токен или group_id не настроены", "timestamp": datetime.utcnow().isoformat()}
+    
+    result = scan_content({
+        "platform": "vk",
+        "group_id": group_id,
+        "min_likes": 3,
+        "serverName": "Автосканирование",
+        "webhooks": []
+    })
+    
+    return {
+        "status": "ok",
+        "message": f"Найдено: {result.get('found', 0)}, отправлено: {result.get('sent', 0)}",
+        "timestamp": datetime.utcnow().isoformat()
+    }
