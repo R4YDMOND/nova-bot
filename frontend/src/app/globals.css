@@ -9,7 +9,7 @@
   --font-xs: 11px;
   --font-sm: 12px;
   --font-md: 13px;
-  --font-lg: 14px;
+  --font-lg: 15px;
   --font-xl: 16px;
   --font-2xl: 20px;
   --font-3xl: 24px;
@@ -18,7 +18,7 @@
   /* Иконки */
   --icon-sm: 14px;
   --icon-md: 16px;
-  --icon-lg: 20px;
+  --icon-lg: 22px;
   --icon-xl: 28px;
 
   /* Цвета — ночная тема (по умолчанию) */
@@ -52,7 +52,7 @@
   --transition-slow: 0.4s;
 
   /* Сайдбар */
-  --sidebar-width: 250px;
+  --sidebar-width: 280px;
   --sidebar-collapsed: 56px;
 }
 
