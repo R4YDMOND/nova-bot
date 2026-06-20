@@ -602,4 +602,12 @@ def get_moderation_log():
 
 @app.get("/api/ranking/members")
 def get_ranking_members():
-    return {"members": [], "total": 0}
+    """Возвращает список участников рейтинга"""
+    return {
+        "members": [
+            {"name": "🦊 Лисёнок", "level": 42, "xp": 15420, "rank": 1, "avatar": "🦊", "messages": 2400, "voiceHours": 120, "reactions": 856},
+            {"name": "🐉 Dragon", "level": 38, "xp": 12800, "rank": 2, "avatar": "🐉", "messages": 1800, "voiceHours": 95, "reactions": 620},
+            {"name": "⭐ StarUser", "level": 27, "xp": 7650, "rank": 3, "avatar": "⭐", "messages": 1200, "voiceHours": 60, "reactions": 340}
+        ],
+        "total": 3
+    }
