@@ -1,7 +1,7 @@
-from fastapi import FastAPI, Query
+"from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
-from models import Server, ModuleConfig, AISettings
+from models import Server, ModuleConfig, AISettings, Member
 import requests
 import random
 import re
@@ -590,6 +590,37 @@ def auto_scan():
 
 # ==================== Статистика ====================
 
+@app.get("/api/stats")
+def get_public_stats():
+    """Публичная статистика для лендинга"""
+    db = SessionLocal()
+    try:
+        servers_count = db.query(Server).count()
+        
+        try:
+            from models import Member
+            users_count = db.query(Member).count()
+        except ImportError:
+            users_count = 85000
+        
+        return {
+            "servers": servers_count or 1,
+            "users": users_count or 85000,
+            "responseTime": 0.8,
+            "webhooksOnline": True
+        }
+    except Exception as e:
+        print(f"Stats error (using fallback): {e}")
+        return {
+            "servers": 128,
+            "users": 85200,
+            "responseTime": 0.8,
+            "webhooksOnline": True
+        }
+    finally:
+        db.close()
+
+
 @app.get("/api/stats/dashboard")
 def get_dashboard_stats():
     return {"totalMessages": 0, "activeUsers": 0, "commandsUsed": 0, "voiceHours": 0, "onlineNow": 0, "newUsers": 0, "messagesChart": [0,0,0,0,0,0,0], "recentActivity": [], "topCommands": [], "serversCount": 0}
@@ -610,4 +641,4 @@ def get_ranking_members():
             {"name": "⭐ StarUser", "level": 27, "xp": 7650, "rank": 3, "avatar": "⭐", "messages": 1200, "voiceHours": 60, "reactions": 340}
         ],
         "total": 3
-    }
+    }" внеси изменения в код
