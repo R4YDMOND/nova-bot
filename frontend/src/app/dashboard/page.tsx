@@ -1,259 +1,340 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
+import Link from "next/link";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const navigate = (url: string) => window.location.href = url
+const API_BASE = "https://nova-bot-rpsy.onrender.com";
 
-// Защита от краша, эмодзи и спецсимволов
-const sanitize = (text: string): string => {
-  if (!text) return ''
-  return text
-    .replace(/[\u0000-\u001F]/g, '')
-    .replace(/[\u200B-\u200D]/g, '')
-    .replace(/[\uFEFF]/g, '')
-    .trim()
-}
+const navigate = (url: string) => {
+  window.location.href = url;
+};
 
-export default function Dashboard() {
-  const [servers, setServers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [timeframe, setTimeframe] = useState('7d')
-
-  // Динамическая статистика из API
-  const [stats, setStats] = useState({
-    totalMessages: 0, activeUsers: 0, commandsUsed: 0, voiceHours: 0,
-    onlineNow: 0, newUsers: 0, messagesChart: [0,0,0,0,0,0,0]
-  })
-  const [recentActivity, setRecentActivity] = useState<any[]>([])
-  const [topCommands, setTopCommands] = useState<any[]>([])
-  const [dashLoading, setDashLoading] = useState(true)
+export default function DashboardPage() {
+  const [stats, setStats] = useState<any>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Загрузка серверов
-    fetch(`${API_URL}/api/servers`)
-      .then(res => res.json())
-      .then(data => { setServers(data.servers || []); setLoading(false) })
-      .catch(() => setLoading(false))
-
-    // Загрузка статистики дашборда
-    fetch(`${API_URL}/api/stats/dashboard`)
-      .then(res => res.json())
-      .then(data => {
-        setStats({
-          totalMessages: data.totalMessages || 0,
-          activeUsers: data.activeUsers || 0,
-          commandsUsed: data.commandsUsed || 0,
-          voiceHours: data.voiceHours || 0,
-          onlineNow: data.onlineNow || 0,
-          newUsers: data.newUsers || 0,
-          messagesChart: data.messagesChart || [0,0,0,0,0,0,0]
-        })
-        setRecentActivity(data.recentActivity || [])
-        setTopCommands(data.topCommands || [])
-        setDashLoading(false)
+    fetch(`${API_BASE}/api/stats/dashboard`)
+      .then((r) => r.json())
+      .then((d) => {
+        setStats(d);
+        setLoading(false);
       })
-      .catch(() => setDashLoading(false))
-  }, [])
+      .catch(() => setLoading(false));
+  }, []);
+
+  const modules = [
+    { name: "Музыка", desc: "YouTube, VK, радио", icon: "🎵", href: "/dashboard/music", color: "#A855F7" },
+    { name: "AI-помощник", desc: "ChatGPT, DeepSeek", icon: "🤖", href: "/dashboard/ai", color: "#3B82F6" },
+    { name: "Рейтинг", desc: "Уровни, XP, карточки", icon: "🏆", href: "/dashboard/ranking", color: "#F59E0B" },
+    { name: "Модерация", desc: "Логи, предупреждения", icon: "🛡️", href: "/dashboard/moderation", color: "#EF4444" },
+    { name: "Аналитика", desc: "Отчёты, статистика", icon: "📊", href: "/dashboard/analytics", color: "#10B981" },
+    { name: "Вебхуки", desc: "VK, Lolka, авто-форвард", icon: "🔗", href: "/dashboard/webhooks", color: "#00E5FF" },
+  ];
+
+  const quickActions = [
+    { icon: "📢", label: "Рассылка", desc: "Отправить сообщение во все каналы", href: "/dashboard/webhooks" },
+    { icon: "🗓️", label: "Создать событие", desc: "Запланировать ивент", href: "/dashboard/webhooks" },
+    { icon: "🔍", label: "Сканировать", desc: "Найти популярный контент", href: "/dashboard/webhooks" },
+  ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
-      
-      <aside style={{ width: '240px', minWidth: '240px', background: '#111118', borderRight: '1px solid #1F2937', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
-        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '32px' }}>
-          <div style={{ width: '34px', height: '34px', background: '#16161F', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#00E5FF', fontSize: '17px' }}>N</div>
-          <span style={{ fontSize: '19px', fontWeight: 'bold', color: '#FFF' }}>Нова</span>
-        </a>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+    <div style={styles.wrapper}>
+      {/* Сайдбар */}
+      <aside style={styles.sidebar}>
+        <Link href="/" style={styles.logoLink}>
+          <div style={styles.logoIcon}>N</div>
+          <span style={styles.logoText}>Нова</span>
+        </Link>
+        <nav style={styles.nav}>
           {[
-            { icon: '📊', label: 'Обзор', href: '/dashboard' },
-            { icon: '🖥️', label: 'Серверы', href: '/dashboard/servers' },
-            { icon: '🧩', label: 'Модули', href: '/dashboard/modules' },
-            { icon: '⚡', label: 'Команды', href: '/dashboard/commands' },
-            { icon: '🔗', label: 'Вебхуки', href: '/dashboard/webhooks' },
-          ].map((item, i) => {
-            const isActive = item.label === 'Обзор'
-            return (
-              <span key={i} onClick={() => navigate(item.href)} style={{
-                padding: '10px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center',
-                gap: '10px', fontSize: '14px', cursor: 'pointer', fontWeight: isActive ? '500' : '400',
-                color: isActive ? '#FFF' : '#94A3B8', background: isActive ? '#1F2937' : 'transparent',
-                transition: 'all 0.15s'
-              }}>
-                <span style={{ fontSize: '16px', width: '20px', textAlign: 'center' }}>{item.icon}</span>
-                {sanitize(item.label)}
-              </span>
-            )
-          })}
+            { icon: "📊", label: "Обзор", href: "/dashboard", active: true },
+            { icon: "🖥️", label: "Серверы", href: "/dashboard/servers" },
+            { icon: "🧩", label: "Модули", href: "/dashboard/modules" },
+            { icon: "⚡", label: "Команды", href: "/dashboard/commands" },
+            { icon: "🔗", label: "Вебхуки", href: "/dashboard/webhooks" },
+          ].map((item, i) => (
+            <span
+              key={i}
+              onClick={() => navigate(item.href)}
+              style={{
+                ...styles.navItem,
+                color: item.active ? "#FFF" : "#94A3B8",
+                background: item.active ? "#1F2937" : "transparent",
+                fontWeight: item.active ? "500" : "400",
+              }}
+            >
+              <span style={styles.navIcon}>{item.icon}</span>
+              {item.label}
+            </span>
+          ))}
         </nav>
-        <div style={{ borderTop: '1px solid #1F2937', paddingTop: '16px' }}>
-          <a href="/docs" style={{ padding: '10px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#94A3B8', textDecoration: 'none' }}>
-            <span style={{ fontSize: '16px' }}>📖</span> Документация
-          </a>
-        </div>
       </aside>
 
-      <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+      {/* Контент */}
+      <main style={styles.main}>
+        {/* Приветствие */}
+        <div style={styles.header}>
           <div>
-            <h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>📊 Обзор</h1>
-            <p style={{ color: '#94A3B8', fontSize: '13px' }}>Сводка активности сервера</p>
+            <h1 style={styles.title}>👋 Добро пожаловать в Nova</h1>
+            <p style={styles.subtitle}>Управляйте серверами, музыкой, событиями и аналитикой</p>
           </div>
-          <div style={{ display: 'flex', gap: '4px', background: '#111118', borderRadius: '10px', padding: '3px' }}>
-            {['7d', '30d', '90d'].map(t => (
-              <button key={t} onClick={() => setTimeframe(t)} style={{
-                padding: '7px 14px', borderRadius: '8px', border: 'none',
-                background: timeframe === t ? '#1F2937' : 'transparent',
-                color: timeframe === t ? '#FFF' : '#94A3B8',
-                cursor: 'pointer', fontSize: '12px', fontWeight: '500', transition: 'all 0.15s'
-              }}>{t}</button>
-            ))}
-          </div>
+          <Link href="/dashboard/servers" style={styles.addServerBtn}>
+            + Подключить сервер
+          </Link>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
+        {/* Карточки статистики */}
+        <div style={styles.statsGrid}>
           {[
-            { label: '💬 Сообщений', value: stats.totalMessages.toLocaleString(), change: '+12%', icon: '💬', color: '#00E5FF' },
-            { label: '🟢 Онлайн', value: stats.onlineNow, change: '+5%', icon: '🟢', color: '#22C55E' },
-            { label: '⚡ Команд', value: stats.commandsUsed.toLocaleString(), change: '+8%', icon: '⚡', color: '#A855F7' },
-            { label: '👋 Новых', value: stats.newUsers, change: '+18%', icon: '👋', color: '#F59E0B' },
-          ].map((stat, i) => (
-            <div key={i} style={{
-              background: '#16161F', borderRadius: '14px', padding: '20px',
-              border: '1px solid #1F2937', transition: 'all 0.2s', cursor: 'default'
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = stat.color; e.currentTarget.style.background = '#1A1A26'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1F2937'; e.currentTarget.style.background = '#16161F'; }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '13px', color: '#94A3B8' }}>{sanitize(stat.label)}</span>
-                <span style={{ fontSize: '18px' }}>{stat.icon}</span>
+            { label: "Серверов", value: stats.serversCount ?? "-", icon: "🖥️", color: "#3B82F6" },
+            { label: "Пользователей", value: stats.totalUsers ?? "-", icon: "👥", color: "#10B981" },
+            { label: "Новых за неделю", value: stats.newUsers ?? "-", icon: "⭐", color: "#F59E0B" },
+            { label: "Команд выполнено", value: stats.commandsUsed ?? "-", icon: "⚡", color: "#A855F7" },
+          ].map((card, i) => (
+            <div key={i} style={{ ...styles.statCard, borderTop: `3px solid ${card.color}` }}>
+              <span style={styles.statIcon}>{card.icon}</span>
+              <div>
+                <div style={styles.statValue}>{loading ? "..." : card.value}</div>
+                <div style={styles.statLabel}>{card.label}</div>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: '700', color: '#FFF', marginBottom: '4px' }}>{stat.value}</div>
-              <span style={{ fontSize: '12px', color: stat.color, fontWeight: '500' }}>{stat.change} за период</span>
             </div>
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '14px', marginBottom: '24px' }}>
-          
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600' }}>📈 Сообщения</h3>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>За неделю</span>
-            </div>
-            {stats.messagesChart.every(v => v === 0) ? (
-              <div style={{ height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '13px' }}>
-                📊 Нет данных о сообщениях
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '120px' }}>
-                {stats.messagesChart.map((val, i) => (
-                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '10px', color: '#64748B', opacity: 0 }}>{val}</span>
-                    <div style={{
-                      width: '100%', background: 'linear-gradient(180deg, #00E5FF 0%, #7B5EFF 100%)',
-                      borderRadius: '4px 4px 0 0', height: `${Math.max(val * 1.2, 2)}px`, maxHeight: '100px',
-                      transition: 'all 0.3s', opacity: 0.85, cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.filter = 'brightness(1.2)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.filter = 'none'; }}
-                    />
-                    <span style={{ fontSize: '10px', color: '#64748B' }}>{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][i]}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🕐 Активность</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-              {recentActivity.length === 0 ? (
-                <div style={{ padding: '30px', textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>
-                  🕐 Нет недавней активности
+        {/* Быстрые действия */}
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>⚡ Быстрые действия</h3>
+          <div style={styles.quickGrid}>
+            {quickActions.map((action, i) => (
+              <Link key={i} href={action.href} style={styles.quickCard}>
+                <span style={styles.quickIcon}>{action.icon}</span>
+                <div>
+                  <div style={styles.quickLabel}>{action.label}</div>
+                  <div style={styles.quickDesc}>{action.desc}</div>
                 </div>
-              ) : (
-                recentActivity.map((act, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0',
-                    borderBottom: i < recentActivity.length - 1 ? '1px solid #1A1A24' : 'none'
-                  }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: (act.color || '#00E5FF') + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px' }}>{act.icon || '📌'}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontWeight: '500', fontSize: '13px' }}>{sanitize(act.user)}</span>
-                      <span style={{ color: '#94A3B8', fontSize: '12px' }}> {sanitize(act.action)}</span>
-                    </div>
-                    <span style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap' }}>{act.time}</span>
-                  </div>
-                ))
-              )}
-            </div>
+              </Link>
+            ))}
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-          
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '14px' }}>🔥 Популярные команды</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {topCommands.length === 0 ? (
-                <div style={{ padding: '30px', textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>
-                  ⚡ Нет данных о командах
+        {/* Модули */}
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>🧩 Модули</h3>
+          <div style={styles.modulesGrid}>
+            {modules.map((mod, i) => (
+              <Link
+                key={i}
+                href={mod.href}
+                style={{ ...styles.moduleCard, borderLeft: `3px solid ${mod.color}` }}
+              >
+                <span style={styles.moduleIcon}>{mod.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.moduleName}>{mod.name}</div>
+                  <div style={styles.moduleDesc}>{mod.desc}</div>
                 </div>
-              ) : (
-                topCommands.map((cmd, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0' }}>
-                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: cmd.color || '#00E5FF' }} />
-                    <code style={{ fontSize: '12px', fontFamily: 'monospace', color: '#FFF', minWidth: '60px' }}>{sanitize(cmd.name)}</code>
-                    <div style={{ flex: 1, height: '4px', background: '#1A1A24', borderRadius: '2px' }}>
-                      <div style={{ width: `${Math.min(100, ((cmd.uses || 0) / Math.max(...topCommands.map(c => c.uses || 1))) * 100)}%`, height: '100%', background: cmd.color || '#00E5FF', borderRadius: '2px' }} />
-                    </div>
-                    <span style={{ fontSize: '11px', color: '#94A3B8', minWidth: '40px', textAlign: 'right' }}>{cmd.uses || 0}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div style={{ background: '#16161F', borderRadius: '14px', padding: '22px', border: '1px solid #1F2937' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600' }}>🖥️ Серверы</h3>
-              <button onClick={() => navigate('/dashboard/servers')} style={{
-                padding: '6px 14px', background: 'transparent', color: '#00E5FF',
-                border: '1px solid #1F2937', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: '500'
-              }}>Все →</button>
-            </div>
-            
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '13px' }}>⏳ Загрузка...</div>
-            ) : servers.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <div style={{ fontSize: '28px', marginBottom: '8px' }}>🖥️</div>
-                <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '12px' }}>Нет серверов</p>
-                <button onClick={() => navigate('/login')} style={{
-                  padding: '8px 16px', background: '#00E5FF', color: '#000', border: 'none',
-                  borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '12px'
-                }}>⭐ Интегрировать</button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {servers.slice(0, 4).map((s: any) => (
-                  <div key={s.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                    background: '#111118', borderRadius: '10px'
-                  }}>
-                    <div style={{ width: '32px', height: '32px', background: '#0A0A0F', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>🖥️</div>
-                    <span style={{ fontSize: '13px', fontWeight: '500', flex: 1 }}>{sanitize(s.name)}</span>
-                    <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '10px', background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}>🟢</span>
-                  </div>
-                ))}
-              </div>
-            )}
+                <span style={{ color: "#64748B", fontSize: "14px" }}>→</span>
+              </Link>
+            ))}
           </div>
         </div>
       </main>
     </div>
-  )
+  );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  wrapper: {
+    minHeight: "100vh",
+    background: "#0A0A0F",
+    display: "flex",
+    color: "#F1F5F9",
+    fontFamily: "'Inter', system-ui, sans-serif",
+  },
+  sidebar: {
+    width: "230px",
+    minWidth: "230px",
+    background: "#111118",
+    borderRight: "1px solid #1F2937",
+    padding: "24px 16px",
+    display: "flex",
+    flexDirection: "column",
+    position: "sticky",
+    top: 0,
+    height: "100vh",
+  },
+  logoLink: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    textDecoration: "none",
+    marginBottom: "32px",
+  },
+  logoIcon: {
+    width: "34px",
+    height: "34px",
+    background: "#16161F",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "bold",
+    color: "#00E5FF",
+    fontSize: "17px",
+  },
+  logoText: {
+    fontSize: "19px",
+    fontWeight: "bold",
+    color: "#FFF",
+  },
+  nav: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+    flex: 1,
+  },
+  navItem: {
+    padding: "10px 12px",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    fontSize: "14px",
+    cursor: "pointer",
+    transition: "all 0.15s",
+  },
+  navIcon: {
+    fontSize: "16px",
+    width: "20px",
+    textAlign: "center" as const,
+  },
+  main: {
+    flex: 1,
+    padding: "32px 40px",
+    overflow: "auto",
+    maxWidth: "1200px",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: "32px",
+    flexWrap: "wrap",
+    gap: "16px",
+  },
+  title: {
+    fontSize: "26px",
+    fontWeight: "700",
+    marginBottom: "4px",
+  },
+  subtitle: {
+    color: "#94A3B8",
+    fontSize: "14px",
+  },
+  addServerBtn: {
+    padding: "12px 24px",
+    background: "#00E5FF",
+    color: "#000",
+    fontWeight: "600",
+    fontSize: "14px",
+    borderRadius: "10px",
+    textDecoration: "none",
+    whiteSpace: "nowrap" as const,
+    transition: "all 0.2s",
+  },
+  statsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: "14px",
+    marginBottom: "28px",
+  },
+  statCard: {
+    background: "#16161F",
+    borderRadius: "14px",
+    padding: "20px",
+    border: "1px solid #1F2937",
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+  },
+  statIcon: {
+    fontSize: "28px",
+  },
+  statValue: {
+    fontSize: "24px",
+    fontWeight: "700",
+    color: "#FFF",
+    lineHeight: "1.1",
+  },
+  statLabel: {
+    fontSize: "12px",
+    color: "#94A3B8",
+    marginTop: "2px",
+  },
+  section: {
+    marginBottom: "28px",
+  },
+  sectionTitle: {
+    fontSize: "16px",
+    fontWeight: "600",
+    marginBottom: "14px",
+  },
+  quickGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "12px",
+  },
+  quickCard: {
+    background: "#16161F",
+    borderRadius: "12px",
+    padding: "18px",
+    border: "1px solid #1F2937",
+    textDecoration: "none",
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    transition: "border-color 0.2s",
+  },
+  quickIcon: {
+    fontSize: "28px",
+  },
+  quickLabel: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#F1F5F9",
+    marginBottom: "2px",
+  },
+  quickDesc: {
+    fontSize: "12px",
+    color: "#94A3B8",
+  },
+  modulesGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "12px",
+  },
+  moduleCard: {
+    background: "#16161F",
+    borderRadius: "12px",
+    padding: "18px",
+    border: "1px solid #1F2937",
+    textDecoration: "none",
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    transition: "border-color 0.2s",
+  },
+  moduleIcon: {
+    fontSize: "26px",
+  },
+  moduleName: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#F1F5F9",
+    marginBottom: "2px",
+  },
+  moduleDesc: {
+    fontSize: "12px",
+    color: "#94A3B8",
+  },
+};
