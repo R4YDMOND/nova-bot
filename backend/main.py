@@ -1,4 +1,4 @@
-"from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
 from models import Server, ModuleConfig, AISettings, Member
