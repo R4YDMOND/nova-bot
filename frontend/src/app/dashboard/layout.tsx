@@ -1,187 +1,111 @@
-/* ========== Nova Bot — Темы и анимации ========== */
+"use client";
 
-/* Сброс */
-* { margin: 0; padding: 0; box-sizing: border-box; }
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 
-/* ===== ТЕМЫ ===== */
-:root {
-  /* Размеры */
-  --font-xs: 11px;
-  --font-sm: 12px;
-  --font-md: 13px;
-  --font-lg: 14px;
-  --font-xl: 16px;
-  --font-2xl: 20px;
-  --font-3xl: 24px;
-  --font-4xl: 28px;
+const navigate = (url: string) => { window.location.href = url; };
 
-  /* Иконки */
-  --icon-sm: 14px;
-  --icon-md: 16px;
-  --icon-lg: 20px;
-  --icon-xl: 28px;
+const NAV_ITEMS = [
+  { icon: "📊", label: "Обзор", href: "/dashboard" },
+  { icon: "🖥️", label: "Серверы", href: "/dashboard/servers" },
+  { icon: "🎵", label: "Музыка", href: "/dashboard/music" },
+  { icon: "🏆", label: "Рейтинг", href: "/dashboard/ranking" },
+  { icon: "🛡️", label: "Модерация", href: "/dashboard/moderation" },
+  { icon: "📊", label: "Аналитика", href: "/dashboard/analytics" },
+  { icon: "⚡", label: "Команды", href: "/dashboard/commands" },
+  { icon: "🤖", label: "AI", href: "/dashboard/ai" },
+  { icon: "🔗", label: "Вебхуки", href: "/dashboard/webhooks" },
+];
 
-  /* Цвета — ночная тема (по умолчанию) */
-  --bg-primary: #0A0A0F;
-  --bg-secondary: #111118;
-  --bg-card: #16161F;
-  --bg-input: #0A0A0F;
-  --border: #1F2937;
-  --border-light: #374151;
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --accent: #00E5FF;
-  --accent-hover: #00B8D4;
-  --success: #22C55E;
-  --danger: #EF4444;
-  --warning: #F59E0B;
-  --info: #3B82F6;
-  --purple: #A855F7;
-  --pink: #EC4899;
+const THEMES = [
+  { value: "dark", label: "🌙 Тёмная", icon: "🌙" },
+  { value: "light", label: "☀️ Светлая", icon: "☀️" },
+  { value: "cyberpunk", label: "🦾 Киберпанк", icon: "🦾" },
+  { value: "gray", label: "⬜ Серый", icon: "⬜" },
+];
 
-  /* Радиусы */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+  const [theme, setTheme] = useState("dark");
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
-  /* Анимации */
-  --transition-fast: 0.15s;
-  --transition-normal: 0.25s;
-  --transition-slow: 0.4s;
+  useEffect(() => {
+    const saved = localStorage.getItem("nova-theme") || "dark";
+    setTheme(saved);
+    document.documentElement.setAttribute("data-theme", saved);
+    const savedSound = localStorage.getItem("nova-sound") === "true";
+    setSoundEnabled(savedSound);
+  }, []);
 
-  /* Сайдбар */
-  --sidebar-width: 250px;
-  --sidebar-collapsed: 56px;
-}
+  const changeTheme = (t: string) => {
+    setTheme(t);
+    localStorage.setItem("nova-theme", t);
+    document.documentElement.setAttribute("data-theme", t);
+  };
 
-/* Дневная тема */
-[data-theme="light"] {
-  --bg-primary: #F8FAFC;
-  --bg-secondary: #F1F5F9;
-  --bg-card: #FFFFFF;
-  --bg-input: #F8FAFC;
-  --border: #E2E8F0;
-  --border-light: #CBD5E1;
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #94A3B8;
-}
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    localStorage.setItem("nova-sound", String(next));
+    if (next && typeof window !== "undefined") {
+      try { new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=").play().catch(() => {}); } catch {}
+    }
+  };
 
-/* Киберпанк-тема */
-[data-theme="cyberpunk"] {
-  --bg-primary: #0D0221;
-  --bg-secondary: #150533;
-  --bg-card: #1A0A3E;
-  --bg-input: #0D0221;
-  --border: #2D1B69;
-  --border-light: #4A2D8F;
-  --text-primary: #00FF9D;
-  --text-secondary: #B794F4;
-  --text-muted: #6B46C1;
-  --accent: #FF00FF;
-  --accent-hover: #CC00CC;
-  --success: #00FF9D;
-  --danger: #FF0044;
-  --warning: #FFD700;
-  --info: #00D4FF;
-}
+  const playClickSound = () => {
+    if (soundEnabled && typeof window !== "undefined") {
+      try { new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=").play().catch(() => {}); } catch {}
+    }
+  };
 
-/* Серый (минимал) */
-[data-theme="gray"] {
-  --bg-primary: #1A1A1A;
-  --bg-secondary: #242424;
-  --bg-card: #2A2A2A;
-  --bg-input: #1A1A1A;
-  --border: #333333;
-  --border-light: #444444;
-  --text-primary: #E5E5E5;
-  --text-secondary: #999999;
-  --text-muted: #666666;
-  --accent: #888888;
-  --accent-hover: #AAAAAA;
-}
-
-/* ===== БАЗОВЫЕ СТИЛИ ===== */
-body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: var(--font-md);
-  line-height: 1.5;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
-}
-
-h1 { font-size: var(--font-3xl); font-weight: 700; }
-h2 { font-size: var(--font-2xl); font-weight: 600; }
-h3 { font-size: var(--font-xl); font-weight: 600; }
-
-button {
-  font-size: var(--font-md);
-  font-family: inherit;
-  cursor: pointer;
-}
-
-input, select, textarea {
-  font-size: var(--font-md);
-  font-family: inherit;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
-  outline: none;
-}
-
-table { font-size: var(--font-md); }
-th { font-size: var(--font-xs); font-weight: 600; text-transform: uppercase; color: var(--text-secondary); }
-td { font-size: var(--font-md); }
-label { font-size: var(--font-sm); color: var(--text-secondary); }
-small, .text-sm { font-size: var(--font-sm); color: var(--text-secondary); }
-
-/* Переходы */
-button, a, input, select, textarea { transition: all var(--transition-fast) ease; }
-
-/* ===== АНИМАЦИИ ===== */
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes fadeOutDown { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(12px); } }
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes popIn { 0% { transform: scale(0.95); opacity: 0; } 50% { transform: scale(1.02); } 100% { transform: scale(1); opacity: 1; } }
-@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); } }
-@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-/* Звуковые уведомления (визуальный индикатор) */
-.sound-enabled::after {
-  content: "🔊";
-  font-size: 10px;
-  margin-left: 4px;
-}
-
-/* ===== СКРОЛЛБАР ===== */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
-
-/* ===== УТИЛИТЫ ===== */
-.btn-saved { animation: pulse 0.6s ease; background: var(--success) !important; }
-.card-animate { animation: fadeInUp 0.3s ease forwards; }
-.toast-notification { animation: slideUp 0.3s ease; }
-.no-select { user-select: none; -webkit-user-select: none; }
-
-/* ===== АДАПТИВ ===== */
-@media (max-width: 1200px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-  .modules-grid { grid-template-columns: repeat(2, 1fr) !important; }
-}
-@media (max-width: 768px) {
-  .stats-grid { grid-template-columns: 1fr !important; }
-  .modules-grid { grid-template-columns: 1fr !important; }
-  .quick-grid { grid-template-columns: repeat(2, 1fr) !important; }
-}
-@media (max-width: 480px) {
-  .quick-grid { grid-template-columns: 1fr !important; }
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--bg-primary)", display: "flex", color: "var(--text-primary)", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif" }}>
+      <aside style={{ width: collapsed ? 56 : "var(--sidebar-width)", minWidth: collapsed ? 56 : "var(--sidebar-width)", background: "var(--bg-secondary)", borderRight: "1px solid var(--border)", padding: collapsed ? "16px 8px" : "22px 16px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflow: "hidden", transition: "all 0.3s ease", zIndex: 10 }}>
+        <div style={{ display: "flex", justifyContent: collapsed ? "center" : "flex-end", marginBottom: 18 }}>
+          <button onClick={() => { setCollapsed(!collapsed); playClickSound(); }} title={collapsed ? "Развернуть" : "Свернуть"} style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)", borderRadius: "var(--radius-sm)", cursor: "pointer", fontSize: 13, padding: "4px 8px", transition: "transform 0.3s", transform: collapsed ? "rotate(180deg)" : "rotate(0deg)" }}>◀</button>
+        </div>
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: collapsed ? 0 : 10, textDecoration: "none", marginBottom: 22, justifyContent: collapsed ? "center" : "flex-start", opacity: collapsed ? 0 : 1, transition: "opacity 0.2s", pointerEvents: collapsed ? "none" : "auto", overflow: "hidden" }}>
+          <div style={{ width: 34, height: 34, minWidth: 34, background: "var(--bg-card)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "var(--accent)", fontSize: 17 }}>N</div>
+          <span style={{ fontSize: 19, fontWeight: "bold", color: "var(--text-primary)", whiteSpace: "nowrap" }}>Нова</span>
+        </Link>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+          {NAV_ITEMS.map((item, i) => {
+            const isActive = pathname === item.href;
+            return (
+              <span key={i} onClick={() => { navigate(item.href); playClickSound(); }} title={collapsed ? item.label : undefined} style={{ padding: collapsed ? "11px 0" : "11px 14px", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", gap: collapsed ? 0 : 12, fontSize: "var(--font-lg)", cursor: "pointer", transition: "all 0.15s", color: isActive ? "var(--text-primary)" : "var(--text-secondary)", background: isActive ? "var(--border)" : "transparent", fontWeight: isActive ? 500 : 400, justifyContent: collapsed ? "center" : "flex-start", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "var(--icon-lg)", width: 22, textAlign: "center" }}>{item.icon}</span>
+                <span style={{ opacity: collapsed ? 0 : 1, transition: "opacity 0.15s", display: collapsed ? "none" : "inline" }}>{item.label}</span>
+              </span>
+            );
+          })}
+        </nav>
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+          <button onClick={() => { setShowSettings(!showSettings); playClickSound(); }} style={{ padding: "8px 10px", background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", color: "var(--text-secondary)", cursor: "pointer", fontSize: "var(--font-md)", display: "flex", alignItems: "center", gap: 8, justifyContent: collapsed ? "center" : "flex-start" }}>
+            <span>⚙️</span>
+            {!collapsed && <span>Настройки</span>}
+          </button>
+          {showSettings && !collapsed && (
+            <div style={{ background: "var(--bg-card)", borderRadius: "var(--radius-md)", padding: 10, display: "flex", flexDirection: "column", gap: 6, animation: "fadeInUp 0.2s ease" }}>
+              <span style={{ fontSize: "var(--font-xs)", color: "var(--text-muted)", marginBottom: 2 }}>Тема</span>
+              {THEMES.map((t) => (
+                <button key={t.value} onClick={() => { changeTheme(t.value); playClickSound(); }} style={{ padding: "6px 10px", background: theme === t.value ? "var(--border)" : "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: theme === t.value ? "var(--text-primary)" : "var(--text-secondary)", cursor: "pointer", fontSize: "var(--font-sm)", textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>{t.icon}</span> {t.label}
+                </button>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                <span style={{ fontSize: "var(--font-xs)", color: "var(--text-muted)" }}>Звук</span>
+                <div onClick={() => { toggleSound(); playClickSound(); }} style={{ width: 36, height: 20, background: soundEnabled ? "var(--accent)" : "var(--border)", borderRadius: 20, cursor: "pointer", position: "relative" }}>
+                  <div style={{ position: "absolute", height: 14, width: 14, left: soundEnabled ? 20 : 3, top: 3, background: soundEnabled ? "#000" : "#FFF", borderRadius: "50%", transition: "0.2s" }} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+      <main style={{ flex: 1, overflow: "auto", minWidth: 0, animation: "fadeIn 0.2s ease" }}>{children}</main>
+    </div>
+  );
 }
