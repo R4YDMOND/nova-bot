@@ -23,19 +23,18 @@ export default function DashboardPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  const modules = [
-    { name: "Музыка", desc: "YouTube, VK, радио", icon: "🎵", href: "/dashboard/music", color: "#A855F7" },
-    { name: "AI-помощник", desc: "ChatGPT, DeepSeek", icon: "🤖", href: "/dashboard/ai", color: "#3B82F6" },
-    { name: "Рейтинг", desc: "Уровни, XP, карточки", icon: "🏆", href: "/dashboard/ranking", color: "#F59E0B" },
-    { name: "Модерация", desc: "Логи, предупреждения", icon: "🛡️", href: "/dashboard/moderation", color: "#EF4444" },
-    { name: "Аналитика", desc: "Отчёты, статистика", icon: "📊", href: "/dashboard/analytics", color: "#10B981" },
-    { name: "Вебхуки", desc: "VK, Lolka, авто-форвард", icon: "🔗", href: "/dashboard/webhooks", color: "#00E5FF" },
-  ];
-
   const quickActions = [
     { icon: "📢", label: "Рассылка", desc: "Отправить сообщение во все каналы", href: "/dashboard/webhooks" },
     { icon: "🗓️", label: "Создать событие", desc: "Запланировать ивент", href: "/dashboard/webhooks" },
+    { icon: "🎵", label: "Включить музыку", desc: "Треки и радиостанции", href: "/dashboard/music" },
     { icon: "🔍", label: "Сканировать", desc: "Найти популярный контент", href: "/dashboard/webhooks" },
+  ];
+
+  const recentActivity = [
+    { text: "Тестовый вебхук отправлен", time: "Только что", icon: "🧪" },
+    { text: "Сервер Phoenix Gaming добавлен", time: "5 минут назад", icon: "🖥️" },
+    { text: "Сканирование завершено", time: "1 час назад", icon: "🔍" },
+    { text: "Обновлены настройки AI", time: "Вчера", icon: "🤖" },
   ];
 
   return (
@@ -50,8 +49,12 @@ export default function DashboardPage() {
           {[
             { icon: "📊", label: "Обзор", href: "/dashboard", active: true },
             { icon: "🖥️", label: "Серверы", href: "/dashboard/servers" },
-            { icon: "🧩", label: "Модули", href: "/dashboard/modules" },
+            { icon: "🎵", label: "Музыка", href: "/dashboard/music" },
+            { icon: "🏆", label: "Рейтинг", href: "/dashboard/ranking" },
+            { icon: "🛡️", label: "Модерация", href: "/dashboard/moderation" },
+            { icon: "📊", label: "Аналитика", href: "/dashboard/analytics" },
             { icon: "⚡", label: "Команды", href: "/dashboard/commands" },
+            { icon: "🤖", label: "AI", href: "/dashboard/ai" },
             { icon: "🔗", label: "Вебхуки", href: "/dashboard/webhooks" },
           ].map((item, i) => (
             <span
@@ -118,23 +121,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Модули */}
+        {/* Последняя активность */}
         <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>🧩 Модули</h3>
-          <div style={styles.modulesGrid}>
-            {modules.map((mod, i) => (
-              <Link
-                key={i}
-                href={mod.href}
-                style={{ ...styles.moduleCard, borderLeft: `3px solid ${mod.color}` }}
-              >
-                <span style={styles.moduleIcon}>{mod.icon}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={styles.moduleName}>{mod.name}</div>
-                  <div style={styles.moduleDesc}>{mod.desc}</div>
-                </div>
-                <span style={{ color: "#64748B", fontSize: "14px" }}>→</span>
-              </Link>
+          <h3 style={styles.sectionTitle}>📋 Последняя активность</h3>
+          <div style={styles.activityList}>
+            {recentActivity.map((item, i) => (
+              <div key={i} style={styles.activityItem}>
+                <span style={styles.activityIcon}>{item.icon}</span>
+                <span style={styles.activityText}>{item.text}</span>
+                <span style={styles.activityTime}>{item.time}</span>
+              </div>
             ))}
           </div>
         </div>
@@ -162,13 +158,14 @@ const styles: Record<string, React.CSSProperties> = {
     position: "sticky",
     top: 0,
     height: "100vh",
+    overflow: "auto",
   },
   logoLink: {
     display: "flex",
     alignItems: "center",
     gap: "10px",
     textDecoration: "none",
-    marginBottom: "32px",
+    marginBottom: "28px",
   },
   logoIcon: {
     width: "34px",
@@ -194,17 +191,17 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
   },
   navItem: {
-    padding: "10px 12px",
+    padding: "9px 12px",
     borderRadius: "8px",
     display: "flex",
     alignItems: "center",
     gap: "10px",
-    fontSize: "14px",
+    fontSize: "13px",
     cursor: "pointer",
     transition: "all 0.15s",
   },
   navIcon: {
-    fontSize: "16px",
+    fontSize: "15px",
     width: "20px",
     textAlign: "center" as const,
   },
@@ -212,7 +209,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: "32px 40px",
     overflow: "auto",
-    maxWidth: "1200px",
+    maxWidth: "1000px",
   },
   header: {
     display: "flex",
@@ -246,7 +243,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "repeat(4, 1fr)",
     gap: "14px",
-    marginBottom: "28px",
+    marginBottom: "32px",
   },
   statCard: {
     background: "#16161F",
@@ -281,7 +278,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   quickGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
+    gridTemplateColumns: "repeat(4, 1fr)",
     gap: "12px",
   },
   quickCard: {
@@ -296,7 +293,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: "border-color 0.2s",
   },
   quickIcon: {
-    fontSize: "28px",
+    fontSize: "26px",
   },
   quickLabel: {
     fontSize: "14px",
@@ -305,36 +302,33 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: "2px",
   },
   quickDesc: {
-    fontSize: "12px",
+    fontSize: "11px",
     color: "#94A3B8",
   },
-  modulesGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "12px",
-  },
-  moduleCard: {
+  activityList: {
     background: "#16161F",
     borderRadius: "12px",
-    padding: "18px",
     border: "1px solid #1F2937",
-    textDecoration: "none",
+    overflow: "hidden",
+  },
+  activityItem: {
     display: "flex",
     alignItems: "center",
-    gap: "14px",
-    transition: "border-color 0.2s",
+    gap: "12px",
+    padding: "14px 18px",
+    borderBottom: "1px solid #1F2937",
   },
-  moduleIcon: {
-    fontSize: "26px",
+  activityIcon: {
+    fontSize: "18px",
   },
-  moduleName: {
-    fontSize: "14px",
-    fontWeight: "600",
-    color: "#F1F5F9",
-    marginBottom: "2px",
+  activityText: {
+    flex: 1,
+    fontSize: "13px",
+    color: "#E2E8F0",
   },
-  moduleDesc: {
-    fontSize: "12px",
-    color: "#94A3B8",
+  activityTime: {
+    fontSize: "11px",
+    color: "#64748B",
+    whiteSpace: "nowrap" as const,
   },
 };
