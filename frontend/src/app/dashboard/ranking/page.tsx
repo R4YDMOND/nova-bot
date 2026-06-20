@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // Защита от краша, эмодзи и спецсимволов
 const sanitize = (text: string): string => {
@@ -92,17 +92,24 @@ export default function RankingPage() {
   const [cardShowRank, setCardShowRank] = useState(true)
   const [cardStyle, setCardStyle] = useState('modern')
 
-  // ===== Members =====
-  const [members] = useState([
-    { name: '👩 Alice', level: 42, xp: 15420, avatar: '👩', rank: 1 },
-    { name: '👨 Bob', level: 38, xp: 12800, avatar: '👨', rank: 2 },
-    { name: '🧑 Charlie', level: 27, xp: 7650, avatar: '🧑', rank: 3 },
-    { name: '👩‍🦰 Diana', level: 55, xp: 23100, avatar: '👩‍🦰', rank: 4 },
-    { name: '👩‍🦱 Eve', level: 15, xp: 3200, avatar: '👩‍🦱', rank: 5 },
-    { name: '👨‍🦰 Frank', level: 61, xp: 28500, avatar: '👨‍🦰', rank: 6 },
-  ])
+  // ===== Members (динамические из API) =====
+  const [members, setMembers] = useState<any[]>([])
+  const [membersLoading, setMembersLoading] = useState(true)
   const [searchMember, setSearchMember] = useState('')
-  const filteredMembers = members.filter(m => m.name.toLowerCase().includes(searchMember.toLowerCase()))
+
+  useEffect(() => {
+    fetch('https://nova-bot-rpsy.onrender.com/api/ranking/members')
+      .then(res => res.json())
+      .then(data => {
+        setMembers(data.members || [])
+        setMembersLoading(false)
+      })
+      .catch(() => setMembersLoading(false))
+  }, [])
+
+  const filteredMembers = members.filter(m => 
+    (m.name || '').toLowerCase().includes(searchMember.toLowerCase())
+  )
 
   const resetAll = () => {
     setXpSources([{ name: '💬 Сообщение', value: 10, enabled: true }, { name: '🎤 Голос (мин)', value: 5, enabled: true }, { name: '👍 Реакция', value: 2, enabled: false }, { name: '🎉 Ивент', value: 50, enabled: false }])
@@ -374,42 +381,52 @@ export default function RankingPage() {
             </div>
 
             <div style={{ background: '#16161F', borderRadius: '16px', border: '1px solid #1F2937', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #1F2937' }}>
-                    {['#', 'Участник', 'Уровень', 'XP', 'Прогресс'].map((h, i) => (
-                      <th key={i} style={{ padding: '14px 20px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMembers.map((m, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #1F2937' }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#1A1A24'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <td style={{ padding: '14px 20px' }}>
-                        <span style={{ fontWeight: 'bold', color: i < 3 ? '#F59E0B' : '#94A3B8', fontSize: '16px' }}>#{m.rank}</span>
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '20px' }}>{m.avatar}</span>
-                          <span style={{ fontWeight: '500' }}>{sanitize(m.name)}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <span style={{ background: '#0A0A0F', padding: '4px 12px', borderRadius: '8px', fontWeight: '600', fontSize: '14px' }}>{m.level}</span>
-                      </td>
-                      <td style={{ padding: '14px 20px', color: '#94A3B8', fontSize: '13px' }}>{m.xp.toLocaleString()}</td>
-                      <td style={{ padding: '14px 20px' }}>
-                        <div style={{ height: '6px', background: '#1F2937', borderRadius: '3px', width: '120px' }}>
-                          <div style={{ width: `${Math.min(100, (m.xp / 30000) * 100)}%`, height: '100%', background: '#00E5FF', borderRadius: '3px' }} />
-                        </div>
-                      </td>
+              {membersLoading ? (
+                <div style={{ padding: '60px', textAlign: 'center', color: '#94A3B8' }}>⏳ Загрузка участников...</div>
+              ) : members.length === 0 ? (
+                <div style={{ padding: '60px', textAlign: 'center', color: '#94A3B8' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>👥</div>
+                  <p>Нет данных об участниках</p>
+                  <p style={{ fontSize: '12px', color: '#64748B', marginTop: '8px' }}>Данные появятся когда бот начнёт отслеживать активность</p>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #1F2937' }}>
+                      {['#', 'Участник', 'Уровень', 'XP', 'Прогресс'].map((h, i) => (
+                        <th key={i} style={{ padding: '14px 20px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredMembers.map((m, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #1F2937' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#1A1A24'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ padding: '14px 20px' }}>
+                          <span style={{ fontWeight: 'bold', color: i < 3 ? '#F59E0B' : '#94A3B8', fontSize: '16px' }}>#{m.rank || i + 1}</span>
+                        </td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '20px' }}>{m.avatar || '👤'}</span>
+                            <span style={{ fontWeight: '500' }}>{sanitize(m.name)}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <span style={{ background: '#0A0A0F', padding: '4px 12px', borderRadius: '8px', fontWeight: '600', fontSize: '14px' }}>{m.level || 0}</span>
+                        </td>
+                        <td style={{ padding: '14px 20px', color: '#94A3B8', fontSize: '13px' }}>{(m.xp || 0).toLocaleString()}</td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <div style={{ height: '6px', background: '#1F2937', borderRadius: '3px', width: '120px' }}>
+                            <div style={{ width: `${Math.min(100, ((m.xp || 0) / 30000) * 100)}%`, height: '100%', background: '#00E5FF', borderRadius: '3px' }} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
