@@ -290,32 +290,101 @@ export default function AIPage() {
         {activeTab === 'server' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             
+            {/* Платформа и название */}
             <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
               <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>🖥️ Привязка к серверу</h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Платформа</label>
+                  <select value={settings.platform} onChange={(e) => update('platform', e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', cursor: 'pointer' }}>
+                    <option value="Lolka">🎮 Lolka</option>
+                    <option value="VK">💙 VK</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Название сервера/группы</label>
+                  <input type="text" value={settings.serverName} onChange={(e) => update('serverName', e.target.value)}
+                    placeholder="Phoenix Gaming"
+                    style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Аватар */}
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>🖼️ Аватар AI-помощника</h3>
               <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '16px' }}>
-                AI будет адаптировать стиль общения под название сервера или группы
+                Выберите стиль аватара для вашего бота
               </p>
               
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Платформа</label>
-                <select value={settings.platform} onChange={(e) => update('platform', e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', cursor: 'pointer' }}>
-                  <option value="Lolka">🎮 Lolka</option>
-                  <option value="VK">💙 VK</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                {[
+                  { id: 'nova', icon: 'N', label: 'Нова', color: '#00E5FF', bg: '#0A0A0F' },
+                  { id: 'star', icon: '⭐', label: 'Звезда', color: '#F59E0B', bg: '#0A0A0F' },
+                  { id: 'robot', icon: '🤖', label: 'Робот', color: '#3B82F6', bg: '#0A0A0F' },
+                  { id: 'cat', icon: '🐱', label: 'Кот', color: '#EC4899', bg: '#0A0A0F' },
+                  { id: 'fox', icon: '🦊', label: 'Лис', color: '#F97316', bg: '#0A0A0F' },
+                  { id: 'dragon', icon: '🐉', label: 'Дракон', color: '#EF4444', bg: '#0A0A0F' },
+                  { id: 'crystal', icon: '💎', label: 'Кристалл', color: '#A855F7', bg: '#0A0A0F' },
+                  { id: 'fire', icon: '🔥', label: 'Огонь', color: '#F59E0B', bg: '#0A0A0F' },
+                ].map(avatar => (
+                  <div key={avatar.id} onClick={() => update('avatarStyle', avatar.id)} style={{
+                    padding: '16px 8px', borderRadius: '14px', cursor: 'pointer', textAlign: 'center',
+                    background: settings.avatarStyle === avatar.id ? 'rgba(0,229,255,0.08)' : '#111118',
+                    border: `2px solid ${settings.avatarStyle === avatar.id ? '#00E5FF' : '#1F2937'}`,
+                    transition: 'all 0.2s'
+                  }}>
+                    <div style={{
+                      width: '48px', height: '48px', borderRadius: '14px',
+                      background: avatar.bg, display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', fontSize: '26px', margin: '0 auto 8px',
+                      border: `2px solid ${avatar.color}40`
+                    }}>{avatar.icon}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '500' }}>{avatar.label}</div>
+                  </div>
+                ))}
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>Название сервера/группы</label>
-                <input type="text" value={settings.serverName} onChange={(e) => update('serverName', e.target.value)}
-                  placeholder="Например: Phoenix Gaming"
+                <label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>
+                  Или укажите свой URL аватара
+                </label>
+                <input type="text" value={settings.avatarUrl} onChange={(e) => update('avatarUrl', e.target.value)}
+                  placeholder="https://example.com/avatar.png"
                   style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
               </div>
+            </div>
 
-              {/* Предпросмотр */}
-              <div style={{ marginTop: '16px', background: '#111118', borderRadius: '12px', padding: '16px' }}>
-                <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '8px' }}>📝 Пример обращения:</div>
-                <div style={{ fontSize: '14px', color: '#00E5FF', fontStyle: 'italic' }}>
+            {/* Предпросмотр */}
+            <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', border: '1px solid #1F2937' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>👁️ Предпросмотр</h3>
+              <div style={{ background: settings.platform === 'VK' ? '#1A1A24' : '#111118', borderRadius: '12px', padding: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <div style={{
+                    width: '36px', height: '36px', borderRadius: '10px',
+                    background: '#0A0A0F', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: '20px',
+                    border: '2px solid #00E5FF40'
+                  }}>
+                    {settings.avatarStyle === 'nova' ? 'N' :
+                     settings.avatarStyle === 'star' ? '⭐' :
+                     settings.avatarStyle === 'robot' ? '🤖' :
+                     settings.avatarStyle === 'cat' ? '🐱' :
+                     settings.avatarStyle === 'fox' ? '🦊' :
+                     settings.avatarStyle === 'dragon' ? '🐉' :
+                     settings.avatarStyle === 'crystal' ? '💎' :
+                     settings.avatarStyle === 'fire' ? '🔥' : 'N'}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '13px' }}>{settings.botName}</div>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>
+                      {settings.platform === 'VK' ? 'ВКонтакте' : 'Lolka'} • {settings.serverName || 'Сервер'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '13px', color: '#94A3B8', fontStyle: 'italic', padding: '8px 12px', background: '#0A0A0F', borderRadius: '8px' }}>
                   {settings.platform === 'VK' 
                     ? `«Привет, подписчики ${settings.serverName || 'нашего паблика'}! ${settings.botName} на связи!»`
                     : `«Всем привет с сервера ${settings.serverName || 'Lolka'}! Я ${settings.botName}, ваш помощник!»`
