@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const navigate = (url: string) => { window.location.href = url }
 
@@ -22,17 +22,20 @@ async function apiCall(url: string, options?: RequestInit) {
 }
 
 export default function WebhooksPage() {
+  // Вебхуки
   const [webhooks, setWebhooks] = useState<Webhook[]>([
     { id: '1', platform: 'Lolka', url: 'https://lolka.app/api/webhooks/xxx', channel: '📢 общий', groupId: '', serverName: 'Phoenix Gaming', active: true, autoScan: false, scanInterval: 30, minLikes: 5, rules: { posts: true, videos: true, articles: false, music: false, other: true } },
     { id: '2', platform: 'VK', url: 'https://vk.com/callback/xxx', channel: '📢 Новости', groupId: '123456', serverName: 'Техномания', active: true, autoScan: true, scanInterval: 30, minLikes: 5, rules: { posts: true, videos: false, articles: true, music: false, other: false } },
   ])
 
+  // Состояния
   const [saved, setSaved] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [showBroadcast, setShowBroadcast] = useState(false)
   const [showForward, setShowForward] = useState(false)
   const [showLogs, setShowLogs] = useState(false)
   const [showAutoForward, setShowAutoForward] = useState(false)
+  const [showEvents, setShowEvents] = useState(false)
   const [editingRules, setEditingRules] = useState<string | null>(null)
   const [editingScan, setEditingScan] = useState<string | null>(null)
   const [editingChannel, setEditingChannel] = useState<string | null>(null)
@@ -52,6 +55,66 @@ export default function WebhooksPage() {
   const [logsLoading, setLogsLoading] = useState(false)
   const [autoForward, setAutoForward] = useState({ enabled: false, from_lolka_to_vk: true, from_vk_to_lolka: true })
 
+  // События
+  const [events, setEvents] = useState<any[]>([])
+  const [templates, setTemplates] = useState<any[]>([])
+  const [showAddEvent, setShowAddEvent] = useState(false)
+  const [newEvent, setNewEvent] = useState({
+    title: '', description: '', event_date: '', template: 'custom',
+    channel: '', webhook_url: '', max_participants: 0, created_by: 'Admin'
+  })
+
+  useEffect(() => {
+    loadEvents()
+    loadAutoForward()
+  }, [])
+
+  const loadEvents = async () => {
+    const data = await apiCall(API_BASE + '/api/events?server_id=default')
+    setEvents(data.events || [])
+    setTemplates(data.templates || [])
+  }
+
+  const loadAutoForward = async () => {
+    const data = await apiCall(API_BASE + '/api/webhooks/auto-forward/config?server_id=default')
+    if (data.config) setAutoForward(data.config)
+  }
+
+  const createEvent = async () => {
+    if (!newEvent.title || !newEvent.event_date) return
+    await apiCall(API_BASE + '/api/events', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...newEvent, server_id: 'default' })
+    })
+    setShowAddEvent(false)
+    setNewEvent({ title: '', description: '', event_date: '', template: 'custom', channel: '', webhook_url: '', max_participants: 0, created_by: 'Admin' })
+    loadEvents()
+  }
+
+  const deleteEvent = async (id: number) => {
+    await apiCall(API_BASE + '/api/events/' + id, { method: 'DELETE' })
+    loadEvents()
+  }
+
+  const notifyEvent = async (event: any) => {
+    const data = await apiCall(API_BASE + '/api/events/' + event.id + '/notify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhook_url: event.webhook_url || '' })
+    })
+    alert(data.sent ? '✅ Уведомление отправлено!' : '❌ Ошибка')
+  }
+
+  const selectTemplate = (tpl: string) => {
+    const t = templates.find((x: any) => x.value === tpl)
+    setNewEvent({
+      ...newEvent,
+      template: tpl,
+      max_participants: t?.max_players || 0,
+      title: tpl !== 'custom' ? t?.name?.replace(/[^\w\sа-яА-Я]/g, '').trim() + ' ' : ''
+    })
+  }
+
+  // Вебхуки функции
   const save = function() { setSaved(true); setTimeout(function() { setSaved(false) }, 2000) }
   const toggle = function(id: string) { setWebhooks(webhooks.map(function(w) { return w.id === id ? { ...w, active: !w.active } : w })) }
   const deleteWebhook = function(id: string) { setWebhooks(webhooks.filter(function(w) { return w.id !== id })) }
@@ -99,8 +162,17 @@ export default function WebhooksPage() {
     setForwardResult('✅ ' + data.total_sent + '/' + data.total_urls); setSending(false); setTimeout(function() { setForwardResult('') }, 4000)
   }
 
+  const saveAutoForward = async function() {
+    await apiCall(API_BASE + '/api/webhooks/auto-forward/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ server_id: 'default', config: autoForward })
+    })
+    setSaved(true); setTimeout(function() { setSaved(false) }, 2000)
+  }
+
   var getTypeLabel: any = { posts: 'пост', videos: 'видео', articles: 'статья', music: 'музыка', other: 'материал' }
   var getTypeIcon: any = { posts: '📝', videos: '🎬', articles: '📄', music: '🎵', other: '📎' }
+  var getEventIcon: any = { raid: '⚔️', farm: '🎯', meeting: '🤝', event: '🎉', tournament: '🏆', custom: '📝' }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0F', display: 'flex', color: '#F1F5F9' }}>
@@ -112,18 +184,71 @@ export default function WebhooksPage() {
       </aside>
 
       <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}><div><h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>🔗 Вебхуки</h1><p style={{ color: '#94A3B8', fontSize: '13px' }}>Автоопределение, каналы, автосканирование, пересылка</p></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}><div><h1 style={{ fontSize: '26px', fontWeight: '700', marginBottom: '2px' }}>🔗 Вебхуки</h1><p style={{ color: '#94A3B8', fontSize: '13px' }}>События, авто-форвард, логи и управление</p></div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button onClick={function() { setShowLogs(!showLogs); if (!showLogs) loadLogs() }} style={{ padding: '10px 16px', background: showLogs ? '#1F2937' : '#F59E0B', color: showLogs ? '#FFF' : '#000', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showLogs ? '✕' : '📋 Логи'}</button>
-            <button onClick={function() { setShowAutoForward(!showAutoForward) }} style={{ padding: '10px 16px', background: showAutoForward ? '#1F2937' : '#10B981', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showAutoForward ? '✕' : '🔄 Авто-форвард'}</button>
-            <button onClick={scanAll} disabled={scanning} style={{ padding: '10px 16px', background: scanning ? '#374151' : '#10B981', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: scanning ? 'wait' : 'pointer' }}>{scanning ? '⏳' : '🔍 Сканировать всё'}</button>
+            <button onClick={function() { setShowEvents(!showEvents); if (!showEvents) loadEvents() }} style={{ padding: '10px 16px', background: showEvents ? '#1F2937' : '#EF4444', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showEvents ? '✕' : '🗓️ События'}</button>
+            <button onClick={function() { setShowLogs(!showLogs); if (!showLogs) loadLogs() }} style={{ padding: '10px 16px', background: showLogs ? '#1F2937' : '#F59E0B', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showLogs ? '✕' : '📋 Логи'}</button>
+            <button onClick={function() { setShowAutoForward(!showAutoForward) }} style={{ padding: '10px 16px', background: showAutoForward ? '#1F2937' : '#10B981', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showAutoForward ? '✕' : '🔄 Форвард'}</button>
+            <button onClick={scanAll} disabled={scanning} style={{ padding: '10px 16px', background: scanning ? '#374151' : '#3B82F6', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: scanning ? 'wait' : 'pointer' }}>{scanning ? '⏳' : '🔍 Скан'}</button>
             <button onClick={function() { setShowForward(!showForward) }} style={{ padding: '10px 16px', background: showForward ? '#1F2937' : '#EC4899', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showForward ? '✕' : '↗'}</button>
             <button onClick={function() { setShowBroadcast(!showBroadcast) }} style={{ padding: '10px 16px', background: showBroadcast ? '#1F2937' : '#A855F7', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showBroadcast ? '✕' : '📢'}</button>
-            <button onClick={function() { setShowAdd(!showAdd) }} style={{ padding: '10px 16px', background: showAdd ? '#1F2937' : '#00E5FF', color: showAdd ? '#FFF' : '#000', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showAdd ? '✕' : '+ Добавить'}</button>
+            <button onClick={function() { setShowAdd(!showAdd) }} style={{ padding: '10px 16px', background: showAdd ? '#1F2937' : '#00E5FF', color: showAdd ? '#FFF' : '#000', border: 'none', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{showAdd ? '✕' : '+ Вебхук'}</button>
             <button onClick={save} style={{ padding: '10px 20px', background: saved ? '#22C55E' : '#1F2937', color: saved ? '#000' : '#FFF', border: '1px solid #374151', borderRadius: '10px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>{saved ? '✅' : '💾'}</button>
           </div>
         </div>
         {scanResult && <div style={{ background: '#10B98120', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', border: '1px solid #10B98140' }}><span style={{ fontSize: '13px', color: '#10B981' }}>{scanResult}</span></div>}
+
+        {/* События */}
+        {showEvents && (
+          <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', marginBottom: '16px', border: '1px solid #EF444420' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600' }}>🗓️ События</h3>
+              <button onClick={function() { setShowAddEvent(!showAddEvent) }} style={{ padding: '8px 14px', background: showAddEvent ? '#1F2937' : '#EF4444', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' }}>{showAddEvent ? '✕' : '+ Событие'}</button>
+            </div>
+
+            {showAddEvent && (
+              <div style={{ background: '#111118', borderRadius: '10px', padding: '16px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {templates.map((t: any) => (
+                    <button key={t.value} onClick={function() { selectTemplate(t.value) }}
+                      style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid ' + (newEvent.template === t.value ? '#EF4444' : '#1F2937'), background: newEvent.template === t.value ? '#EF444420' : 'transparent', color: newEvent.template === t.value ? '#EF4444' : '#94A3B8', cursor: 'pointer', fontSize: '12px' }}>
+                      {t.icon} {t.name.replace(/[^\w\sа-яА-Я]/g, '').trim()}
+                    </button>
+                  ))}
+                </div>
+                <input type="text" value={newEvent.title} onChange={function(e) { setNewEvent({ ...newEvent, title: e.target.value }) }} placeholder="Название события" style={{ padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px' }} />
+                <input type="datetime-local" value={newEvent.event_date} onChange={function(e) { setNewEvent({ ...newEvent, event_date: e.target.value }) }} style={{ padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px' }} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input type="text" value={newEvent.channel} onChange={function(e) { setNewEvent({ ...newEvent, channel: e.target.value }) }} placeholder="Канал" style={{ flex: 1, padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px' }} />
+                  <input type="number" value={newEvent.max_participants || ''} onChange={function(e) { setNewEvent({ ...newEvent, max_participants: parseInt(e.target.value) || 0 }) }} placeholder="Мест" style={{ width: '80px', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px' }} />
+                </div>
+                <textarea value={newEvent.description} onChange={function(e) { setNewEvent({ ...newEvent, description: e.target.value }) }} placeholder="Описание..." rows={2} style={{ padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', resize: 'vertical' }} />
+                <button onClick={createEvent} style={{ padding: '10px', background: '#EF4444', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}>✅ Создать событие</button>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {events.length === 0 && <p style={{ color: '#64748B', fontSize: '13px', textAlign: 'center', padding: '12px' }}>Нет запланированных событий</p>}
+              {events.map(function(e: any) {
+                var d = new Date(e.event_date);
+                return (
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#111118', borderRadius: '10px' }}>
+                    <span style={{ fontSize: '20px' }}>{getEventIcon[e.template] || '📝'}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '13px', fontWeight: '600' }}>{e.title}</div>
+                      <div style={{ fontSize: '11px', color: '#94A3B8' }}>
+                        {d.toLocaleDateString('ru-RU')} в {d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        {e.max_participants > 0 ? ' • ' + e.max_participants + ' мест' : ' • Безлимит'}
+                      </div>
+                    </div>
+                    <button onClick={function() { notifyEvent(e) }} style={{ padding: '5px 10px', background: '#EF4444', color: '#FFF', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>📢</button>
+                    <button onClick={function() { deleteEvent(e.id) }} style={{ padding: '5px 8px', background: 'transparent', color: '#EF4444', border: '1px solid #374151', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>✕</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Логи */}
         {showLogs && (
@@ -136,7 +261,7 @@ export default function WebhooksPage() {
                   return (
                     <div key={i} style={{ display: 'flex', gap: '10px', padding: '8px 12px', background: '#111118', borderRadius: '8px', fontSize: '12px', alignItems: 'center' }}>
                       <span style={{ color: '#00E5FF', whiteSpace: 'nowrap' }}>{new Date(log.timestamp).toLocaleString('ru-RU')}</span>
-                      <span style={{ color: log.platform === 'lolka' ? '#5865F2' : '#0077FF' }}>{log.platform.toUpperCase()}</span>
+                      <span style={{ color: log.platform === 'lolka' ? '#5865F2' : '#0077FF' }}>{log.platform?.toUpperCase()}</span>
                       <span style={{ color: '#94A3B8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.message}</span>
                     </div>
                   );
@@ -164,7 +289,7 @@ export default function WebhooksPage() {
                 <input type="checkbox" checked={autoForward.from_vk_to_lolka} onChange={function(e) { setAutoForward({ ...autoForward, from_vk_to_lolka: e.target.checked }) }} style={{ accentColor: '#0077FF' }} />
                 💙 VK → 🎮 Lolka
               </label>
-              <button onClick={save} style={{ padding: '10px 20px', background: '#10B981', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '14px', marginTop: '6px' }}>💾 Сохранить</button>
+              <button onClick={saveAutoForward} style={{ padding: '10px 20px', background: '#10B981', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '14px', marginTop: '6px' }}>💾 Сохранить</button>
             </div>
           </div>
         )}
@@ -176,7 +301,7 @@ export default function WebhooksPage() {
         {showBroadcast && (
           <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', marginBottom: '16px', border: '1px solid #A855F720' }}><h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '12px' }}>📢 Рассылка</h3>
             <textarea value={broadcastMsg} onChange={function(e) { setBroadcastMsg(e.target.value) }} placeholder="Текст..." rows={2} style={{ width: '100%', padding: '12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box', marginBottom: '12px' }} />
-            <div style={{ marginBottom: '12px' }}><label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>🖼️ Аватар бота (URL, необязательно)</label><input type="text" value={broadcastAvatarUrl} onChange={function(e) { setBroadcastAvatarUrl(e.target.value) }} placeholder="https://example.com/avatar.png" style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} /></div>
+            <div style={{ marginBottom: '12px' }}><label style={{ fontSize: '12px', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>🖼️ Аватар бота (URL)</label><input type="text" value={broadcastAvatarUrl} onChange={function(e) { setBroadcastAvatarUrl(e.target.value) }} placeholder="https://..." style={{ width: '100%', padding: '10px 14px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '10px', color: '#FFF', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} /></div>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               {['lolka', 'vk'].map(function(p) { return (<label key={p} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}><input type="checkbox" checked={broadcastPlatforms.includes(p)} onChange={function() { setBroadcastPlatforms(function(prev) { return prev.includes(p) ? prev.filter(function(x) { return x !== p }) : [...prev, p] }) }} />{p === 'lolka' ? '🎮' : '💙'} {p}</label>) })}
               <button onClick={sendBroadcast} disabled={sending || !broadcastMsg.trim()} style={{ padding: '10px 24px', background: sending ? '#374151' : '#A855F7', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: '600', cursor: sending ? 'wait' : 'pointer', fontSize: '14px' }}>{sending ? '⏳' : '🚀'}</button>
@@ -196,6 +321,7 @@ export default function WebhooksPage() {
           </div>
         )}
 
+        {/* Список вебхуков */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {webhooks.map(function(w) { return (
             <div key={w.id} style={{ background: '#16161F', borderRadius: '14px', padding: '16px 20px', border: '1px solid #1F2937', opacity: w.active ? 1 : 0.5 }}>
@@ -219,8 +345,6 @@ export default function WebhooksPage() {
             </div>
           )})}
         </div>
-
-        <div style={{ background: '#16161F', borderRadius: '14px', padding: '20px', marginTop: '20px', border: '1px solid #1F2937' }}><h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '10px' }}>📖 Как работает</h3><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}><div style={{ background: '#111118', borderRadius: '10px', padding: '14px' }}><div style={{ fontWeight: '600', fontSize: '13px', marginBottom: '4px' }}>🔍 Автоопределение</div><p style={{ fontSize: '12px', color: '#94A3B8', lineHeight: '1.5' }}>Вставьте URL — платформа определится автоматически.</p></div><div style={{ background: '#111118', borderRadius: '10px', padding: '14px' }}><div style={{ fontWeight: '600', fontSize: '13px', marginBottom: '4px' }}>📋 Выбор канала</div><p style={{ fontSize: '12px', color: '#94A3B8', lineHeight: '1.5' }}>Выберите канал из списка или введите свой.</p></div></div></div>
 
         {saved && <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: '#22C55E', color: '#000', padding: '10px 20px', borderRadius: '12px', fontWeight: '600', fontSize: '13px', zIndex: 1000, boxShadow: '0 4px 20px rgba(34,197,94,0.3)', animation: 'slideUp 0.3s ease' }}>✅ Сохранено</div>}
         <style>{`@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
