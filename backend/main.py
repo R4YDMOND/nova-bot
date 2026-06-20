@@ -450,31 +450,15 @@ def detect_content_type(url: str) -> str:
 
 
 def generate_ai_comment(url: str, content_type: str, platform: str = "Lolka", server_name: str = "") -> str:
-    """
-    Генерирует живой комментарий через AI (Gemini → DeepSeek → fallback).
-    Адаптирует стиль под платформу и название сервера/группы.
-    """
-    type_names = {
-        'videos': 'видео', 'articles': 'статья', 'posts': 'пост',
-        'music': 'музыка', 'other': 'ссылка'
-    }
+    type_names = {'videos': 'видео', 'articles': 'статья', 'posts': 'пост', 'music': 'музыка', 'other': 'ссылка'}
     type_name = type_names.get(content_type, 'ссылка')
     
     if server_name:
-        if platform == "VK":
-            platform_context = f"в сообществе ВКонтакте «{server_name}»"
-        else:
-            platform_context = f"на сервере Lolka «{server_name}»"
+        platform_context = f"в сообществе ВКонтакте «{server_name}»" if platform == "VK" else f"на сервере Lolka «{server_name}»"
     else:
-        if platform == "VK":
-            platform_context = "в сообществе ВКонтакте"
-        else:
-            platform_context = "на сервере Lolka"
+        platform_context = "в сообществе ВКонтакте" if platform == "VK" else "на сервере Lolka"
     
-    if platform == "VK":
-        style = "дружелюбный, как в паблике VK"
-    else:
-        style = "весёлый, энергичный, как в игровом сообществе"
+    style = "дружелюбный, как в паблике VK" if platform == "VK" else "весёлый, энергичный, как в игровом сообществе"
     
     prompt = f"""Ты — дружелюбный AI-помощник {platform_context}.
 Напиши короткий живой комментарий (1 предложение, до 15 слов) на русском языке, 
@@ -482,70 +466,31 @@ def generate_ai_comment(url: str, content_type: str, platform: str = "Lolka", se
 Стиль: {style}, как будто ты делишься находкой с друзьями.
 Не используй Markdown. Ответь просто текстом."""
 
-    # === Gemini ===
     gemini_key = os.getenv("GEMINI_API_KEY", "")
     if gemini_key:
         try:
-            resp = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.9, "maxOutputTokens": 50}
-                },
-                timeout=8
-            )
+            resp = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}", json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.9, "maxOutputTokens": 50}}, timeout=8)
             if resp.ok:
                 data = resp.json()
                 text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                if text and len(text) > 5:
-                    return text.strip()
-        except Exception as e:
-            print(f"Gemini error: {e}")
+                if text and len(text) > 5: return text.strip()
+        except Exception as e: print(f"Gemini error: {e}")
     
-    # === DeepSeek ===
     deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
     if deepseek_key:
         try:
-            resp = requests.post(
-                "https://api.deepseek.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {deepseek_key}", "Content-Type": "application/json"},
-                json={
-                    "model": "deepseek-chat",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 50, "temperature": 0.9
-                },
-                timeout=10
-            )
+            resp = requests.post("https://api.deepseek.com/v1/chat/completions", headers={"Authorization": f"Bearer {deepseek_key}", "Content-Type": "application/json"}, json={"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "max_tokens": 50, "temperature": 0.9}, timeout=10)
             if resp.ok:
                 data = resp.json()
                 text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                if text and len(text) > 5:
-                    return text.strip()
-        except Exception as e:
-            print(f"DeepSeek error: {e}")
+                if text and len(text) > 5: return text.strip()
+        except Exception as e: print(f"DeepSeek error: {e}")
     
-    # === Fallback ===
-    if server_name:
-        server_prefix = f"«{server_name}»"
-    else:
-        server_prefix = ""
-    
+    server_prefix = f"«{server_name}»" if server_name else ""
     if platform == "VK":
-        fallback = {
-            'videos': [f"Ребята из {server_prefix}, нашёл крутое видео!", f"Подписчики {server_prefix}, гляньте какое видео — огонь!", "ВК-шные, вот это находка — обязательно к просмотру!"],
-            'articles': [f"Для {server_prefix} — полезная статья!", f"Подписчикам {server_prefix} на заметку!", "Читайте, это важно для нашего паблика!"],
-            'posts': [f"Смотрите какой пост для {server_prefix}!", "ВК не спит — делюсь интересным постом!", "Для подписчиков — горячее обсуждение!"],
-            'music': [f"Для {server_prefix} — отличный трек!", "Подписчикам в плейлист — музыкальная находка!", "ВК, послушайте что я нашёл!"],
-            'other': [f"Для {server_prefix} — полезная ссылка!", "Подписчикам пригодится!", "ВК-паблик, смотрите что нашёл!"]
-        }
+        fallback = {'videos': [f"Ребята из {server_prefix}, нашёл крутое видео!", f"Подписчики {server_prefix}, гляньте какое видео — огонь!", "ВК-шные, вот это находка — обязательно к просмотру!"], 'articles': [f"Для {server_prefix} — полезная статья!", f"Подписчикам {server_prefix} на заметку!", "Читайте, это важно для нашего паблика!"], 'posts': [f"Смотрите какой пост для {server_prefix}!", "ВК не спит — делюсь интересным постом!", "Для подписчиков — горячее обсуждение!"], 'music': [f"Для {server_prefix} — отличный трек!", "Подписчикам в плейлист — музыкальная находка!", "ВК, послушайте что я нашёл!"], 'other': [f"Для {server_prefix} — полезная ссылка!", "Подписчикам пригодится!", "ВК-паблик, смотрите что нашёл!"]}
     else:
-        fallback = {
-            'videos': [f"Эй, {server_prefix}, посмотрите какое видео!", "Ребята, это видео просто огонь — рекомендую!", "Вот это находка! Обязательно к просмотру."],
-            'articles': [f"{server_prefix}, нашёл статью которая стоит прочтения!", "Полезный материал — рекомендую ознакомиться!", "Статья дня — обязательно посмотрите!"],
-            'posts': [f"{server_prefix}, смотрите какой интересный пост!", "Вот это обсуждение — присоединяйтесь!", "Делюсь постом который вызвал бурю эмоций!"],
-            'music': [f"{server_prefix}, нашёл отличный трек для плейлиста!", "Послушайте какая музыка мне попалась!", "Этот трек сегодня в моём сердечке!"],
-            'other': [f"{server_prefix}, смотрите что я нашёл!", "Полезная ссылка для вас!", "Делюсь находкой — пригодится!"]
-        }
+        fallback = {'videos': [f"Эй, {server_prefix}, посмотрите какое видео!", "Ребята, это видео просто огонь — рекомендую!", "Вот это находка! Обязательно к просмотру."], 'articles': [f"{server_prefix}, нашёл статью которая стоит прочтения!", "Полезный материал — рекомендую ознакомиться!", "Статья дня — обязательно посмотрите!"], 'posts': [f"{server_prefix}, смотрите какой интересный пост!", "Вот это обсуждение — присоединяйтесь!", "Делюсь постом который вызвал бурю эмоций!"], 'music': [f"{server_prefix}, нашёл отличный трек для плейлиста!", "Послушайте какая музыка мне попалась!", "Этот трек сегодня в моём сердечке!"], 'other': [f"{server_prefix}, смотрите что я нашёл!", "Полезная ссылка для вас!", "Делюсь находкой — пригодится!"]}
     return random.choice(fallback.get(content_type, fallback['other']))
 
 
@@ -558,74 +503,40 @@ def forward_content(data: dict):
     avatar_url = data.get("avatar_url", "")
     
     urls = extract_urls(message)
-    if not urls:
-        return {"status": "error", "message": "Ссылки не найдены"}
+    if not urls: return {"status": "error", "message": "Ссылки не найдены"}
     
     comment = message
-    for url in urls:
-        comment = comment.replace(url, '').replace('/forward', '').replace('/перешли', '').strip()
+    for url in urls: comment = comment.replace(url, '').replace('/forward', '').replace('/перешли', '').strip()
     
     results = []
-    
     for url in urls:
         content_type = detect_content_type(url)
         ai_comment = generate_ai_comment(url, content_type, platform, server_name)
-        
-        if comment:
-            full_message = f"{ai_comment}\n💬 {comment}\n{url}"
-        else:
-            full_message = f"{ai_comment}\n{url}"
-        
+        full_message = f"{ai_comment}\n💬 {comment}\n{url}" if comment else f"{ai_comment}\n{url}"
         matching_webhooks = [w for w in webhooks if w.get("rules", {}).get(content_type, False)]
-        
         if not matching_webhooks:
             results.append({"url": url, "type": content_type, "sent": False, "message": "Нет каналов для этого типа"})
             continue
-        
         for wh in matching_webhooks:
             try:
-                if wh.get("platform") == "lolka":
-                    send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": full_message, "avatar_url": avatar_url})
-                elif wh.get("platform") == "vk":
-                    send_to_vk({"group_id": wh.get("group_id"), "message": full_message})
-                
-                forward_stats.append({
-                    "url": url, "type": content_type, "platform": wh.get("platform"),
-                    "channel": wh.get("channel", ""), "timestamp": datetime.utcnow().isoformat()
-                })
-            except Exception as e:
-                pass
-        
+                if wh.get("platform") == "lolka": send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": full_message, "avatar_url": avatar_url})
+                elif wh.get("platform") == "vk": send_to_vk({"group_id": wh.get("group_id"), "message": full_message})
+                forward_stats.append({"url": url, "type": content_type, "platform": wh.get("platform"), "channel": wh.get("channel", ""), "timestamp": datetime.utcnow().isoformat()})
+            except: pass
         results.append({"url": url, "type": content_type, "comment": ai_comment, "sent": True, "channels": len(matching_webhooks)})
-    
     return {"status": "ok", "results": results, "total_urls": len(urls), "total_sent": sum(1 for r in results if r.get("sent"))}
 
 
 @app.get("/api/forward/stats")
 def get_forward_stats():
-    if not forward_stats:
-        return {"total": 0, "today": 0, "by_type": {}, "by_platform": {}, "recent": []}
-    
+    if not forward_stats: return {"total": 0, "today": 0, "by_type": {}, "by_platform": {}, "recent": []}
     by_type = {}
-    for s in forward_stats:
-        t = s.get("type", "other")
-        by_type[t] = by_type.get(t, 0) + 1
-    
+    for s in forward_stats: t = s.get("type", "other"); by_type[t] = by_type.get(t, 0) + 1
     by_platform = {}
-    for s in forward_stats:
-        p = s.get("platform", "unknown")
-        by_platform[p] = by_platform.get(p, 0) + 1
-    
+    for s in forward_stats: p = s.get("platform", "unknown"); by_platform[p] = by_platform.get(p, 0) + 1
     today = datetime.utcnow().strftime("%Y-%m-%d")
     recent = sorted(forward_stats, key=lambda x: x.get("timestamp", ""), reverse=True)[:10]
-    
-    return {
-        "total": len(forward_stats),
-        "today": len([s for s in forward_stats if s.get("timestamp", "").startswith(today)]),
-        "by_type": by_type,
-        "by_platform": by_platform,
-        "recent": recent
-    }
+    return {"total": len(forward_stats), "today": len([s for s in forward_stats if s.get("timestamp", "").startswith(today)]), "by_type": by_type, "by_platform": by_platform, "recent": recent}
 
 
 # ==================== Сканирование контента ====================
@@ -638,70 +549,57 @@ def scan_content(data: dict):
     server_name = data.get("serverName", "")
     webhooks = data.get("webhooks", [])
     avatar_url = data.get("avatar_url", "")
-    
-    if platform != "vk" or not group_id:
-        return {"status": "ok", "found": 0, "sent": 0}
-    
+    if platform != "vk" or not group_id: return {"status": "ok", "found": 0, "sent": 0}
     access_token = os.getenv("VK_ACCESS_TOKEN", "")
-    if not access_token:
-        return {"status": "ok", "found": 0, "sent": 0}
-    
+    if not access_token: return {"status": "ok", "found": 0, "sent": 0}
     try:
-        resp = requests.get("https://api.vk.com/method/wall.get", params={
-            "owner_id": f"-{group_id}", "count": 10, "filter": "owner",
-            "access_token": access_token, "v": "5.199"
-        }, timeout=10)
+        resp = requests.get("https://api.vk.com/method/wall.get", params={"owner_id": f"-{group_id}", "count": 10, "filter": "owner", "access_token": access_token, "v": "5.199"}, timeout=10)
         data_resp = resp.json()
-        if "error" in data_resp:
-            return {"status": "ok", "found": 0, "sent": 0}
+        if "error" in data_resp: return {"status": "ok", "found": 0, "sent": 0}
         posts = data_resp.get("response", {}).get("items", [])
-    except:
-        return {"status": "ok", "found": 0, "sent": 0}
-    
-    found = 0
-    sent = 0
-    
+    except: return {"status": "ok", "found": 0, "sent": 0}
+    found = 0; sent = 0
     for post in posts:
-        likes = post.get("likes", {}).get("count", 0)
-        reposts = post.get("reposts", {}).get("count", 0)
-        
-        if likes + reposts < min_likes:
-            continue
-        
+        likes = post.get("likes", {}).get("count", 0); reposts = post.get("reposts", {}).get("count", 0)
+        if likes + reposts < min_likes: continue
         found += 1
         post_url = f"https://vk.com/wall-{group_id}_{post.get('id')}"
-        post_text = post.get("text", "")[:100]
-        
         content_type = "posts"
         for att in post.get("attachments", []):
             t = att.get("type", "")
             if t == "video": content_type = "videos"
             elif t == "link": content_type = "articles"
             elif t == "audio": content_type = "music"
-        
         matching = [w for w in webhooks if w.get("rules", {}).get(content_type, False)]
-        
         if matching:
             ai = generate_ai_comment(post_url, content_type, "VK", server_name)
             msg = f"🔥 Популярное ({likes}👍):\n{ai}\n{post_url}"
-            
             for wh in matching:
                 try:
-                    if wh.get("platform") == "vk":
-                        send_to_vk({"group_id": wh.get("group_id"), "message": msg})
-                    elif wh.get("platform") == "lolka":
-                        send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": msg, "avatar_url": avatar_url})
+                    if wh.get("platform") == "vk": send_to_vk({"group_id": wh.get("group_id"), "message": msg})
+                    elif wh.get("platform") == "lolka": send_to_lolka_webhook({"webhook_url": wh.get("url"), "message": msg, "avatar_url": avatar_url})
                     sent += 1
-                except:
-                    pass
-    
+                except: pass
     return {"status": "ok", "found": found, "sent": sent, "total_posts": len(posts)}
 
 
 @app.get("/api/scan/auto")
 def auto_scan():
-    return {
-        "status": "ok",
-        "message": "Автосканирование работает",
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    return {"status": "ok", "message": "Автосканирование работает", "timestamp": datetime.utcnow().isoformat()}
+
+
+# ==================== Статистика ====================
+
+@app.get("/api/stats/dashboard")
+def get_dashboard_stats():
+    return {"totalMessages": 0, "activeUsers": 0, "commandsUsed": 0, "voiceHours": 0, "onlineNow": 0, "newUsers": 0, "messagesChart": [0,0,0,0,0,0,0], "recentActivity": [], "topCommands": [], "serversCount": 0}
+
+
+@app.get("/api/moderation/log")
+def get_moderation_log():
+    return {"entries": [], "total": 0, "warns": 0, "mutes": 0, "bans": 0}
+
+
+@app.get("/api/ranking/members")
+def get_ranking_members():
+    return {"members": [], "total": 0}
