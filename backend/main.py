@@ -588,6 +588,173 @@ def auto_scan():
     return {"status": "ok", "message": "Автосканирование работает", "timestamp": datetime.utcnow().isoformat()}
 
 
+# ==================== Логи и статистика вебхуков ====================
+
+webhook_logs = []
+
+
+@app.get("/api/webhooks/logs")
+def get_webhook_logs(webhook_id: str = Query(""), limit: int = 20):
+    """Логи отправленных сообщений через вебхуки"""
+    logs = webhook_logs
+    if webhook_id:
+        logs = [l for l in logs if l.get("webhook_id") == webhook_id]
+    return {
+        "logs": sorted(logs, key=lambda x: x.get("timestamp", ""), reverse=True)[:limit],
+        "total": len(logs)
+    }
+
+
+@app.get("/api/webhooks/stats")
+def get_webhook_stats(webhook_id: str = Query("")):
+    """Статистика по вебхуку"""
+    logs = webhook_logs
+    if webhook_id:
+        logs = [l for l in logs if l.get("webhook_id") == webhook_id]
+    
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today_logs = [l for l in logs if l.get("timestamp", "").startswith(today)]
+    
+    return {
+        "total_sent": len(logs),
+        "today_sent": len(today_logs),
+        "last_sent": logs[0].get("timestamp") if logs else None
+    }
+
+
+@app.post("/api/webhooks/auto-forward")
+def auto_forward(data: dict):
+    """Автоматический кросс-постинг между платформами"""
+    source_platform = data.get("source_platform", "")
+    message = data.get("message", "")
+    source_channel = data.get("channel", "")
+    source_server = data.get("server_name", "")
+    
+    # Ищем все активные вебхуки
+    db = SessionLocal()
+    try:
+        # Получаем настройки авто-форварда
+        config = db.query(ModuleConfig).filter(
+            ModuleConfig.module_name == "auto_forward"
+        ).first()
+        
+        if not config or not config.is_enabled:
+            return {"status": "disabled"}
+        
+        import json
+        rules = json.loads(config.config) if config.config else {}
+        
+        if not rules.get("enabled"):
+            return {"status": "disabled"}
+        
+        # Определяем платформу-назначение
+        target_platform = "vk" if source_platform.lower() == "lolka" else "lolka"
+        
+        if not rules.get(f"from_{source_platform.lower()}_to_{target_platform}"):
+            return {"status": "skipped", "reason": "rule not enabled"}
+        
+        # Находим вебхуки для целевой платформы
+        from models import Server
+        servers = db.query(Server).all()
+        
+        sent_count = 0
+        for server in servers:
+            if server.webhook_url and target_platform == "lolka":
+                try:
+                    formatted_msg = f"📢 **Из {source_platform.upper()}**\n{source_server}: {message}"
+                    requests.post(server.webhook_url, json={
+                        "content": formatted_msg,
+                        "username": "Нова 🔄"
+                    }, timeout=10)
+                    sent_count += 1
+                    
+                    webhook_logs.append({
+                        "webhook_id": str(server.id),
+                        "message": formatted_msg[:100],
+                        "platform": target_platform,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                except:
+                    pass
+        
+        return {"status": "ok", "sent": sent_count}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.get("/api/webhooks/auto-forward/config")
+def get_auto_forward_config(server_id: str = Query("default")):
+    """Получить настройки авто-форварда"""
+    db = SessionLocal()
+    try:
+        config = db.query(ModuleConfig).filter(
+            ModuleConfig.server_id == server_id,
+            ModuleConfig.module_name == "auto_forward"
+        ).first()
+        
+        if config:
+            import json
+            try:
+                return {"config": json.loads(config.config)}
+            except:
+                pass
+        
+        return {"config": {
+            "enabled": False,
+            "from_lolka_to_vk": True,
+            "from_vk_to_lolka": True,
+            "include_source": True,
+            "filter_empty": True,
+        }}
+    finally:
+        db.close()
+
+
+@app.post("/api/webhooks/auto-forward/config")
+def save_auto_forward_config(data: dict):
+    """Сохранить настройки авто-форварда"""
+    db = SessionLocal()
+    try:
+        server_id = data.get("server_id", "default")
+        config_data = data.get("config", {})
+        
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            server = Server(name="Auto-created", server_id=server_id)
+            db.add(server)
+            db.commit()
+            db.refresh(server)
+        
+        existing = db.query(ModuleConfig).filter(
+            ModuleConfig.server_id == server.id,
+            ModuleConfig.module_name == "auto_forward"
+        ).first()
+        
+        import json
+        config_json = json.dumps(config_data)
+        
+        if existing:
+            existing.config = config_json
+        else:
+            new_config = ModuleConfig(
+                server_id=server.id,
+                module_name="auto_forward",
+                is_enabled=True,
+                config=config_json
+            )
+            db.add(new_config)
+        
+        db.commit()
+        return {"status": "saved"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
 # ==================== Отчёты ====================
 
 @app.get("/api/analytics/reports")
