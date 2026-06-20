@@ -18,6 +18,8 @@ const TABS = [
 export default function RankingPage() {
   const [activeTab, setActiveTab] = useState('settings')
   const [saved, setSaved] = useState(false)
+  const [shareAnim, setShareAnim] = useState(false)
+  const [shareToast, setShareToast] = useState('')
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
 
   const [xpSources, setXpSources] = useState([
@@ -124,7 +126,27 @@ export default function RankingPage() {
 
   const shareCard = function() {
     var text = '🏆 ' + (sanitize(cardNickname).length>25?sanitize(cardNickname).slice(0,25)+'...':sanitize(cardNickname)) + '\n📊 Уровень: ' + (firstMember.level||42) + '\n⭐ XP: ' + ((firstMember.xp||15420).toLocaleString()) + '\n💬 Сообщений: ' + ((firstMember.messages||2400).toLocaleString()) + '\n🎤 Голос: ' + (firstMember.voiceHours||120) + 'ч\n🚀 Создано в Nova Bot'
-    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(function() { alert('✅ Текст карточки скопирован!') }) } else { alert(text) }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(function() {
+        setShareAnim(true); setShareToast('✅ Текст карточки скопирован!')
+        setTimeout(function() { setShareAnim(false); setShareToast('') }, 2500)
+      })
+    }
+  }
+
+  const shareToVK = function() {
+    var text = encodeURIComponent('🏆 Моя карточка в Nova Bot!\n📊 Уровень: ' + (firstMember.level||42) + '\n⭐ XP: ' + ((firstMember.xp||15420).toLocaleString()) + '\n🚀 Попробуй: https://nova-bot-4vmp.vercel.app')
+    window.open('https://vk.com/share.php?url=https://nova-bot-4vmp.vercel.app&title=' + text, '_blank')
+  }
+
+  const shareToLolka = function() {
+    var text = '🏆 Моя карточка в Nova Bot!\n📊 Уровень: ' + (firstMember.level||42) + '\n⭐ XP: ' + ((firstMember.xp||15420).toLocaleString()) + '\n🚀 Попробуй: https://nova-bot-4vmp.vercel.app'
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(function() {
+        setShareToast('✅ Текст скопирован! Отправьте в Lolka через /forward')
+        setTimeout(function() { setShareToast('') }, 3000)
+      })
+    }
   }
 
   return (
@@ -184,7 +206,22 @@ export default function RankingPage() {
                   </div>
                   {cardShowAchievements&&(<div style={{ display: 'flex', gap: '6px', marginTop: '14px' }}>{['🏅','⭐','💎','🔥','👑'].map((a,i)=><div key={i} style={{ width: '28px', height: '28px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>{a}</div>)}</div>)}
                   <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}><div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '6px 10px', textAlign: 'center' }}><div style={{ fontSize: '10px', color: '#94A3B8' }}>💬 Сообщений</div><div style={{ fontSize: '14px', fontWeight: 'bold', color: cardAccentColor }}>{(firstMember.messages||2400).toLocaleString()}</div></div><div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '6px 10px', textAlign: 'center' }}><div style={{ fontSize: '10px', color: '#94A3B8' }}>🎤 Голос</div><div style={{ fontSize: '14px', fontWeight: 'bold', color: cardAccentColor }}>{firstMember.voiceHours||120}ч</div></div><div style={{ flex: 1, background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '6px 10px', textAlign: 'center' }}><div style={{ fontSize: '10px', color: '#94A3B8' }}>⭐ Реакций</div><div style={{ fontSize: '14px', fontWeight: 'bold', color: cardAccentColor }}>{(firstMember.reactions||856).toLocaleString()}</div></div></div>
-                  {cardShowShare&&(<div style={{ marginTop: '12px', textAlign: 'center' }}><button onClick={shareCard} style={{ padding: '6px 16px', background: cardAccentColor, color: '#000', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>🔗 Поделиться карточкой</button></div>)}
+                  {cardShowShare&&(
+                    <div style={{ marginTop: '12px' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <button onClick={shareCard} style={{
+                          padding: '7px 14px', background: shareAnim ? '#22C55E' : cardAccentColor, color: '#000',
+                          border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '11px', cursor: 'pointer',
+                          transition: 'all 0.3s ease', transform: shareAnim ? 'scale(1.05)' : 'scale(1)'
+                        }}>{shareAnim ? '✅ Скопировано!' : '📋 Копировать'}</button>
+                        <button onClick={shareToVK} style={{ padding: '7px 14px', background: '#0077FF', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>💙 VK</button>
+                        <button onClick={shareToLolka} style={{ padding: '7px 14px', background: '#5865F2', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '11px', cursor: 'pointer' }}>🎮 Lolka</button>
+                      </div>
+                      {shareToast && (
+                        <div style={{ marginTop: '8px', padding: '6px 12px', background: '#22C55E20', borderRadius: '8px', textAlign: 'center', fontSize: '11px', color: '#22C55E', animation: 'slideUp 0.3s ease' }}>{shareToast}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
