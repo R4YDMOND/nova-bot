@@ -55,3 +55,17 @@ class MusicProvider(Base):
     stream_url = Column(String(1024), default="")
     is_enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Event(Base):
+    __tablename__ = "events"
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, default="")
+    event_date = Column(DateTime, nullable=False)
+    template = Column(String(50), default="custom")
+    channel = Column(String(255), default="")
+    webhook_url = Column(String(1024), default="")
+    max_participants = Column(Integer, default=0)
+    created_by = Column(String(255), default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
