@@ -54,311 +54,122 @@ export default function WebhooksPage() {
   const [events, setEvents] = useState<any[]>([])
   const [templates, setTemplates] = useState<any[]>([])
   const [showAddEvent, setShowAddEvent] = useState(false)
-  const [newEvent, setNewEvent] = useState({
-    title: '', description: '', event_date: '', template: 'custom',
-    channel: '', webhook_url: '', max_participants: 0, created_by: 'Admin'
-  })
+  const [newEvent, setNewEvent] = useState({ title: '', description: '', event_date: '', template: 'custom', channel: '', webhook_url: '', max_participants: 0, created_by: 'Admin' })
   const [channelLinkInput, setChannelLinkInput] = useState('')
 
-  useEffect(() => {
-    loadEvents()
-    loadAutoForward()
-  }, [])
+  useEffect(() => { loadEvents(); loadAutoForward() }, [])
 
-  const loadEvents = async () => {
-    const data = await apiCall(API_BASE + '/api/events?server_id=default')
-    setEvents(data.events || [])
-    setTemplates(data.templates || [])
-  }
+  const loadEvents = async () => { const data = await apiCall(API_BASE + '/api/events?server_id=default'); setEvents(data.events || []); setTemplates(data.templates || []) }
+  const loadAutoForward = async () => { const data = await apiCall(API_BASE + '/api/webhooks/auto-forward/config?server_id=default'); if (data.config) setAutoForward(data.config) }
 
-  const loadAutoForward = async () => {
-    const data = await apiCall(API_BASE + '/api/webhooks/auto-forward/config?server_id=default')
-    if (data.config) setAutoForward(data.config)
-  }
-
-  const detectChannelFromLink = (link: string) => {
-    if (!link) return ''
-    if (link.includes('lolka.app/channels/')) return link.split('/').pop() || ''
-    if (link.includes('vk.com/')) { const parts = link.split('/'); return parts[parts.length - 1] || '' }
-    if (link.startsWith('#')) return link.replace('#', '')
-    return link
-  }
-
-  const handleChannelLink = (link: string) => {
-    setChannelLinkInput(link)
-    const detected = detectChannelFromLink(link)
-    if (detected) setNewEvent({ ...newEvent, channel: '#' + detected })
-  }
-
-  const createEvent = async () => {
-    if (!newEvent.title || !newEvent.event_date) return
-    await apiCall(API_BASE + '/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newEvent, server_id: 'default' }) })
-    setShowAddEvent(false)
-    setNewEvent({ title: '', description: '', event_date: '', template: 'custom', channel: '', webhook_url: '', max_participants: 0, created_by: 'Admin' })
-    setChannelLinkInput('')
-    loadEvents()
-  }
-
+  const detectChannelFromLink = (link: string) => { if (!link) return ''; if (link.includes('lolka.app/channels/')) return link.split('/').pop() || ''; if (link.includes('vk.com/')) { const parts = link.split('/'); return parts[parts.length - 1] || '' } if (link.startsWith('#')) return link.replace('#', ''); return link }
+  const handleChannelLink = (link: string) => { setChannelLinkInput(link); const detected = detectChannelFromLink(link); if (detected) setNewEvent({ ...newEvent, channel: '#' + detected }) }
+  const createEvent = async () => { if (!newEvent.title || !newEvent.event_date) return; await apiCall(API_BASE + '/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newEvent, server_id: 'default' }) }); setShowAddEvent(false); setNewEvent({ title: '', description: '', event_date: '', template: 'custom', channel: '', webhook_url: '', max_participants: 0, created_by: 'Admin' }); setChannelLinkInput(''); loadEvents() }
   const deleteEvent = async (id: number) => { await apiCall(API_BASE + '/api/events/' + id, { method: 'DELETE' }); loadEvents() }
-  const notifyEvent = async (event: any) => {
-    const data = await apiCall(API_BASE + '/api/events/' + event.id + '/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ webhook_url: event.webhook_url || '' }) })
-    alert(data.sent ? '✅ Уведомление отправлено!' : '❌ Ошибка')
-  }
+  const notifyEvent = async (event: any) => { const data = await apiCall(API_BASE + '/api/events/' + event.id + '/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ webhook_url: event.webhook_url || '' }) }); alert(data.sent ? '✅ Уведомление отправлено!' : '❌ Ошибка') }
+  const selectTemplate = (tpl: string) => { const t = templates.find((x: any) => x.value === tpl); if (!t) return; setNewEvent({ ...newEvent, template: tpl, max_participants: t.max_players || 0, title: tpl !== 'custom' ? t.name.replace(/[^\w\sа-яА-Я]/g, '').trim() + ' ' : '' }) }
 
-  const selectTemplate = (tpl: string) => {
-    const t = templates.find((x: any) => x.value === tpl)
-    if (!t) return
-    setNewEvent({ ...newEvent, template: tpl, max_participants: t.max_players || 0, title: tpl !== 'custom' ? t.name.replace(/[^\w\sа-яА-Я]/g, '').trim() + ' ' : '' })
-  }
+  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  const toggle = (id: string) => { setWebhooks(webhooks.map(w => w.id === id ? { ...w, active: !w.active } : w)) }
+  const deleteWebhook = (id: string) => { setWebhooks(webhooks.filter(w => w.id !== id)) }
+  const toggleRule = (webhookId: string, rule: string) => { setWebhooks(webhooks.map(w => { if (w.id !== webhookId) return w; const newRules = { ...w.rules, [rule]: !w.rules[rule as keyof typeof w.rules] }; return { ...w, rules: newRules } })) }
+  const updateWebhook = (id: string, key: string, value: any) => { setWebhooks(webhooks.map(w => w.id === id ? { ...w, [key]: value } : w)) }
+  const detectPlatform = (url: string): string => { if (!url) return ''; const clean = url.toLowerCase().trim(); if (clean.includes('lolka.app') || clean.includes('lolka')) return 'Lolka'; if (clean.includes('vk.com') || clean.includes('vk.ru')) return 'VK'; return '' }
+  const handleUrlChange = (value: string) => { const platform = detectPlatform(value); setNewWebhook({ ...newWebhook, url: value, platform: platform || newWebhook.platform }) }
+  const channelsFor = (platform: string): string[] => mockChannels[platform] || []
+  const addWebhook = () => { if (!newWebhook.url || !newWebhook.channel) return; setWebhooks([...webhooks, { ...newWebhook, id: Date.now().toString(), active: true }]); setNewWebhook({ platform: '', url: '', channel: '', groupId: '', serverName: '', autoScan: false, scanInterval: 30, minLikes: 5, rules: { posts: true, videos: true, articles: true, music: false, other: true } }); setShowAdd(false) }
 
-  const save = function() { setSaved(true); setTimeout(function() { setSaved(false) }, 2000) }
-  const toggle = function(id: string) { setWebhooks(webhooks.map(function(w) { return w.id === id ? { ...w, active: !w.active } : w })) }
-  const deleteWebhook = function(id: string) { setWebhooks(webhooks.filter(function(w) { return w.id !== id })) }
-  const toggleRule = function(webhookId: string, rule: string) { setWebhooks(webhooks.map(function(w) { if (w.id !== webhookId) return w; var newRules = { ...w.rules, [rule]: !w.rules[rule as keyof typeof w.rules] }; return { ...w, rules: newRules } })) }
-  const updateWebhook = function(id: string, key: string, value: any) { setWebhooks(webhooks.map(function(w) { return w.id === id ? { ...w, [key]: value } : w })) }
-  const detectPlatform = function(url: string): string { if (!url) return ''; var clean = url.toLowerCase().trim(); if (clean.includes('lolka.app') || clean.includes('lolka')) return 'Lolka'; if (clean.includes('vk.com') || clean.includes('vk.ru')) return 'VK'; return '' }
-  const handleUrlChange = function(value: string) { var platform = detectPlatform(value); setNewWebhook({ ...newWebhook, url: value, platform: platform || newWebhook.platform }) }
-  const channelsFor = function(platform: string): string[] { return mockChannels[platform] || [] }
-  const addWebhook = function() { if (!newWebhook.url || !newWebhook.channel) return; setWebhooks([...webhooks, { ...newWebhook, id: Date.now().toString(), active: true }]); setNewWebhook({ platform: '', url: '', channel: '', groupId: '', serverName: '', autoScan: false, scanInterval: 30, minLikes: 5, rules: { posts: true, videos: true, articles: true, music: false, other: true } }); setShowAdd(false) }
+  const testWebhook = async (wh: Webhook) => { const endpoint = wh.platform === 'Lolka' ? '/api/send/lolka' : '/api/send/vk'; const body: any = { message: '🧪 Тест от Новы!', webhook_url: wh.url }; if (wh.platform === 'VK') body.group_id = wh.groupId; const data = await apiCall(API_BASE + endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); alert(data.sent ? '✅ Отправлено!' : '❌ Ошибка: ' + JSON.stringify(data)) }
+  const scanWebhook = async (wh: Webhook) => { setScanning(true); setScanResult(''); const data = await apiCall(API_BASE + '/api/scan/content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ platform: wh.platform.toLowerCase(), group_id: wh.groupId, serverName: wh.serverName, min_likes: wh.minLikes, rules: wh.rules, webhooks: [{ platform: wh.platform.toLowerCase(), url: wh.url, group_id: wh.groupId, rules: wh.rules, serverName: wh.serverName, channel: wh.channel }] }) }); setScanResult(data.found ? '✅ Найдено: ' + data.found + ', переслано: ' + (data.sent || 0) : 'ℹ️ Нет нового'); setScanning(false); setTimeout(() => setScanResult(''), 4000) }
+  const scanAll = () => { webhooks.filter(w => w.active).forEach((wh, i) => { setTimeout(() => scanWebhook(wh), i * 500) }) }
+  const loadLogs = async () => { setLogsLoading(true); const data = await apiCall(API_BASE + '/api/webhooks/logs?limit=50'); setLogs(data.logs || []); setLogsLoading(false) }
+  const sendBroadcast = async () => { if (!broadcastMsg.trim()) return; setSending(true); const active = webhooks.filter(w => w.active && broadcastPlatforms.includes(w.platform.toLowerCase())); const data = await apiCall(API_BASE + '/api/send/broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: broadcastMsg, platforms: broadcastPlatforms, avatar_url: broadcastAvatarUrl, webhooks: active.map(w => ({ platform: w.platform.toLowerCase(), url: w.url, group_id: w.groupId, serverName: w.serverName })) }) }); setSendResult('✅ ' + data.sent_count + '/' + data.total); setSending(false); setTimeout(() => setSendResult(''), 3000) }
+  const forwardContent = async () => { if (!forwardUrl.trim()) return; setSending(true); const active = webhooks.filter(w => w.active && w.rules[forwardType as keyof typeof w.rules]); const data = await apiCall(API_BASE + '/api/forward', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: ('/forward ' + forwardUrl + ' ' + forwardComment).trim(), platform: active[0]?.platform || 'Lolka', serverName: active[0]?.serverName || '', webhooks: active.map(w => ({ platform: w.platform.toLowerCase(), url: w.url, group_id: w.groupId, rules: w.rules, serverName: w.serverName, channel: w.channel })) }) }); setForwardResult('✅ ' + data.total_sent + '/' + data.total_urls); setSending(false); setTimeout(() => setForwardResult(''), 4000) }
+  const saveAutoForward = async () => { await apiCall(API_BASE + '/api/webhooks/auto-forward/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ server_id: 'default', config: autoForward }) }); setSaved(true); setTimeout(() => setSaved(false), 2000) }
 
-  const testWebhook = async function(wh: Webhook) {
-    var endpoint = wh.platform === 'Lolka' ? '/api/send/lolka' : '/api/send/vk'
-    var body: any = { message: '🧪 Тест от Новы!', webhook_url: wh.url }
-    if (wh.platform === 'VK') body.group_id = wh.groupId
-    var data = await apiCall(API_BASE + endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    alert(data.sent ? '✅ Отправлено!' : '❌ Ошибка: ' + JSON.stringify(data))
-  }
-
-  const scanWebhook = async function(wh: Webhook) {
-    setScanning(true); setScanResult('')
-    var data = await apiCall(API_BASE + '/api/scan/content', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ platform: wh.platform.toLowerCase(), group_id: wh.groupId, serverName: wh.serverName, min_likes: wh.minLikes, rules: wh.rules, webhooks: [{ platform: wh.platform.toLowerCase(), url: wh.url, group_id: wh.groupId, rules: wh.rules, serverName: wh.serverName, channel: wh.channel }] }) })
-    setScanResult(data.found ? '✅ Найдено: ' + data.found + ', переслано: ' + (data.sent || 0) : 'ℹ️ Нет нового'); setScanning(false); setTimeout(function() { setScanResult('') }, 4000)
-  }
-
-  const scanAll = function() { webhooks.filter(function(w) { return w.active }).forEach(function(wh, i) { setTimeout(function() { scanWebhook(wh) }, i * 500) }) }
-  const loadLogs = async function() { setLogsLoading(true); var data = await apiCall(API_BASE + '/api/webhooks/logs?limit=50'); setLogs(data.logs || []); setLogsLoading(false) }
-
-  const sendBroadcast = async function() {
-    if (!broadcastMsg.trim()) return; setSending(true)
-    var active = webhooks.filter(function(w) { return w.active && broadcastPlatforms.includes(w.platform.toLowerCase()) })
-    var data = await apiCall(API_BASE + '/api/send/broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: broadcastMsg, platforms: broadcastPlatforms, avatar_url: broadcastAvatarUrl, webhooks: active.map(function(w) { return { platform: w.platform.toLowerCase(), url: w.url, group_id: w.groupId, serverName: w.serverName } }) }) })
-    setSendResult('✅ ' + data.sent_count + '/' + data.total); setSending(false); setTimeout(function() { setSendResult('') }, 3000)
-  }
-
-  const forwardContent = async function() {
-    if (!forwardUrl.trim()) return; setSending(true)
-    var active = webhooks.filter(function(w) { return w.active && w.rules[forwardType as keyof typeof w.rules] })
-    var data = await apiCall(API_BASE + '/api/forward', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: ('/forward ' + forwardUrl + ' ' + forwardComment).trim(), platform: active[0]?.platform || 'Lolka', serverName: active[0]?.serverName || '', webhooks: active.map(function(w) { return { platform: w.platform.toLowerCase(), url: w.url, group_id: w.groupId, rules: w.rules, serverName: w.serverName, channel: w.channel } }) }) })
-    setForwardResult('✅ ' + data.total_sent + '/' + data.total_urls); setSending(false); setTimeout(function() { setForwardResult('') }, 4000)
-  }
-
-  const saveAutoForward = async function() {
-    await apiCall(API_BASE + '/api/webhooks/auto-forward/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ server_id: 'default', config: autoForward }) })
-    setSaved(true); setTimeout(function() { setSaved(false) }, 2000)
-  }
-
-  var getTypeLabel: any = { posts: 'пост', videos: 'видео', articles: 'статья', music: 'музыка', other: 'материал' }
-  var getTypeIcon: any = { posts: '📝', videos: '🎬', articles: '📄', music: '🎵', other: '📎' }
-  var getEventIcon: any = { raid: '⚔️', farm: '🎯', meeting: '🤝', event: '🎉', tournament: '🏆', custom: '📝' }
-  var getEventColor: any = { raid: '#EF4444', farm: '#F59E0B', meeting: '#3B82F6', event: '#A855F7', tournament: '#F59E0B', custom: '#00E5FF' }
+  const getTypeLabel: any = { posts: 'пост', videos: 'видео', articles: 'статья', music: 'музыка', other: 'материал' }
+  const getTypeIcon: any = { posts: '📝', videos: '🎬', articles: '📄', music: '🎵', other: '📎' }
+  const getEventIcon: any = { raid: '⚔️', farm: '🎯', meeting: '🤝', event: '🎉', tournament: '🏆', custom: '📝' }
+  const getEventColor: any = { raid: 'var(--danger)', farm: 'var(--warning)', meeting: 'var(--info)', event: 'var(--purple)', tournament: 'var(--warning)', custom: 'var(--accent)' }
 
   return (
     <div style={{ padding: '28px 36px', maxWidth: '1100px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '2px' }}>🔗 Вебхуки</h1>
-          <p style={{ color: '#94A3B8', fontSize: '12px' }}>События, логи, авто-форвард и управление</p>
-        </div>
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          <button onClick={function() { setShowEvents(!showEvents); if (!showEvents) loadEvents() }} style={btnStyle(showEvents, '#EF4444')}>{showEvents ? '✕' : '🗓️ События'}</button>
-          <button onClick={function() { setShowLogs(!showLogs); if (!showLogs) loadLogs() }} style={btnStyle(showLogs, '#F59E0B')}>{showLogs ? '✕' : '📋 Логи'}</button>
-          <button onClick={function() { setShowAutoForward(!showAutoForward) }} style={btnStyle(showAutoForward, '#10B981')}>{showAutoForward ? '✕' : '🔄 Форвард'}</button>
-          <button onClick={function() { setShowAdd(!showAdd) }} style={btnStyle(showAdd, '#00E5FF')}>{showAdd ? '✕' : '+ Вебхук'}</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+        <div><h1 style={{ fontSize: 'var(--font-3xl)', fontWeight: 700, marginBottom: 2 }}>🔗 Вебхуки</h1><p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-md)' }}>События, логи, авто-форвард и управление</p></div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button onClick={() => { setShowEvents(!showEvents); if (!showEvents) loadEvents() }} style={btnStyle(showEvents, 'var(--danger)')}>{showEvents ? '✕' : '🗓️ События'}</button>
+          <button onClick={() => { setShowLogs(!showLogs); if (!showLogs) loadLogs() }} style={btnStyle(showLogs, 'var(--warning)')}>{showLogs ? '✕' : '📋 Логи'}</button>
+          <button onClick={() => setShowAutoForward(!showAutoForward)} style={btnStyle(showAutoForward, 'var(--success)')}>{showAutoForward ? '✕' : '🔄 Форвард'}</button>
+          <button onClick={() => setShowAdd(!showAdd)} style={btnStyle(showAdd, 'var(--accent)')}>{showAdd ? '✕' : '+ Вебхук'}</button>
         </div>
       </div>
 
-      {scanResult && (
-        <div style={{ background: '#10B98115', borderRadius: '8px', padding: '8px 14px', marginBottom: '12px', border: '1px solid #10B98130' }}>
-          <span style={{ fontSize: '12px', color: '#10B981' }}>{scanResult}</span>
-        </div>
-      )}
+      {scanResult && <div style={{ background: 'var(--success)', borderRadius: 'var(--radius-md)', padding: '8px 14px', marginBottom: 12, border: '1px solid var(--success)', opacity: 0.15 }}><span style={{ fontSize: 'var(--font-md)', color: 'var(--success)' }}>{scanResult}</span></div>}
 
       {showEvents && (
-        <div style={panelStyle('#EF444410')}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>🗓️ События</h3>
-            <button onClick={function() { setShowAddEvent(!showAddEvent) }} style={{ padding: '6px 12px', background: showAddEvent ? '#1F2937' : '#EF4444', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '11px' }}>{showAddEvent ? '✕' : '+ Создать'}</button>
-          </div>
-
+        <div style={panelStyle('var(--danger)')}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}><h3 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, margin: 0 }}>🗓️ События</h3><button onClick={() => setShowAddEvent(!showAddEvent)} style={{ padding: '7px 14px', background: showAddEvent ? 'var(--border)' : 'var(--danger)', color: '#FFF', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: 'pointer', fontSize: 'var(--font-sm)' }}>{showAddEvent ? '✕' : '+ Создать'}</button></div>
           {showAddEvent && (
-            <div style={{ background: '#111118', borderRadius: '10px', padding: '16px', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                {templates.map((t: any) => (
-                  <button key={t.value} onClick={function() { selectTemplate(t.value) }} style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid ' + (newEvent.template === t.value ? getEventColor[t.value] : '#1F2937'), background: newEvent.template === t.value ? getEventColor[t.value] + '20' : 'transparent', color: newEvent.template === t.value ? getEventColor[t.value] : '#94A3B8', cursor: 'pointer', fontSize: '11px', fontWeight: newEvent.template === t.value ? '600' : '400' }}>{t.icon} {t.name.replace(/[^\w\sа-яА-Я]/g, '').trim()}</button>
-                ))}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                <input type="text" value={newEvent.title} onChange={function(e) { setNewEvent({ ...newEvent, title: e.target.value }) }} placeholder="Название события" style={inputStyle} />
-                <input type="datetime-local" value={newEvent.event_date} onChange={function(e) { setNewEvent({ ...newEvent, event_date: e.target.value }) }} style={inputStyle} />
-              </div>
-              <div style={{ marginBottom: '8px' }}>
-                <label style={{ fontSize: '10px', color: '#64748B', display: 'block', marginBottom: '4px' }}>💡 Вставьте ссылку на канал — название подтянется автоматически</label>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <input type="text" value={channelLinkInput} onChange={function(e) { handleChannelLink(e.target.value) }} placeholder="https://lolka.app/channels/... или #канал" style={{ ...inputStyle, flex: 1 }} />
-                  <input type="text" value={newEvent.channel} onChange={function(e) { setNewEvent({ ...newEvent, channel: e.target.value }) }} placeholder="Канал" style={{ ...inputStyle, width: '140px' }} />
-                  <input type="number" value={newEvent.max_participants || ''} onChange={function(e) { setNewEvent({ ...newEvent, max_participants: parseInt(e.target.value) || 0 }) }} placeholder="Мест" style={{ ...inputStyle, width: '70px' }} />
-                </div>
-              </div>
-              <textarea value={newEvent.description} onChange={function(e) { setNewEvent({ ...newEvent, description: e.target.value }) }} placeholder="Описание события..." rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical', marginBottom: '10px', boxSizing: 'border-box' }} />
-              <button onClick={createEvent} style={{ width: '100%', padding: '10px', background: '#EF4444', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}>✅ Создать событие</button>
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', padding: 16, marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>{templates.map((t: any) => (<button key={t.value} onClick={() => selectTemplate(t.value)} style={{ padding: '5px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid ' + (newEvent.template === t.value ? getEventColor[t.value] : 'var(--border)'), background: newEvent.template === t.value ? getEventColor[t.value] + '20' : 'transparent', color: newEvent.template === t.value ? getEventColor[t.value] : 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--font-sm)', fontWeight: newEvent.template === t.value ? 600 : 400 }}>{t.icon} {t.name?.replace(/[^\w\sа-яА-Я]/g, '').trim()}</button>))}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}><input type="text" value={newEvent.title} onChange={e => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Название события" style={inputStyle} /><input type="datetime-local" value={newEvent.event_date} onChange={e => setNewEvent({ ...newEvent, event_date: e.target.value })} style={inputStyle} /></div>
+              <div style={{ marginBottom: 8 }}><label style={labelStyle}>💡 Вставьте ссылку на канал — название подтянется автоматически</label><div style={{ display: 'flex', gap: 6 }}><input type="text" value={channelLinkInput} onChange={e => handleChannelLink(e.target.value)} placeholder="https://lolka.app/channels/... или #канал" style={{ ...inputStyle, flex: 1 }} /><input type="text" value={newEvent.channel} onChange={e => setNewEvent({ ...newEvent, channel: e.target.value })} placeholder="Канал" style={{ ...inputStyle, width: 140 }} /><input type="number" value={newEvent.max_participants || ''} onChange={e => setNewEvent({ ...newEvent, max_participants: parseInt(e.target.value) || 0 })} placeholder="Мест" style={{ ...inputStyle, width: 70 }} /></div></div>
+              <textarea value={newEvent.description} onChange={e => setNewEvent({ ...newEvent, description: e.target.value })} placeholder="Описание события..." rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical', marginBottom: 10, boxSizing: 'border-box' }} />
+              <button onClick={createEvent} style={{ width: '100%', padding: 10, background: 'var(--danger)', color: '#FFF', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', fontSize: 'var(--font-md)' }}>✅ Создать событие</button>
             </div>
           )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {events.length === 0 && <p style={{ color: '#64748B', fontSize: '12px', textAlign: 'center', padding: '16px' }}>Нет запланированных событий</p>}
-            {events.map(function(e: any) {
-              var d = new Date(e.event_date);
-              var color = getEventColor[e.template] || '#00E5FF';
-              return (
-                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#111118', borderRadius: '8px', borderLeft: '3px solid ' + color }}>
-                  <span style={{ fontSize: '18px' }}>{getEventIcon[e.template] || '📝'}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
-                    <div style={{ fontSize: '10px', color: '#94A3B8' }}>{d.toLocaleDateString('ru-RU')} в {d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}{e.channel ? ' • ' + e.channel : ''}{e.max_participants > 0 ? ' • ' + e.max_participants + ' мест' : ''}</div>
-                  </div>
-                  <button onClick={function() { notifyEvent(e) }} style={{ padding: '4px 8px', background: color + '20', color: color, border: '1px solid ' + color + '40', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}>📢</button>
-                  <button onClick={function() { deleteEvent(e.id) }} style={{ padding: '4px 6px', background: 'transparent', color: '#EF4444', border: '1px solid #374151', borderRadius: '5px', cursor: 'pointer', fontSize: '11px' }}>✕</button>
-                </div>
-              );
-            })}
-          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{events.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-md)', textAlign: 'center', padding: 16 }}>Нет запланированных событий</p>}{events.map((e: any) => { const d = new Date(e.event_date); const color = getEventColor[e.template] || 'var(--accent)'; return (<div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', borderLeft: '3px solid ' + color }}><span style={{ fontSize: 'var(--icon-lg)' }}>{getEventIcon[e.template] || '📝'}</span><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 'var(--font-md)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div><div style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>{d.toLocaleDateString('ru-RU')} в {d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}{e.channel ? ' • ' + e.channel : ''}{e.max_participants > 0 ? ' • ' + e.max_participants + ' мест' : ''}</div></div><button onClick={() => notifyEvent(e)} style={{ padding: '5px 10px', background: color + '20', color: color, border: '1px solid ' + color + '40', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 'var(--font-sm)', whiteSpace: 'nowrap' }}>📢</button><button onClick={() => deleteEvent(e.id)} style={{ padding: '5px 8px', background: 'transparent', color: 'var(--danger)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 'var(--font-sm)' }}>✕</button></div>) })})}</div>
         </div>
       )}
 
       {showLogs && (
-        <div style={panelStyle('#F59E0B10')}>
-          <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>📋 Логи отправленных сообщений</h3>
-          {logsLoading ? <p style={{ color: '#94A3B8', fontSize: '12px' }}>⏳ Загрузка...</p> : logs.length === 0 ? <p style={{ color: '#64748B', fontSize: '12px' }}>Логов пока нет</p> :
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '250px', overflow: 'auto' }}>
-              {logs.map(function(log: any, i: number) {
-                return (
-                  <div key={i} style={{ display: 'flex', gap: '8px', padding: '6px 10px', background: '#111118', borderRadius: '6px', fontSize: '11px', alignItems: 'center' }}>
-                    <span style={{ color: '#00E5FF', whiteSpace: 'nowrap', fontSize: '10px' }}>{new Date(log.timestamp).toLocaleString('ru-RU')}</span>
-                    <span style={{ color: log.platform === 'lolka' ? '#5865F2' : '#0077FF', fontWeight: '600' }}>{log.platform?.toUpperCase()}</span>
-                    <span style={{ color: '#94A3B8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.message}</span>
-                  </div>
-                );
-              })}
-            </div>
-          }
-        </div>
+        <div style={panelStyle('var(--warning)')}><h3 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, marginBottom: 12 }}>📋 Логи отправленных сообщений</h3>{logsLoading ? <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-md)' }}>⏳ Загрузка...</p> : logs.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-md)' }}>Логов пока нет</p> : <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 250, overflow: 'auto' }}>{logs.map((log: any, i: number) => (<div key={i} style={{ display: 'flex', gap: 8, padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-sm)', alignItems: 'center' }}><span style={{ color: 'var(--accent)', whiteSpace: 'nowrap', fontSize: 'var(--font-xs)' }}>{new Date(log.timestamp).toLocaleString('ru-RU')}</span><span style={{ color: log.platform === 'lolka' ? '#5865F2' : '#0077FF', fontWeight: 600 }}>{log.platform?.toUpperCase()}</span><span style={{ color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.message}</span></div>))}</div>}</div>
       )}
 
       {showAutoForward && (
-        <div style={panelStyle('#10B98110')}>
-          <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>🔄 Авто-форвард</h3>
-          <p style={{ color: '#94A3B8', fontSize: '11px', marginBottom: '14px' }}>Сообщения автоматически пересылаются между VK и Lolka</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px' }}>Включить авто-форвард</span>
-              <div onClick={function() { setAutoForward({ ...autoForward, enabled: !autoForward.enabled }) }} style={{ width: '40px', height: '22px', background: autoForward.enabled ? '#10B981' : '#374151', borderRadius: '22px', cursor: 'pointer', position: 'relative' }}><div style={{ position: 'absolute', height: '16px', width: '16px', left: autoForward.enabled ? '22px' : '3px', top: '3px', background: '#FFF', borderRadius: '50%', transition: '0.2s' }} /></div>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px' }}><input type="checkbox" checked={autoForward.from_lolka_to_vk} onChange={function(e) { setAutoForward({ ...autoForward, from_lolka_to_vk: e.target.checked }) }} style={{ accentColor: '#5865F2' }} />🎮 Lolka → 💙 VK</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px' }}><input type="checkbox" checked={autoForward.from_vk_to_lolka} onChange={function(e) { setAutoForward({ ...autoForward, from_vk_to_lolka: e.target.checked }) }} style={{ accentColor: '#0077FF' }} />💙 VK → 🎮 Lolka</label>
-            <button onClick={saveAutoForward} style={{ padding: '8px 16px', background: '#10B981', color: '#000', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '12px', marginTop: '4px', width: 'fit-content' }}>💾 Сохранить</button>
-          </div>
-        </div>
+        <div style={panelStyle('var(--success)')}><h3 style={{ fontSize: 'var(--font-xl)', fontWeight: 600, marginBottom: 4 }}>🔄 Авто-форвард</h3><p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-sm)', marginBottom: 14 }}>Сообщения автоматически пересылаются между VK и Lolka</p><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ fontSize: 'var(--font-lg)' }}>Включить авто-форвард</span><div onClick={() => setAutoForward({ ...autoForward, enabled: !autoForward.enabled })} style={{ width: 40, height: 22, background: autoForward.enabled ? 'var(--success)' : 'var(--border)', borderRadius: 22, cursor: 'pointer', position: 'relative' }}><div style={{ position: 'absolute', height: 16, width: 16, left: autoForward.enabled ? 22 : 3, top: 3, background: '#FFF', borderRadius: '50%', transition: '0.2s' }} /></div></div><label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 'var(--font-md)' }}><input type="checkbox" checked={autoForward.from_lolka_to_vk} onChange={e => setAutoForward({ ...autoForward, from_lolka_to_vk: e.target.checked })} style={{ accentColor: '#5865F2' }} />🎮 Lolka → 💙 VK</label><label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 'var(--font-md)' }}><input type="checkbox" checked={autoForward.from_vk_to_lolka} onChange={e => setAutoForward({ ...autoForward, from_vk_to_lolka: e.target.checked })} style={{ accentColor: '#0077FF' }} />💙 VK → 🎮 Lolka</label><button onClick={saveAutoForward} style={{ padding: '8px 16px', background: 'var(--success)', color: '#000', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', fontSize: 'var(--font-md)', marginTop: 4, width: 'fit-content' }}>💾 Сохранить</button></div></div>
       )}
 
-      <div style={{ marginTop: showEvents || showLogs || showAutoForward ? '16px' : '0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: '600' }}>Подключённые вебхуки ({webhooks.length})</h3>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button onClick={scanAll} disabled={scanning} style={{ padding: '5px 10px', background: scanning ? '#374151' : '#3B82F620', color: scanning ? '#64748B' : '#3B82F6', border: '1px solid ' + (scanning ? '#374151' : '#3B82F640'), borderRadius: '6px', cursor: scanning ? 'wait' : 'pointer', fontSize: '11px' }}>{scanning ? '⏳' : '🔍 Сканировать всё'}</button>
-            <button onClick={function() { setShowForward(!showForward) }} style={{ padding: '5px 10px', background: '#EC489920', color: '#EC4899', border: '1px solid #EC489940', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>↗</button>
-            <button onClick={function() { setShowBroadcast(!showBroadcast) }} style={{ padding: '5px 10px', background: '#A855F720', color: '#A855F7', border: '1px solid #A855F740', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>📢</button>
-          </div>
-        </div>
+      <div style={{ marginTop: showEvents || showLogs || showAutoForward ? 16 : 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><h3 style={{ fontSize: 'var(--font-xl)', fontWeight: 600 }}>Подключённые вебхуки ({webhooks.length})</h3><div style={{ display: 'flex', gap: 4 }}><button onClick={scanAll} disabled={scanning} style={{ padding: '6px 12px', background: scanning ? 'var(--border)' : 'var(--info)20', color: scanning ? 'var(--text-muted)' : 'var(--info)', border: '1px solid ' + (scanning ? 'var(--border)' : 'var(--info)40'), borderRadius: 'var(--radius-sm)', cursor: scanning ? 'wait' : 'pointer', fontSize: 'var(--font-sm)' }}>{scanning ? '⏳' : '🔍 Сканировать всё'}</button><button onClick={() => setShowForward(!showForward)} style={{ padding: '6px 12px', background: 'var(--pink)20', color: 'var(--pink)', border: '1px solid var(--pink)40', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 'var(--font-sm)' }}>↗</button><button onClick={() => setShowBroadcast(!showBroadcast)} style={{ padding: '6px 12px', background: 'var(--purple)20', color: 'var(--purple)', border: '1px solid var(--purple)40', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 'var(--font-sm)' }}>📢</button></div></div>
 
-        {showForward && (
-          <div style={{ ...panelStyle('#EC489910'), marginBottom: '10px', padding: '14px' }}>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap' }}><input type="text" value={forwardUrl} onChange={function(e) { setForwardUrl(e.target.value) }} placeholder="https://ссылка..." style={{ ...inputStyle, flex: 1, minWidth: '200px' }} /><select value={forwardType} onChange={function(e) { setForwardType(e.target.value) }} style={{ ...inputStyle, width: '110px' }}><option value="posts">📝 Пост</option><option value="videos">🎬 Видео</option><option value="articles">📄 Статья</option><option value="music">🎵 Музыка</option><option value="other">📎 Другое</option></select></div>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}><input type="text" value={forwardComment} onChange={function(e) { setForwardComment(e.target.value) }} placeholder="💬 Комментарий" style={{ ...inputStyle, flex: 1 }} /><button onClick={forwardContent} disabled={sending || !forwardUrl.trim()} style={{ padding: '6px 14px', background: sending ? '#374151' : '#EC4899', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: sending ? 'wait' : 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>{sending ? '⏳' : '🚀 Переслать'}</button></div>
-            {forwardResult && <div style={{ marginTop: '6px', fontSize: '11px', color: forwardResult.includes('✅') ? '#22C55E' : '#EF4444' }}>{forwardResult}</div>}
-          </div>
-        )}
+        {showForward && (<div style={{ ...panelStyle('var(--pink)'), marginBottom: 10, padding: 14 }}><div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}><input type="text" value={forwardUrl} onChange={e => setForwardUrl(e.target.value)} placeholder="https://ссылка..." style={{ ...inputStyle, flex: 1, minWidth: 200 }} /><select value={forwardType} onChange={e => setForwardType(e.target.value)} style={{ ...inputStyle, width: 110 }}><option value="posts">📝 Пост</option><option value="videos">🎬 Видео</option><option value="articles">📄 Статья</option><option value="music">🎵 Музыка</option><option value="other">📎 Другое</option></select></div><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="text" value={forwardComment} onChange={e => setForwardComment(e.target.value)} placeholder="💬 Комментарий" style={{ ...inputStyle, flex: 1 }} /><button onClick={forwardContent} disabled={sending || !forwardUrl.trim()} style={{ padding: '7px 16px', background: sending ? 'var(--border)' : 'var(--pink)', color: '#FFF', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: sending ? 'wait' : 'pointer', fontSize: 'var(--font-md)', whiteSpace: 'nowrap' }}>{sending ? '⏳' : '🚀 Переслать'}</button></div>{forwardResult && <div style={{ marginTop: 6, fontSize: 'var(--font-sm)', color: forwardResult.includes('✅') ? 'var(--success)' : 'var(--danger)' }}>{forwardResult}</div>}</div>)}
 
-        {showBroadcast && (
-          <div style={{ ...panelStyle('#A855F710'), marginBottom: '10px', padding: '14px' }}>
-            <textarea value={broadcastMsg} onChange={function(e) { setBroadcastMsg(e.target.value) }} placeholder="Текст рассылки..." rows={2} style={{ width: '100%', padding: '8px 12px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '8px', color: '#FFF', fontSize: '13px', resize: 'vertical', boxSizing: 'border-box', marginBottom: '8px' }} />
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {['lolka', 'vk'].map(function(p) { return (<label key={p} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '12px' }}><input type="checkbox" checked={broadcastPlatforms.includes(p)} onChange={function() { setBroadcastPlatforms(function(prev) { return prev.includes(p) ? prev.filter(function(x) { return x !== p }) : [...prev, p] }) }} style={{ accentColor: '#A855F7' }} />{p === 'lolka' ? '🎮 Lolka' : '💙 VK'}</label>) })}
-              <button onClick={sendBroadcast} disabled={sending || !broadcastMsg.trim()} style={{ padding: '6px 16px', background: sending ? '#374151' : '#A855F7', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: sending ? 'wait' : 'pointer', fontSize: '12px' }}>{sending ? '⏳' : '🚀 Отправить'}</button>
-              {sendResult && <span style={{ fontSize: '11px', color: sendResult.includes('✅') ? '#22C55E' : '#EF4444' }}>{sendResult}</span>}
-            </div>
-          </div>
-        )}
+        {showBroadcast && (<div style={{ ...panelStyle('var(--purple)'), marginBottom: 10, padding: 14 }}><textarea value={broadcastMsg} onChange={e => setBroadcastMsg(e.target.value)} placeholder="Текст рассылки..." rows={2} style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-md)', resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} /><div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>{['lolka', 'vk'].map(p => (<label key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 'var(--font-md)' }}><input type="checkbox" checked={broadcastPlatforms.includes(p)} onChange={() => setBroadcastPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])} style={{ accentColor: 'var(--purple)' }} />{p === 'lolka' ? '🎮 Lolka' : '💙 VK'}</label>))}<button onClick={sendBroadcast} disabled={sending || !broadcastMsg.trim()} style={{ padding: '7px 16px', background: sending ? 'var(--border)' : 'var(--purple)', color: '#FFF', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: sending ? 'wait' : 'pointer', fontSize: 'var(--font-md)' }}>{sending ? '⏳' : '🚀 Отправить'}</button>{sendResult && <span style={{ fontSize: 'var(--font-sm)', color: sendResult.includes('✅') ? 'var(--success)' : 'var(--danger)' }}>{sendResult}</span>}</div></div>)}
 
-        {showAdd && (
-          <div style={{ ...panelStyle('#00E5FF10'), marginBottom: '10px', padding: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '8px' }}>
-            <div><label style={labelStyle}>URL вебхука</label><input type="text" value={newWebhook.url} onChange={function(e) { handleUrlChange(e.target.value) }} placeholder="https://..." style={inputStyle} /></div>
-            <div><label style={labelStyle}>Платформа</label><select value={newWebhook.platform} onChange={function(e) { setNewWebhook({ ...newWebhook, platform: e.target.value }) }} style={inputStyle}><option value="">Авто</option><option value="Lolka">🎮 Lolka</option><option value="VK">💙 VK</option></select></div>
-            <div><label style={labelStyle}>Канал</label><select value={newWebhook.channel} onChange={function(e) { setNewWebhook({ ...newWebhook, channel: e.target.value }) }} style={inputStyle}><option value="">📋 Выберите...</option>{(newWebhook.platform ? channelsFor(newWebhook.platform) : []).map(function(ch) { return <option key={ch} value={ch}>{ch}</option> })}</select></div>
-            <button onClick={addWebhook} style={{ padding: '8px 14px', background: '#00E5FF', color: '#000', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '12px', alignSelf: 'flex-end' }}>✅</button>
-            <input type="text" value={newWebhook.serverName} onChange={function(e) { setNewWebhook({ ...newWebhook, serverName: e.target.value }) }} placeholder="Название сервера/группы" style={{ ...inputStyle, gridColumn: '1 / 3' }} />
-            {newWebhook.platform === 'VK' && <input type="text" value={newWebhook.groupId} onChange={function(e) { setNewWebhook({ ...newWebhook, groupId: e.target.value }) }} placeholder="ID группы VK" style={{ ...inputStyle, gridColumn: '1 / 3' }} />}
-          </div>
-        )}
+        {showAdd && (<div style={{ ...panelStyle('var(--accent)'), marginBottom: 10, padding: 14, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8 }}><div><label style={labelStyle}>URL вебхука</label><input type="text" value={newWebhook.url} onChange={e => handleUrlChange(e.target.value)} placeholder="https://..." style={inputStyle} /></div><div><label style={labelStyle}>Платформа</label><select value={newWebhook.platform} onChange={e => setNewWebhook({ ...newWebhook, platform: e.target.value })} style={inputStyle}><option value="">Авто</option><option value="Lolka">🎮 Lolka</option><option value="VK">💙 VK</option></select></div><div><label style={labelStyle}>Канал</label><select value={newWebhook.channel} onChange={e => setNewWebhook({ ...newWebhook, channel: e.target.value })} style={inputStyle}><option value="">📋 Выберите...</option>{(newWebhook.platform ? channelsFor(newWebhook.platform) : []).map(ch => <option key={ch} value={ch}>{ch}</option>)}</select></div><button onClick={addWebhook} style={{ padding: '8px 14px', background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: 'pointer', fontSize: 'var(--font-md)', alignSelf: 'flex-end' }}>✅</button><input type="text" value={newWebhook.serverName} onChange={e => setNewWebhook({ ...newWebhook, serverName: e.target.value })} placeholder="Название сервера/группы" style={{ ...inputStyle, gridColumn: '1 / 3' }} />{newWebhook.platform === 'VK' && <input type="text" value={newWebhook.groupId} onChange={e => setNewWebhook({ ...newWebhook, groupId: e.target.value })} placeholder="ID группы VK" style={{ ...inputStyle, gridColumn: '1 / 3' }} />}</div>)}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {webhooks.map(function(w) { return (
-            <div key={w.id} style={{ background: '#16161F', borderRadius: '10px', padding: '12px 16px', border: '1px solid #1F2937', opacity: w.active ? 1 : 0.4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '11px', fontWeight: '600', background: w.platform === 'Lolka' ? 'rgba(88,101,242,0.12)' : 'rgba(0,119,255,0.12)', color: w.platform === 'Lolka' ? '#5865F2' : '#0077FF' }}>{w.platform === 'Lolka' ? '🎮 Lolka' : '💙 VK'}</span>
-                {w.serverName && <span style={{ fontSize: '12px', color: '#FFF', fontWeight: '500' }}>{w.serverName}</span>}
-                <code style={{ flex: 1, minWidth: '100px', padding: '3px 8px', background: '#0A0A0F', borderRadius: '5px', fontSize: '10px', fontFamily: 'monospace', color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.url}</code>
-                <div onClick={function() { setEditingChannel(editingChannel === w.id ? null : w.id) }} style={{ fontSize: '11px', color: '#94A3B8', cursor: 'pointer', padding: '3px 8px', borderRadius: '5px', background: '#0A0A0F', border: '1px solid #1F2937', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}><span>{w.channel || '📋 выбрать'}</span><span style={{ fontSize: '8px' }}>▾</span></div>
-                <div style={{ display: 'flex', gap: '3px' }}>{Object.entries(w.rules).filter(function(e) { return e[1] }).map(function(e) { return <span key={e[0]} style={{ fontSize: '12px' }} title={getTypeLabel[e[0]] || e[0]}>{getTypeIcon[e[0]] || '📎'}</span> })}</div>
-                <div onClick={function() { toggle(w.id) }} style={{ width: '32px', height: '18px', background: w.active ? '#00E5FF' : '#374151', borderRadius: '18px', cursor: 'pointer', position: 'relative', flexShrink: 0 }}><div style={{ position: 'absolute', height: '12px', width: '12px', left: w.active ? '18px' : '2px', top: '3px', background: w.active ? '#000' : '#FFF', borderRadius: '50%', transition: '0.2s' }} /></div>
-                <button onClick={function() { setEditingRules(editingRules === w.id ? null : w.id) }} style={actionBtnStyle('#F59E0B')}>⚙️</button>
-                <button onClick={function() { setEditingScan(editingScan === w.id ? null : w.id) }} style={actionBtnStyle('#10B981')}>🔍</button>
-                <button onClick={function() { testWebhook(w) }} style={actionBtnStyle('#00E5FF')}>🧪</button>
-                <button onClick={function() { deleteWebhook(w.id) }} style={actionBtnStyle('#EF4444')}>✕</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {webhooks.map(w => (
+            <div key={w.id} style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', border: '1px solid var(--border)', opacity: w.active ? 1 : 0.4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ padding: '3px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-sm)', fontWeight: 600, background: w.platform === 'Lolka' ? 'rgba(88,101,242,0.12)' : 'rgba(0,119,255,0.12)', color: w.platform === 'Lolka' ? '#5865F2' : '#0077FF' }}>{w.platform === 'Lolka' ? '🎮 Lolka' : '💙 VK'}</span>
+                {w.serverName && <span style={{ fontSize: 'var(--font-md)', color: 'var(--text-primary)', fontWeight: 500 }}>{w.serverName}</span>}
+                <code style={{ flex: 1, minWidth: 100, padding: '3px 8px', background: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-xs)', fontFamily: 'monospace', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.url}</code>
+                <div onClick={() => setEditingChannel(editingChannel === w.id ? null : w.id)} style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)', cursor: 'pointer', padding: '3px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-input)', border: '1px solid var(--border)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}><span>{w.channel || '📋 выбрать'}</span><span style={{ fontSize: 9 }}>▾</span></div>
+                <div style={{ display: 'flex', gap: 3 }}>{Object.entries(w.rules).filter(e => e[1]).map(e => <span key={e[0]} style={{ fontSize: 'var(--icon-sm)' }} title={getTypeLabel[e[0]] || e[0]}>{getTypeIcon[e[0]] || '📎'}</span>)}</div>
+                <div onClick={() => toggle(w.id)} style={{ width: 32, height: 18, background: w.active ? 'var(--accent)' : 'var(--border)', borderRadius: 18, cursor: 'pointer', position: 'relative', flexShrink: 0 }}><div style={{ position: 'absolute', height: 12, width: 12, left: w.active ? 18 : 2, top: 3, background: w.active ? '#000' : '#FFF', borderRadius: '50%', transition: '0.2s' }} /></div>
+                <button onClick={() => setEditingRules(editingRules === w.id ? null : w.id)} style={actionBtnStyle('var(--warning)')}>⚙️</button>
+                <button onClick={() => setEditingScan(editingScan === w.id ? null : w.id)} style={actionBtnStyle('var(--success)')}>🔍</button>
+                <button onClick={() => testWebhook(w)} style={actionBtnStyle('var(--accent)')}>🧪</button>
+                <button onClick={() => deleteWebhook(w.id)} style={actionBtnStyle('var(--danger)')}>✕</button>
               </div>
-              {editingChannel === w.id && (
-                <div style={{ background: '#111118', borderRadius: '8px', padding: '10px', marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>📋 Канал:</span>
-                  {channelsFor(w.platform).map(function(ch) { return <button key={ch} onClick={function() { updateWebhook(w.id, 'channel', ch); setEditingChannel(null) }} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #1F2937', background: w.channel === ch ? 'rgba(0,229,255,0.1)' : 'transparent', color: w.channel === ch ? '#00E5FF' : '#94A3B8', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}>{ch}</button> })}
-                  <input type="text" placeholder="Свой..." onKeyDown={function(e) { if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) { updateWebhook(w.id, 'channel', (e.target as HTMLInputElement).value.trim()); setEditingChannel(null) } }} style={{ padding: '4px 8px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '6px', color: '#FFF', fontSize: '11px', width: '100px' }} />
-                </div>
-              )}
-              {editingRules === w.id && (
-                <div style={{ background: '#111118', borderRadius: '8px', padding: '10px', marginTop: '8px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>Пересылать:</span>
-                  {Object.entries(w.rules).map(function(e) { var key = e[0]; var value = e[1]; return (<label key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: value ? 'rgba(0,229,255,0.1)' : '#0A0A0F', border: '1px solid ' + (value ? '#00E5FF40' : '#1F2937') }}><input type="checkbox" checked={value} onChange={function() { toggleRule(w.id, key) }} style={{ accentColor: '#00E5FF' }} />{getTypeIcon[key] || '📎'} {getTypeLabel[key] || key}</label>) })}
-                </div>
-              )}
-              {editingScan === w.id && (
-                <div style={{ background: '#111118', borderRadius: '8px', padding: '10px', marginTop: '8px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: '#94A3B8' }}>🔍 Автосканирование:</span>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '11px' }}><input type="checkbox" checked={w.autoScan} onChange={function() { updateWebhook(w.id, 'autoScan', !w.autoScan) }} style={{ accentColor: '#10B981' }} /> Вкл</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ fontSize: '11px', color: '#94A3B8' }}>Интервал:</span><select value={w.scanInterval} onChange={function(e) { updateWebhook(w.id, 'scanInterval', parseInt(e.target.value)) }} style={{ padding: '3px 6px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '5px', color: '#FFF', fontSize: '11px' }}><option value="15">15м</option><option value="30">30м</option><option value="60">1ч</option><option value="120">2ч</option></select></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ fontSize: '11px', color: '#94A3B8' }}>Мин 👍:</span><input type="number" value={w.minLikes} onChange={function(e) { updateWebhook(w.id, 'minLikes', parseInt(e.target.value) || 1) }} style={{ width: '45px', padding: '3px 6px', background: '#0A0A0F', border: '1px solid #1F2937', borderRadius: '5px', color: '#FFF', fontSize: '11px' }} /></div>
-                </div>
-              )}
+              {editingChannel === w.id && (<div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', padding: 10, marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>📋 Канал:</span>{channelsFor(w.platform).map(ch => <button key={ch} onClick={() => { updateWebhook(w.id, 'channel', ch); setEditingChannel(null) }} style={{ padding: '5px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: w.channel === ch ? 'var(--accent)10' : 'transparent', color: w.channel === ch ? 'var(--accent)' : 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--font-sm)', whiteSpace: 'nowrap' }}>{ch}</button>)}<input type="text" placeholder="Свой..." onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLInputElement).value.trim()) { updateWebhook(w.id, 'channel', (e.target as HTMLInputElement).value.trim()); setEditingChannel(null) } }} style={{ padding: '5px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 'var(--font-sm)', width: 100 }} /></div>)}
+              {editingRules === w.id && (<div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', padding: 10, marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>Пересылать:</span>{Object.entries(w.rules).map(e => { const key = e[0]; const value = e[1]; return (<label key={key} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 'var(--font-sm)', padding: '5px 12px', borderRadius: 'var(--radius-sm)', background: value ? 'var(--accent)10' : 'var(--bg-input)', border: '1px solid ' + (value ? 'var(--accent)40' : 'var(--border)') }}><input type="checkbox" checked={value} onChange={() => toggleRule(w.id, key)} style={{ accentColor: 'var(--accent)' }} />{getTypeIcon[key] || '📎'} {getTypeLabel[key] || key}</label>) })})}</div>)}
+              {editingScan === w.id && (<div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', padding: 10, marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>🔍 Автосканирование:</span><label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 'var(--font-sm)' }}><input type="checkbox" checked={w.autoScan} onChange={() => updateWebhook(w.id, 'autoScan', !w.autoScan)} style={{ accentColor: 'var(--success)' }} /> Вкл</label><div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>Интервал:</span><select value={w.scanInterval} onChange={e => updateWebhook(w.id, 'scanInterval', parseInt(e.target.value))} style={{ padding: '4px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 'var(--font-sm)' }}><option value="15">15м</option><option value="30">30м</option><option value="60">1ч</option><option value="120">2ч</option></select></div><div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 'var(--font-sm)', color: 'var(--text-secondary)' }}>Мин 👍:</span><input type="number" value={w.minLikes} onChange={e => updateWebhook(w.id, 'minLikes', parseInt(e.target.value) || 1)} style={{ width: 50, padding: '4px 8px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 'var(--font-sm)' }} /></div></div>)}
             </div>
-          )})}
+          ))}
         </div>
       </div>
 
-      {saved && <div style={{ position: 'fixed', bottom: '20px', right: '20px', background: '#22C55E', color: '#000', padding: '10px 20px', borderRadius: '10px', fontWeight: '600', fontSize: '13px', zIndex: 1000, boxShadow: '0 4px 20px rgba(34,197,94,0.3)', animation: 'slideUp 0.3s ease' }}>✅ Сохранено</div>}
+      {saved && <div style={{ position: 'fixed', bottom: 20, right: 20, background: 'var(--success)', color: '#000', padding: '10px 20px', borderRadius: 'var(--radius-lg)', fontWeight: 600, fontSize: 'var(--font-lg)', zIndex: 1000, boxShadow: '0 4px 20px rgba(34,197,94,0.3)', animation: 'slideUp 0.3s ease' }}>✅ Сохранено</div>}
       <style>{`@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
     </div>
   )
 }
 
-const btnStyle = (active: boolean, color: string): React.CSSProperties => ({ padding: '8px 16px', background: active ? 'var(--border)' : color + '15', color: active ? 'var(--text-primary)' : color, border: '1px solid ' + (active ? 'var(--border-light)' : color + '30'), borderRadius: 'var(--radius-md)', fontWeight: '600', cursor: 'pointer', fontSize: 'var(--font-md)', whiteSpace: 'nowrap' as const })
-const panelStyle = (borderColor: string): React.CSSProperties => ({ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '18px', marginBottom: '14px', border: '1px solid ' + borderColor })
+const btnStyle = (active: boolean, color: string): React.CSSProperties => ({ padding: '8px 16px', background: active ? 'var(--border)' : color + '15', color: active ? 'var(--text-primary)' : color, border: '1px solid ' + (active ? 'var(--border-light)' : color + '30'), borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', fontSize: 'var(--font-md)', whiteSpace: 'nowrap' as const })
+const panelStyle = (color: string): React.CSSProperties => ({ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: 18, marginBottom: 14, border: '1px solid ' + color + '20' })
 const inputStyle: React.CSSProperties = { padding: '8px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-md)', outline: 'none', width: '100%', boxSizing: 'border-box' }
-const labelStyle: React.CSSProperties = { fontSize: 'var(--font-sm)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }
+const labelStyle: React.CSSProperties = { fontSize: 'var(--font-sm)', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }
 const actionBtnStyle = (color: string): React.CSSProperties => ({ padding: '4px 8px', background: 'transparent', color: color, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 'var(--font-sm)', flexShrink: 0 })
