@@ -12,7 +12,6 @@
     --text-secondary: 161 161 170;
     --accent: 103 232 249;
   }
-
   .dark {
     --background: 10 10 10;
     --surface: 18 18 18;
@@ -22,47 +21,13 @@
     --text-secondary: 161 161 170;
     --accent: 103 232 249;
   }
-
-  html {
-    color-scheme: dark;
-    transition: color-scheme 0.4s ease;
-  }
-
-  * {
-    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 300ms;
-  }
-
-  button, a {
-    transition-duration: 200ms;
-  }
 }
 
 @layer components {
   .card {
     @apply bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-6 shadow-xl;
   }
-
   .input {
-    @apply bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] focus:border-nova-500 focus:ring-1 focus:ring-nova-500/30 rounded-2xl px-4 py-3 text-[rgb(var(--text))] placeholder:text-[rgb(var(--text-secondary))] outline-none;
-  }
-
-  .btn-primary {
-    @apply bg-nova-500 hover:bg-nova-600 text-black font-medium px-5 py-2.5 rounded-2xl transition-all active:scale-[0.97];
-  }
-
-  .btn-secondary {
-    @apply border border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-2))] text-white font-medium px-5 py-2.5 rounded-2xl transition-all;
-  }
-
-  .badge {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[rgb(var(--surface-2))] text-nova-400 border border-nova-500/20;
+    @apply bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] focus:border-nova-500 focus:ring-1 focus:ring-nova-500 rounded-2xl px-4 py-3 text-[rgb(var(--text))] placeholder:text-[rgb(var(--text-secondary))] outline-none transition-all;
   }
 }
-
-/* Скроллбар */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3f3f46; }

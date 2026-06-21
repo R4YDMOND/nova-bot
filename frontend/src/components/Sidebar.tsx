@@ -1,20 +1,19 @@
 'use client';
 
-import * as React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Bot, Command, BarChart3, Shield, Zap, Music, Server, BookOpen } from "lucide-react";
+import { Home, Bot, Music, Shield, BarChart3, Zap, Server, Command, BookOpen } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const navItems = [
-  { icon: Home, label: "Обзор", href: "/dashboard" },
-  { icon: Bot, label: "AI-Настройки", href: "/dashboard/ai" },
-  { icon: Command, label: "Команды", href: "/dashboard/commands" },
-  { icon: BarChart3, label: "Аналитика", href: "/dashboard/analytics" },
-  { icon: Shield, label: "Модерация", href: "/dashboard/moderation" },
-  { icon: Zap, label: "Вебхуки", href: "/dashboard/webhooks" },
-  { icon: Music, label: "Музыка", href: "/dashboard/music" },
-  { icon: Server, label: "Серверы", href: "/dashboard/servers" },
-  { icon: BookOpen, label: "Документация", href: "/docs" },
+  { icon: Home, label: 'Обзор', href: '/dashboard' },
+  { icon: Bot, label: 'AI', href: '/dashboard/ai' },
+  { icon: Command, label: 'Команды', href: '/dashboard/commands' },
+  { icon: BarChart3, label: 'Аналитика', href: '/dashboard/analytics' },
+  { icon: Shield, label: 'Модерация', href: '/dashboard/moderation' },
+  { icon: Zap, label: 'Вебхуки', href: '/dashboard/webhooks' },
+  { icon: Music, label: 'Музыка', href: '/dashboard/music' },
+  { icon: Server, label: 'Серверы', href: '/dashboard/servers' },
+  { icon: BookOpen, label: 'Документация', href: '/docs' },
 ];
 
 export function Sidebar() {
@@ -33,10 +32,9 @@ export function Sidebar() {
           </div>
         </Link>
       </div>
-
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+          const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
           return (
             <Link
               key={item.href}
@@ -53,6 +51,9 @@ export function Sidebar() {
           );
         })}
       </nav>
+      <div className="p-4 border-t border-[rgb(var(--border))]">
+        <p className="text-xs text-center text-[rgb(var(--text-secondary))]">v2.4.1</p>
+      </div>
     </div>
   );
 }
