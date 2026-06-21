@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Bot, Music, Shield, BarChart3, Zap, Server, Command } from 'lucide-react';
+import { Home, Bot, Music, Shield, BarChart3, Zap, Server, Command, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -13,6 +13,7 @@ const navItems = [
   { icon: Zap, label: 'Вебхуки', href: '/dashboard/webhooks' },
   { icon: Music, label: 'Музыка', href: '/dashboard/music' },
   { icon: Server, label: 'Серверы', href: '/dashboard/servers' },
+  { icon: BookOpen, label: 'Документация', href: '/dashboard/docs' },
 ];
 
 export function Sidebar() {
