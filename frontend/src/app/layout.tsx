@@ -1,4 +1,5 @@
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { Toaster } from '@/components/Toaster';
 import './globals.css';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -7,6 +8,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           {children}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
