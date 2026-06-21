@@ -4,13 +4,13 @@
 
 @layer base {
   :root {
-    --background: 250 250 250;
-    --surface: 255 255 255;
-    --surface-2: 245 245 245;
-    --border: 229 229 229;
-    --text: 23 23 23;
-    --text-secondary: 107 114 128;
-    --accent: 34 211 238;
+    --background: 10 10 10;
+    --surface: 18 18 18;
+    --surface-2: 22 22 22;
+    --border: 39 39 42;
+    --text: 244 244 245;
+    --text-secondary: 161 161 170;
+    --accent: 103 232 249;
   }
 
   .dark {
@@ -24,18 +24,16 @@
   }
 
   html {
-    color-scheme: light dark;
+    color-scheme: dark;
     transition: color-scheme 0.4s ease;
   }
 
-  /* Плавная анимация для всего интерфейса */
   * {
     transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 300ms;
   }
 
-  /* Интерактивные элементы — чуть быстрее */
   button, a {
     transition-duration: 200ms;
   }
@@ -43,186 +41,28 @@
 
 @layer components {
   .card {
-    @apply bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-6 shadow-xl transition-colors;
+    @apply bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-6 shadow-xl;
   }
+
   .input {
-    @apply bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] focus:border-nova-500 focus:ring-1 focus:ring-nova-500/30 rounded-2xl px-4 py-3 text-[rgb(var(--text))] placeholder:text-[rgb(var(--text-secondary))] outline-none transition-all;
+    @apply bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] focus:border-nova-500 focus:ring-1 focus:ring-nova-500/30 rounded-2xl px-4 py-3 text-[rgb(var(--text))] placeholder:text-[rgb(var(--text-secondary))] outline-none;
   }
+
   .btn-primary {
     @apply bg-nova-500 hover:bg-nova-600 text-black font-medium px-5 py-2.5 rounded-2xl transition-all active:scale-[0.97];
   }
+
   .btn-secondary {
-    @apply border border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-2))] text-[rgb(var(--text))] font-medium px-5 py-2.5 rounded-2xl transition-all;
+    @apply border border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-2))] text-white font-medium px-5 py-2.5 rounded-2xl transition-all;
   }
+
   .badge {
     @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[rgb(var(--surface-2))] text-nova-400 border border-nova-500/20;
   }
 }
 
-/* ========== Nova Bot — Темы и анимации ========== */
-
-/* Сброс */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-/* ===== ТЕМЫ ===== */
-:root {
-  /* ===== ТИПОГРАФИКА ===== */
-  --font-xs: 0.75rem;
-  --font-sm: 0.8125rem;
-  --font-md: 0.875rem;
-  --font-lg: 0.9375rem;
-  --font-xl: 1.0625rem;
-  --font-2xl: 1.25rem;
-  --font-3xl: 1.5rem;
-  --font-4xl: 1.75rem;
-
-  /* ===== ИКОНКИ ===== */
-  --icon-sm: 0.875rem;
-  --icon-md: 1rem;
-  --icon-lg: 1.25rem;
-  --icon-xl: 1.75rem;
-
-  /* ===== ЦВЕТА ===== */
-  --bg-primary: #0A0A0F;
-  --bg-secondary: #111118;
-  --bg-card: #16161F;
-  --bg-input: #0A0A0F;
-  --border: #1F2937;
-  --border-light: #374151;
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  --accent: #00E5FF;
-  --accent-hover: #00B8D4;
-  --success: #22C55E;
-  --danger: #EF4444;
-  --warning: #F59E0B;
-  --info: #3B82F6;
-  --purple: #A855F7;
-  --pink: #EC4899;
-
-  /* ===== РАДИУСЫ ===== */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.625rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.25rem;
-
-  /* ===== ТЕНИ ===== */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
-  --shadow-nova: 0 0 20px rgba(0, 229, 255, 0.15);
-
-  /* ===== АНИМАЦИИ ===== */
-  --transition-fast: 150ms;
-  --transition-base: 200ms;
-  --transition-slow: 300ms;
-  --transition-snail: 400ms;
-
-  /* ===== САЙДБАР ===== */
-  --sidebar-width: 280px;
-  --sidebar-collapsed: 56px;
-
-  /* ===== Z-ИНДЕКСЫ ===== */
-  --z-sidebar: 10;
-  --z-header: 20;
-  --z-modal: 50;
-  --z-toast: 100;
-}
-
-/* Дневная тема */
-[data-theme="light"] {
-  --bg-primary: #F8FAFC;
-  --bg-secondary: #F1F5F9;
-  --bg-card: #FFFFFF;
-  --bg-input: #F8FAFC;
-  --border: #E2E8F0;
-  --border-light: #CBD5E1;
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #94A3B8;
-}
-
-/* ===== БАЗОВЫЕ СТИЛИ ===== */
-body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: var(--font-md);
-  line-height: 1.5;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
-}
-
-h1 { font-size: var(--font-3xl); font-weight: 700; }
-h2 { font-size: var(--font-2xl); font-weight: 600; }
-h3 { font-size: var(--font-xl); font-weight: 600; }
-
-button {
-  font-size: var(--font-md);
-  font-family: inherit;
-  cursor: pointer;
-}
-
-input, select, textarea {
-  font-size: var(--font-md);
-  font-family: inherit;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
-  outline: none;
-}
-
-table { font-size: var(--font-md); }
-th { font-size: var(--font-xs); font-weight: 600; text-transform: uppercase; color: var(--text-secondary); }
-td { font-size: var(--font-md); }
-label { font-size: var(--font-sm); color: var(--text-secondary); }
-small, .text-sm { font-size: var(--font-sm); color: var(--text-secondary); }
-
-/* Переходы */
-button, a, input, select, textarea { transition: all var(--transition-fast) ease; }
-
-/* ===== АНИМАЦИИ ===== */
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes fadeOutDown { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(12px); } }
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes popIn { 0% { transform: scale(0.95); opacity: 0; } 50% { transform: scale(1.02); } 100% { transform: scale(1); opacity: 1; } }
-@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); } }
-@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-/* Звуковые уведомления */
-.sound-enabled::after {
-  content: "🔊";
-  font-size: 10px;
-  margin-left: 4px;
-}
-
-/* ===== СКРОЛЛБАР ===== */
+/* Скроллбар */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
-
-/* ===== УТИЛИТЫ ===== */
-.btn-saved { animation: pulse 0.6s ease; background: var(--success) !important; }
-.card-animate { animation: fadeInUp 0.3s ease forwards; }
-.toast-notification { animation: slideUp 0.3s ease; }
-.no-select { user-select: none; -webkit-user-select: none; }
-
-/* ===== АДАПТИВ ===== */
-@media (max-width: 1200px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-  .modules-grid { grid-template-columns: repeat(2, 1fr) !important; }
-}
-@media (max-width: 768px) {
-  .stats-grid { grid-template-columns: 1fr !important; }
-  .modules-grid { grid-template-columns: 1fr !important; }
-  .quick-grid { grid-template-columns: repeat(2, 1fr) !important; }
-}
-@media (max-width: 480px) {
-  .quick-grid { grid-template-columns: 1fr !important; }
-}
+::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
