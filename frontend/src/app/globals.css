@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --background: 250 250 250;
+    --surface: 255 255 255;
+    --surface-2: 245 245 245;
+    --border: 229 229 229;
+    --text: 23 23 23;
+  }
+
+  .dark {
+    --background: 10 10 10;
+    --surface: 18 18 18;
+    --surface-2: 22 22 22;
+    --border: 39 39 42;
+    --text: 244 244 245;
+  }
+}
+
 /* ========== Nova Bot — Темы и анимации ========== */
 
 /* Сброс */
@@ -85,40 +103,6 @@
   --text-primary: #0F172A;
   --text-secondary: #475569;
   --text-muted: #94A3B8;
-}
-
-/* Киберпанк-тема */
-[data-theme="cyberpunk"] {
-  --bg-primary: #0D0221;
-  --bg-secondary: #150533;
-  --bg-card: #1A0A3E;
-  --bg-input: #0D0221;
-  --border: #2D1B69;
-  --border-light: #4A2D8F;
-  --text-primary: #00FF9D;
-  --text-secondary: #B794F4;
-  --text-muted: #6B46C1;
-  --accent: #FF00FF;
-  --accent-hover: #CC00CC;
-  --success: #00FF9D;
-  --danger: #FF0044;
-  --warning: #FFD700;
-  --info: #00D4FF;
-}
-
-/* Серый (минимал) */
-[data-theme="gray"] {
-  --bg-primary: #1A1A1A;
-  --bg-secondary: #242424;
-  --bg-card: #2A2A2A;
-  --bg-input: #1A1A1A;
-  --border: #333333;
-  --border-light: #444444;
-  --text-primary: #E5E5E5;
-  --text-secondary: #999999;
-  --text-muted: #666666;
-  --accent: #888888;
-  --accent-hover: #AAAAAA;
 }
 
 /* ===== БАЗОВЫЕ СТИЛИ ===== */
