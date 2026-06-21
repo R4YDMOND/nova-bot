@@ -8,10 +8,16 @@
     "start": "next start"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-switch": "^1.1.0",
+    "@radix-ui/react-tooltip": "^1.1.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
     "lucide-react": "^1.21.0",
     "next": "14.0.4",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "tailwind-merge": "^2.5.0"
   },
   "devDependencies": {
     "@types/node": "^20",
