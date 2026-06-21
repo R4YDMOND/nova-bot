@@ -19,15 +19,15 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="w-64 border-r border-zinc-800 bg-[#0a0a0a] flex flex-col">
-      <div className="p-6 border-b border-zinc-800">
+    <div className="w-64 border-r border-[rgb(var(--border))] bg-[rgb(var(--surface))] flex flex-col">
+      <div className="p-6 border-b border-[rgb(var(--border))]">
         <Link href="/" className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-[#00E5FF] rounded-2xl flex items-center justify-center">
+          <div className="w-9 h-9 bg-nova-500 rounded-2xl flex items-center justify-center">
             <span className="text-black font-bold text-xl">N</span>
           </div>
           <div>
-            <h1 className="font-semibold text-xl tracking-tight text-white">Nova</h1>
-            <p className="text-xs text-zinc-500">Bot</p>
+            <h1 className="font-semibold text-xl tracking-tight text-[rgb(var(--text))]">Nova</h1>
+            <p className="text-xs text-[rgb(var(--text-secondary))]">Bot</p>
           </div>
         </Link>
       </div>
@@ -41,8 +41,8 @@ export function Sidebar() {
               href={item.href}
               className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all mb-1 ${
                 isActive
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+                  ? 'bg-[rgb(var(--surface-2))] text-[rgb(var(--text))]'
+                  : 'text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-2))] hover:text-[rgb(var(--text))]'
               }`}
             >
               <item.icon className="w-5 h-5" />
