@@ -1,292 +1,248 @@
-"use client"
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
 
 export default function Home() {
+  const [stats, setStats] = useState({
+    servers: 0,
+    users: 0,
+    responseTime: 0.8,
+    webhooksOnline: false,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    fetch("https://nova-bot-rpsy.onrender.com/api/stats")
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
+      .then((data) => {
+        setStats({
+          servers: data.servers ?? 0,
+          users: data.users ?? 0,
+          responseTime: data.responseTime ?? 0.8,
+          webhooksOnline: data.webhooksOnline ?? false,
+        });
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load stats:", err);
+        setError(true);
+        setLoading(false);
+      });
+  }, []);
+
+  const formatNumber = (num: number): string => {
+    if (num === 0) return "0";
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M+";
+    if (num >= 1000) return (num / 1000).toFixed(0) + "K+";
+    return num.toString() + "+";
+  };
+
   return (
-    <main style={{ background: '#0A0A0F', minHeight: '100vh' }}>
-      
-      {/* === HERO === */}
-      <section style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        padding: '40px 20px',
-        background: 'linear-gradient(180deg, #0A0A0F 0%, #111118 100%)'
-      }}>
-        
-        {/* Логотип */}
-        <div style={{
-          width: '100px',
-          height: '100px',
-          background: '#16161F',
-          borderRadius: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '30px',
-          boxShadow: '0 0 20px rgba(0, 229, 255, 0.3)'
-        }} className="glow-cyan">
-          <span style={{ fontSize: '48px', fontWeight: 'bold', color: '#00E5FF' }}>N</span>
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <div style={styles.logo}>
+          <div style={styles.logoIcon}>N</div>
+          <span style={styles.logoText}>НОВА</span>
         </div>
+        <p style={styles.tagline}>Умный помощник для серверов</p>
+        <p style={styles.subtitle}>Вспышка энергии для твоего сообщества</p>
+      </header>
 
-        {/* Заголовок */}
-        <h1 className="animate-fade-in" style={{
-          fontSize: 'clamp(40px, 8vw, 72px)',
-          fontWeight: '800',
-          color: '#FFFFFF',
-          lineHeight: '1.1',
-          marginBottom: '16px'
-        }}>
-          НОВА
-        </h1>
-        
-        <p className="animate-fade-in" style={{
-          fontSize: 'clamp(18px, 3vw, 24px)',
-          color: '#94A3B8',
-          maxWidth: '500px',
-          marginBottom: '8px'
-        }}>
-          Умный помощник для Lolka-серверов
-        </p>
-
-        <p className="animate-fade-in" style={{
-          fontSize: '16px',
-          color: '#64748B',
-          marginBottom: '40px'
-        }}>
-          Вспышка энергии для твоего сообщества
-        </p>
-
-        {/* Кнопка */}
-        <button className="animate-fade-in glow-cyan" style={{
-          padding: '16px 40px',
-          fontSize: '18px',
-          fontWeight: '600',
-          background: '#00E5FF',
-          color: '#000000',
-          border: 'none',
-          borderRadius: '16px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          transition: 'transform 0.3s ease'
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
-        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-        >
-          <span>⭐</span>
-          Интегрировать Нова
-        </button>
-
-        <p className="animate-fade-in" style={{
-          fontSize: '14px',
-          color: '#64748B',
-          marginTop: '16px'
-        }}>
-          Вебхуки уже работают • Полная версия скоро
-        </p>
-
-        {/* Статистика */}
-        <div style={{
-          display: 'flex',
-          gap: 'clamp(20px, 5vw, 60px)',
-          marginTop: '60px',
-          flexWrap: 'wrap',
-          justifyContent: 'center'
-        }}>
-          {[
-            { num: '1.2K+', label: 'Серверов' },
-            { num: '85K+', label: 'Пользователей' },
-            { num: '<0.8s', label: 'Ответ' }
-          ].map((stat, i) => (
-            <div key={i} className="animate-fade-in" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#00E5FF' }}>{stat.num}</div>
-              <div style={{ fontSize: '14px', color: '#94A3B8' }}>{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* === FEATURES === */}
-      <section style={{
-        padding: '100px 20px',
-        background: '#111118',
-      }}>
-        <h2 style={{
-          textAlign: 'center',
-          fontSize: 'clamp(28px, 5vw, 40px)',
-          fontWeight: 'bold',
-          marginBottom: '60px',
-          color: '#FFFFFF'
-        }}>
-          Возможности <span style={{ color: '#00E5FF' }}>Нова</span>
-        </h2>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '24px',
-          maxWidth: '1100px',
-          margin: '0 auto'
-        }}>
-          {[
-            { icon: '🛡️', title: 'Модерация', desc: 'Автоматическая фильтрация спама и мата. Безопасность 24/7.' },
-            { icon: '📊', title: 'Система уровней', desc: 'Награждайте участников опытом за активность.' },
-            { icon: '🤖', title: 'AI-помощник', desc: 'Умные ответы и поддержка разговоров с участниками.' },
-            { icon: '🎵', title: 'Музыка', desc: 'Воспроизведение музыки в голосовых каналах.' },
-            { icon: '⚡', title: 'Кастомные команды', desc: 'Создавайте свои команды без программирования.' },
-            { icon: '📈', title: 'Аналитика', desc: 'Отслеживайте рост и активность сообщества.' },
-          ].map((f, i) => (
-            <div key={i} className="animate-fade-in" style={{
-              background: '#16161F',
-              borderRadius: '20px',
-              padding: '30px',
-              transition: 'all 0.3s ease',
-              cursor: 'default'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-4px)';
-              e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 229, 255, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-            >
-              <div style={{ fontSize: '36px', marginBottom: '16px' }}>{f.icon}</div>
-              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '8px', color: '#FFFFFF' }}>{f.title}</h3>
-              <p style={{ fontSize: '15px', color: '#94A3B8', lineHeight: '1.5' }}>{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* === HOW TO === */}
-      <section style={{
-        padding: '100px 20px',
-        background: '#0A0A0F',
-      }}>
-        <h2 style={{
-          textAlign: 'center',
-          fontSize: 'clamp(28px, 5vw, 40px)',
-          fontWeight: 'bold',
-          marginBottom: '60px',
-          color: '#FFFFFF'
-        }}>
-          Как <span style={{ color: '#00E5FF' }}>подключить</span> Нова
-        </h2>
-
-        <div style={{
-          maxWidth: '600px',
-          margin: '0 auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '24px'
-        }}>
-          {[
-            { step: '01', title: 'Нажмите «Интегрировать Нова»', desc: 'Перейдите на страницу интеграции.' },
-            { step: '02', title: 'Настройте вебхуки', desc: 'Следуйте инструкции для вашего сервера.' },
-            { step: '03', title: 'Выберите модули', desc: 'Включите нужные функции бота.' },
-            { step: '04', title: 'Готово!', desc: 'Нова начинает работать на сервере.' },
-          ].map((item, i) => (
-            <div key={i} className="animate-fade-in" style={{
-              display: 'flex',
-              gap: '20px',
-              alignItems: 'flex-start',
-              background: '#16161F',
-              borderRadius: '16px',
-              padding: '24px',
-            }}>
-              <div style={{
-                width: '56px',
-                height: '56px',
-                minWidth: '56px',
-                background: '#0A0A0F',
-                borderRadius: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '22px',
-                fontWeight: 'bold',
-                color: '#00E5FF',
-                boxShadow: '0 0 10px rgba(0, 229, 255, 0.2)'
-              }}>
-                {item.step}
+      <div style={styles.statsRow}>
+        {loading && !error ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={styles.statCard}>
+                <div style={styles.skeleton} />
               </div>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px', color: '#FFFFFF' }}>{item.title}</h3>
-                <p style={{ fontSize: '15px', color: '#94A3B8' }}>{item.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* === FOOTER === */}
-      <footer style={{
-        padding: '40px 20px',
-        borderTop: '1px solid #1F2937',
-        background: '#111118',
-      }}>
-        <div style={{
-          maxWidth: '1100px',
-          margin: '0 auto',
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              background: '#16161F',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold',
-              color: '#00E5FF'
-            }}>N</div>
-            <span style={{ fontWeight: '600', color: '#FFFFFF' }}>Нова 2026</span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-            {['Возможности', 'Демо', 'Документация', 'Поддержка'].map((link, i) => (
-              <a key={i} href="#" style={{
-                color: '#94A3B8',
-                textDecoration: 'none',
-                fontSize: '14px',
-                transition: 'color 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
-              >{link}</a>
             ))}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '14px', color: '#94A3B8' }}>LOLKA-сообщество разработчика</span>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              background: '#16161F',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer'
-            }}>
-              <span style={{ fontSize: '18px' }}>💬</span>
+          </>
+        ) : (
+          <>
+            <div style={styles.statCard}>
+              <span style={styles.statValue}>{formatNumber(stats.servers)}</span>
+              <span style={styles.statLabel}>Серверов</span>
             </div>
-          </div>
-        </div>
-      </footer>
+            <div style={styles.statCard}>
+              <span style={styles.statValue}>{formatNumber(stats.users)}</span>
+              <span style={styles.statLabel}>Пользователей</span>
+            </div>
+            <div style={styles.statCard}>
+              <span style={styles.statValue}>{"<"}{stats.responseTime}s</span>
+              <span style={styles.statLabel}>Ответ</span>
+            </div>
+          </>
+        )}
+      </div>
 
-    </main>
-  )
+      <div style={styles.cta}>
+        <Link href="/login" style={styles.ctaButton}>
+          ⭐ Интегрировать Нова
+        </Link>
+        <p style={styles.ctaStatus}>
+          {stats.webhooksOnline ? (
+            <>
+              <span style={styles.statusDot} />
+              Вебхуки работают
+            </>
+          ) : (
+            "Подключение..."
+          )}
+          <span style={styles.ctaVersion}> • Полная версия скоро</span>
+        </p>
+      </div>
+
+      {error && (
+        <p style={styles.errorText}>
+          ⚡ Данные временно недоступны. Мы уже работаем над этим.
+        </p>
+      )}
+    </div>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    minHeight: "100vh",
+    background: "linear-gradient(135deg, #0A0A0F 0%, #111118 100%)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "20px",
+    fontFamily: "'Inter', system-ui, sans-serif",
+  },
+  header: {
+    textAlign: "center",
+    marginBottom: "48px",
+  },
+  logo: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+    marginBottom: "16px",
+  },
+  logoIcon: {
+    width: "48px",
+    height: "48px",
+    background: "#16161F",
+    borderRadius: "12px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "bold",
+    color: "#00E5FF",
+    fontSize: "24px",
+  },
+  logoText: {
+    fontSize: "32px",
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: "-0.5px",
+  },
+  tagline: {
+    fontSize: "18px",
+    color: "#94A3B8",
+    margin: "0 0 8px 0",
+    fontWeight: "500",
+  },
+  subtitle: {
+    fontSize: "16px",
+    color: "#64748B",
+    margin: 0,
+  },
+  statsRow: {
+    display: "flex",
+    gap: "16px",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginBottom: "48px",
+  },
+  statCard: {
+    background: "#16161F",
+    border: "1px solid #1F2937",
+    borderRadius: "16px",
+    padding: "24px 32px",
+    textAlign: "center",
+    minWidth: "160px",
+  },
+  statValue: {
+    display: "block",
+    fontSize: "28px",
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: "4px",
+  },
+  statLabel: {
+    fontSize: "14px",
+    color: "#94A3B8",
+    fontWeight: "500",
+  },
+  skeleton: {
+    width: "100px",
+    height: "28px",
+    background: "linear-gradient(90deg, #1F2937 25%, #374151 50%, #1F2937 75%)",
+    backgroundSize: "200% 100%",
+    animation: "shimmer 1.5s infinite",
+    borderRadius: "8px",
+  },
+  cta: {
+    textAlign: "center",
+  },
+  ctaButton: {
+    display: "inline-block",
+    padding: "14px 32px",
+    background: "#00E5FF",
+    color: "#000000",
+    fontWeight: "700",
+    fontSize: "16px",
+    borderRadius: "12px",
+    textDecoration: "none",
+    transition: "all 0.2s ease",
+    boxShadow: "0 0 20px rgba(0, 229, 255, 0.2)",
+  },
+  ctaStatus: {
+    marginTop: "16px",
+    fontSize: "14px",
+    color: "#94A3B8",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+  },
+  statusDot: {
+    width: "8px",
+    height: "8px",
+    background: "#22C55E",
+    borderRadius: "50%",
+    display: "inline-block",
+  },
+  ctaVersion: {
+    color: "#64748B",
+  },
+  errorText: {
+    marginTop: "24px",
+    color: "#F59E0B",
+    fontSize: "14px",
+    background: "#F59E0B10",
+    padding: "8px 16px",
+    borderRadius: "8px",
+  },
+};
+
+if (typeof document !== "undefined") {
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+  `;
+  document.head.appendChild(style);
 }
