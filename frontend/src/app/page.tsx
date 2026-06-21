@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Home() {
   const [stats, setStats] = useState({
@@ -43,206 +44,70 @@ export default function Home() {
   };
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <div style={styles.logo}>
-          <div style={styles.logoIcon}>N</div>
-          <span style={styles.logoText}>НОВА</span>
+    <div className="min-h-screen bg-gradient-to-br from-[#0A0A0F] to-[#111118] dark:from-[#0A0A0F] dark:to-[#111118] flex flex-col items-center justify-center p-5 font-sans">
+      {/* Переключатель темы */}
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+
+      <header className="text-center mb-12">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-[#16161F] dark:bg-[#16161F] rounded-xl flex items-center justify-center font-bold text-[#00E5FF] text-2xl">N</div>
+          <span className="text-3xl font-extrabold text-white dark:text-white tracking-tight">НОВА</span>
         </div>
-        <p style={styles.tagline}>Умный помощник для серверов</p>
-        <p style={styles.subtitle}>Вспышка энергии для твоего сообщества</p>
+        <p className="text-lg text-[#94A3B8] mb-2 font-medium">Умный помощник для серверов</p>
+        <p className="text-base text-[#64748B]">Вспышка энергии для твоего сообщества</p>
       </header>
 
-      <div style={styles.statsRow}>
+      <div className="flex gap-4 flex-wrap justify-center mb-12">
         {loading && !error ? (
           <>
             {[1, 2, 3].map((i) => (
-              <div key={i} style={styles.statCard}>
-                <div style={styles.skeleton} />
+              <div key={i} className="bg-[#16161F] border border-[#1F2937] rounded-2xl py-6 px-8 text-center min-w-[160px]">
+                <div className="w-24 h-7 bg-gradient-to-r from-[#1F2937] via-[#374151] to-[#1F2937] bg-[length:200%_100%] animate-shimmer rounded-lg" />
               </div>
             ))}
           </>
         ) : (
           <>
-            <div style={styles.statCard}>
-              <span style={styles.statValue}>{formatNumber(stats.servers)}</span>
-              <span style={styles.statLabel}>Серверов</span>
+            <div className="bg-[#16161F] border border-[#1F2937] rounded-2xl py-6 px-8 text-center min-w-[160px]">
+              <span className="block text-2xl font-bold text-white mb-1">{formatNumber(stats.servers)}</span>
+              <span className="text-sm text-[#94A3B8] font-medium">Серверов</span>
             </div>
-            <div style={styles.statCard}>
-              <span style={styles.statValue}>{formatNumber(stats.users)}</span>
-              <span style={styles.statLabel}>Пользователей</span>
+            <div className="bg-[#16161F] border border-[#1F2937] rounded-2xl py-6 px-8 text-center min-w-[160px]">
+              <span className="block text-2xl font-bold text-white mb-1">{formatNumber(stats.users)}</span>
+              <span className="text-sm text-[#94A3B8] font-medium">Пользователей</span>
             </div>
-            <div style={styles.statCard}>
-              <span style={styles.statValue}>{"<"}{stats.responseTime}s</span>
-              <span style={styles.statLabel}>Ответ</span>
+            <div className="bg-[#16161F] border border-[#1F2937] rounded-2xl py-6 px-8 text-center min-w-[160px]">
+              <span className="block text-2xl font-bold text-white mb-1">{"<"}{stats.responseTime}s</span>
+              <span className="text-sm text-[#94A3B8] font-medium">Ответ</span>
             </div>
           </>
         )}
       </div>
 
-      <div style={styles.cta}>
-        <Link href="/login" style={styles.ctaButton}>
+      <div className="text-center">
+        <Link href="/login" className="inline-block py-3.5 px-8 bg-[#00E5FF] text-black font-bold text-base rounded-xl no-underline transition-all hover:shadow-[0_0_25px_rgba(0,229,255,0.3)] shadow-[0_0_20px_rgba(0,229,255,0.2)]">
           ⭐ Интегрировать Нова
         </Link>
-        <p style={styles.ctaStatus}>
+        <p className="mt-4 text-sm text-[#94A3B8] flex items-center justify-center gap-1.5">
           {stats.webhooksOnline ? (
             <>
-              <span style={styles.statusDot} />
+              <span className="w-2 h-2 bg-[#22C55E] rounded-full inline-block" />
               Вебхуки работают
             </>
           ) : (
             "Подключение..."
           )}
-          <span style={styles.ctaVersion}> • Полная версия скоро</span>
+          <span className="text-[#64748B]"> • Полная версия скоро</span>
         </p>
       </div>
 
       {error && (
-        <p style={styles.errorText}>
+        <p className="mt-6 text-sm text-[#F59E0B] bg-[#F59E0B]/10 py-2 px-4 rounded-lg">
           ⚡ Данные временно недоступны. Мы уже работаем над этим.
         </p>
       )}
     </div>
   );
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh",
-    background: "linear-gradient(135deg, #0A0A0F 0%, #111118 100%)",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "20px",
-    fontFamily: "'Inter', system-ui, sans-serif",
-  },
-  header: {
-    textAlign: "center",
-    marginBottom: "48px",
-  },
-  logo: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "12px",
-    marginBottom: "16px",
-  },
-  logoIcon: {
-    width: "48px",
-    height: "48px",
-    background: "#16161F",
-    borderRadius: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "bold",
-    color: "#00E5FF",
-    fontSize: "24px",
-  },
-  logoText: {
-    fontSize: "32px",
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: "-0.5px",
-  },
-  tagline: {
-    fontSize: "18px",
-    color: "#94A3B8",
-    margin: "0 0 8px 0",
-    fontWeight: "500",
-  },
-  subtitle: {
-    fontSize: "16px",
-    color: "#64748B",
-    margin: 0,
-  },
-  statsRow: {
-    display: "flex",
-    gap: "16px",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    marginBottom: "48px",
-  },
-  statCard: {
-    background: "#16161F",
-    border: "1px solid #1F2937",
-    borderRadius: "16px",
-    padding: "24px 32px",
-    textAlign: "center",
-    minWidth: "160px",
-  },
-  statValue: {
-    display: "block",
-    fontSize: "28px",
-    fontWeight: "700",
-    color: "#FFFFFF",
-    marginBottom: "4px",
-  },
-  statLabel: {
-    fontSize: "14px",
-    color: "#94A3B8",
-    fontWeight: "500",
-  },
-  skeleton: {
-    width: "100px",
-    height: "28px",
-    background: "linear-gradient(90deg, #1F2937 25%, #374151 50%, #1F2937 75%)",
-    backgroundSize: "200% 100%",
-    animation: "shimmer 1.5s infinite",
-    borderRadius: "8px",
-  },
-  cta: {
-    textAlign: "center",
-  },
-  ctaButton: {
-    display: "inline-block",
-    padding: "14px 32px",
-    background: "#00E5FF",
-    color: "#000000",
-    fontWeight: "700",
-    fontSize: "16px",
-    borderRadius: "12px",
-    textDecoration: "none",
-    transition: "all 0.2s ease",
-    boxShadow: "0 0 20px rgba(0, 229, 255, 0.2)",
-  },
-  ctaStatus: {
-    marginTop: "16px",
-    fontSize: "14px",
-    color: "#94A3B8",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "6px",
-  },
-  statusDot: {
-    width: "8px",
-    height: "8px",
-    background: "#22C55E",
-    borderRadius: "50%",
-    display: "inline-block",
-  },
-  ctaVersion: {
-    color: "#64748B",
-  },
-  errorText: {
-    marginTop: "24px",
-    color: "#F59E0B",
-    fontSize: "14px",
-    background: "#F59E0B10",
-    padding: "8px 16px",
-    borderRadius: "8px",
-  },
-};
-
-if (typeof document !== "undefined") {
-  const style = document.createElement("style");
-  style.textContent = `
-    @keyframes shimmer {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
-  `;
-  document.head.appendChild(style);
 }
