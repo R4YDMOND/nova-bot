@@ -168,8 +168,8 @@ export default function WebhooksPage() {
   )
 }
 
-const btnStyle = (active: boolean, color: string): React.CSSProperties => ({ padding: '8px 16px', background: active ? 'var(--border)' : color + '15', color: active ? 'var(--text-primary)' : color, border: '1px solid ' + (active ? 'var(--border-light)' : color + '30'), borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', fontSize: 'var(--font-md)', whiteSpace: 'nowrap' as const })
-const panelStyle = (color: string): React.CSSProperties => ({ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: 18, marginBottom: 14, border: '1px solid ' + color + '20' })
-const inputStyle: React.CSSProperties = { padding: '8px 12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: 'var(--font-md)', outline: 'none', width: '100%', boxSizing: 'border-box' }
-const labelStyle: React.CSSProperties = { fontSize: 'var(--font-sm)', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }
-const actionBtnStyle = (color: string): React.CSSProperties => ({ padding: '4px 8px', background: 'transparent', color: color, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 'var(--font-sm)', flexShrink: 0 })
+const btnStyle = (active: boolean, color: string): React.CSSProperties => ({ padding: '10px 18px', background: active ? 'var(--border)' : color + '15', color: active ? 'var(--text-primary)' : color, border: '1px solid ' + (active ? 'var(--border-light)' : color + '30'), borderRadius: 'var(--radius-lg)', fontWeight: 600, cursor: 'pointer', fontSize: 'var(--font-md)', whiteSpace: 'nowrap' as const, transition: 'all 0.2s' })
+const panelStyle = (color: string): React.CSSProperties => ({ background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 20, marginBottom: 16, border: '1px solid ' + color + '20' })
+const inputStyle: React.CSSProperties = { padding: '10px 14px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', color: 'var(--text-primary)', fontSize: 'var(--font-md)', outline: 'none', width: '100%', boxSizing: 'border-box' }
+const labelStyle: React.CSSProperties = { fontSize: 'var(--font-sm)', color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }
+const actionBtnStyle = (color: string): React.CSSProperties => ({ padding: '6px 10px', background: 'transparent', color: color, border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 'var(--font-sm)', flexShrink: 0 })
