@@ -14,14 +14,14 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "input flex w-full items-center justify-between px-4 py-3 rounded-2xl",
+      "input flex w-full items-center justify-between px-4 py-3 rounded-2xl border border-[rgb(var(--border))]",
       className
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
+      <ChevronDown className="h-4 w-4 opacity-70" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -30,16 +30,14 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "relative z-50 min-w-[8rem] overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-xl",
-        position === "popper" && "w-[var(--radix-select-trigger-width)]",
+        "z-50 min-w-[8rem] overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] p-1 shadow-2xl",
         className
       )}
-      position={position}
       {...props}
     >
       <SelectPrimitive.Viewport className="p-1">
@@ -57,7 +55,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-pointer select-none items-center rounded-xl py-3 px-4 text-sm outline-none hover:bg-[rgb(var(--surface-2))] focus:bg-[rgb(var(--surface-2))]",
+      "relative flex cursor-pointer select-none items-center rounded-xl py-3 px-4 text-sm outline-none hover:bg-[rgb(var(--surface-2))] focus:bg-[rgb(var(--surface-2))]",
       className
     )}
     {...props}
