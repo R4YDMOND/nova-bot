@@ -884,6 +884,87 @@ def send_report(data: dict):
         db.close()
 
 
+# ==================== Музыкальные провайдеры ====================
+
+RADIO_STATIONS = {
+    "yandex_radio": {"name": "Яндекс.Радио", "icon": "📻", "url": "https://radio.yandex.ru", "stream": "https://radio.yandex.ru/radio"},
+    "record": {"name": "Radio Record", "icon": "🎵", "url": "https://www.radiorecord.ru", "stream": "https://radiorecord.ru/player"},
+    "dfm": {"name": "DFM", "icon": "📡", "url": "https://dfm.ru/online", "stream": "https://dfm.ru/player"},
+    "europa_plus": {"name": "Европа Плюс", "icon": "📻", "url": "https://europaplus.ru", "stream": "https://europaplus.ru/player"},
+    "nashe": {"name": "Наше Радио", "icon": "🎸", "url": "https://www.nashe.ru", "stream": "https://www.nashe.ru/player"},
+    "relax_fm": {"name": "Relax FM", "icon": "🎧", "url": "https://relax-fm.ru", "stream": "https://relax-fm.ru/player"},
+    "like_fm": {"name": "Like FM", "icon": "🔊", "url": "https://likefm.ru", "stream": "https://likefm.ru/player"},
+    "shanson": {"name": "Радио Шансон", "icon": "🎹", "url": "https://radioshanson.ru", "stream": "https://radioshanson.ru/player"},
+}
+
+@app.get("/api/music/providers")
+def get_music_providers(server_id: str = Query("default")):
+    db = SessionLocal()
+    try:
+        providers = db.query(MusicProvider).filter(MusicProvider.server_id == server_id).all()
+        return {
+            "providers": [{"id": p.id, "type": p.provider_type, "name": p.name, "hasKey": bool(p.api_key), "enabled": p.is_enabled, "streamUrl": p.stream_url or ""} for p in providers],
+            "available_types": [
+                {"value": "youtube", "label": "YouTube Music", "icon": "▶️", "category": "search"},
+                {"value": "yandex", "label": "Яндекс.Музыка", "icon": "🎧", "category": "search"},
+                {"value": "vk", "label": "VK Музыка", "icon": "💙", "category": "search"},
+                {"value": "soundcloud", "label": "SoundCloud", "icon": "☁️", "category": "search"},
+                {"value": "yandex_radio", "label": "Яндекс.Радио", "icon": "📻", "category": "radio"},
+                {"value": "record", "label": "Radio Record", "icon": "🎵", "category": "radio"},
+                {"value": "dfm", "label": "DFM", "icon": "📡", "category": "radio"},
+                {"value": "europa_plus", "label": "Европа Плюс", "icon": "📻", "category": "radio"},
+                {"value": "nashe", "label": "Наше Радио", "icon": "🎸", "category": "radio"},
+                {"value": "relax_fm", "label": "Relax FM", "icon": "🎧", "category": "radio"},
+                {"value": "like_fm", "label": "Like FM", "icon": "🔊", "category": "radio"},
+                {"value": "shanson", "label": "Радио Шансон", "icon": "🎹", "category": "radio"},
+                {"value": "custom", "label": "Свой Webhook", "icon": "🔗", "category": "custom"}
+            ]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+@app.post("/api/music/providers")
+def add_music_provider(data: dict):
+    db = SessionLocal()
+    try:
+        provider_type = data["type"]
+        stream_url = data.get("stream_url", "")
+        if provider_type in RADIO_STATIONS:
+            stream_url = RADIO_STATIONS[provider_type]["stream"]
+        provider = MusicProvider(
+            server_id=data.get("server_id", "default"),
+            provider_type=provider_type,
+            name=data.get("name", RADIO_STATIONS.get(provider_type, {}).get("name", "Мой провайдер")),
+            api_key=data.get("api_key", ""),
+            webhook_url=data.get("webhook_url", ""),
+            stream_url=stream_url,
+        )
+        db.add(provider)
+        db.commit()
+        db.refresh(provider)
+        return {"status": "created", "id": provider.id}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+@app.delete("/api/music/providers/{provider_id}")
+def delete_music_provider(provider_id: int):
+    db = SessionLocal()
+    try:
+        db.query(MusicProvider).filter(MusicProvider.id == provider_id).delete()
+        db.commit()
+        return {"status": "deleted"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
 # ==================== События (Events) ====================
 
 EVENT_TEMPLATES = {
