@@ -16,7 +16,7 @@ export default function Home() {
           </div>
 
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-6">НОВА</h1>
-          <p className="text-2xl md:text-3xl text-[rgb(var(--text-secondary))] max-w-2xl mx-auto mb-4">Умный Discord-бот для Lolka-сообществ</p>
+          <p className="text-2xl md:text-3xl text-[rgb(var(--text-secondary))] max-w-2xl mx-auto mb-4">Умный бот для серверов Lolka и сообществ VK</p>
           <p className="text-lg text-zinc-500 mb-10">Вспышка энергии • Модерация • AI • Уровни • Музыка</p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
