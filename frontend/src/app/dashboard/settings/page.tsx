@@ -1,14 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input'; // если есть, иначе используй <input className="input" />
-import { Label } from '@/components/ui/label'; // если компонент есть
-import { Save, User, Bell, Shield, Key } from 'lucide-react';
-import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Save, User, Bell, Shield } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
+  const { toast } = useToast();
+
   const [settings, setSettings] = useState({
     username: "Администратор",
     emailNotifications: true,
@@ -22,7 +24,7 @@ export default function SettingsPage() {
   };
 
   const saveSettings = () => {
-    alert('✅ Настройки успешно сохранены!'); // позже заменим на Toast
+    toast('Настройки успешно сохранены!', 'success');
     console.log('Сохранённые настройки:', settings);
   };
 
@@ -47,7 +49,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Имя пользователя</Label>
+              <label className="text-sm font-medium block mb-1.5">Имя пользователя</label>
               <Input 
                 value={settings.username} 
                 onChange={(e) => setSettings(prev => ({...prev, username: e.target.value}))}
@@ -74,8 +76,8 @@ export default function SettingsPage() {
                 <p className="text-sm text-[rgb(var(--text-secondary))]">О новых сообщениях и событиях</p>
               </div>
               <Switch 
-                checked={settings.emailNotifications} 
-                onCheckedChange={() => toggleSetting('emailNotifications')} 
+                checked={settings.emailNotifications}
+                onCheckedChange={() => toggleSetting('emailNotifications')}
               />
             </div>
 
@@ -85,8 +87,8 @@ export default function SettingsPage() {
                 <p className="text-sm text-[rgb(var(--text-secondary))]">Мгновенные оповещения</p>
               </div>
               <Switch 
-                checked={settings.telegramNotifications} 
-                onCheckedChange={() => toggleSetting('telegramNotifications')} 
+                checked={settings.telegramNotifications}
+                onCheckedChange={() => toggleSetting('telegramNotifications')}
               />
             </div>
           </CardContent>
@@ -105,13 +107,13 @@ export default function SettingsPage() {
                 <p className="font-medium">Автомодерация</p>
               </div>
               <Switch 
-                checked={settings.autoModeration} 
-                onCheckedChange={() => toggleSetting('autoModeration')} 
+                checked={settings.autoModeration}
+                onCheckedChange={() => toggleSetting('autoModeration')}
               />
             </div>
 
             <div>
-              <Label>API Ключ</Label>
+              <label className="text-sm font-medium block mb-1.5">API Ключ</label>
               <div className="flex gap-2">
                 <Input 
                   type={settings.apiKeyVisible ? "text" : "password"} 
