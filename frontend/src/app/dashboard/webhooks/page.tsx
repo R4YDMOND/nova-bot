@@ -1,110 +1,94 @@
 'use client';
 
-import { useState } from 'react';
-import { Card } from '@/components/ui/Card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Switch } from '@/components/ui/Toggle';
 import { Badge } from '@/components/ui/Badge';
-import { Zap, Plus, Trash2 } from 'lucide-react';
-
-interface Webhook {
-  id: string;
-  platform: string;
-  url: string;
-  channel: string;
-  serverName: string;
-  active: boolean;
-}
+import { Zap, Copy, Trash2, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 export default function WebhooksPage() {
-  const [webhooks, setWebhooks] = useState<Webhook[]>([
-    {
-      id: '1',
-      platform: 'Lolka',
-      url: 'https://lolka.app/api/webhooks/xxx',
-      channel: '📢 общий',
-      serverName: 'Phoenix Gaming',
-      active: true,
-    },
-    {
-      id: '2',
-      platform: 'VK',
-      url: 'https://vk.com/callback/xxx',
-      channel: '📢 Новости',
-      serverName: 'Техномания',
-      active: true,
-    },
+  const [webhooks, setWebhooks] = useState([
+    { id: 1, name: "Lolka", server: "Phoenix Gaming", url: "https://lolka.app/api/webhooks/xxx", channel: "📢 общий", active: true },
+    { id: 2, name: "VK", server: "Техномания", url: "https://vk.com/callback/xxx", channel: "📢 Новости", active: true },
   ]);
 
-  const [showAdd, setShowAdd] = useState(false);
+  const toggleWebhook = (id: number) => {
+    setWebhooks(prev => prev.map(h => h.id === id ? { ...h, active: !h.active } : h));
+  };
+
+  const copyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    alert('URL скопирован!');
+  };
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Zap className="w-8 h-8 text-nova-400" />
             Вебхуки
           </h1>
-          <p className="text-[rgb(var(--text-secondary))] mt-1">
-            Управление подключениями и событиями
-          </p>
+          <p className="text-[rgb(var(--text-secondary))] mt-2">Управление подключениями и событиями</p>
         </div>
-
-        <Button onClick={() => setShowAdd(!showAdd)} className="flex items-center gap-2">
+        <Button className="flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Новый вебхук
         </Button>
       </div>
 
-      <div className="grid gap-4">
-        {webhooks.map((wh) => (
-          <Card key={wh.id} className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">
-                  {wh.platform === 'Lolka' ? '🎮' : '💙'}
-                </span>
-                <div>
-                  <h3 className="font-semibold text-lg">{wh.platform}</h3>
-                  <p className="text-sm text-[rgb(var(--text-secondary))]">{wh.serverName}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {webhooks.map((hook) => (
+          <Card key={hook.id} className="group">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-nova-400 to-cyan-500 rounded-2xl flex items-center justify-center text-lg">
+                    {hook.name === 'Lolka' ? '🎮' : '💙'}
+                  </div>
+                  <div>
+                    <CardTitle>{hook.name}</CardTitle>
+                    <CardDescription>{hook.server}</CardDescription>
+                  </div>
                 </div>
+                <Badge variant={hook.active ? "success" : "default"}>
+                  {hook.active ? "● Активен" : "Неактивен"}
+                </Badge>
               </div>
-              
-              <Badge variant={wh.active ? "success" : "default"}>
-                {wh.active ? '● Активен' : '○ Выключен'}
-              </Badge>
-            </div>
+            </CardHeader>
 
-            <div className="text-sm text-[rgb(var(--text-secondary))] break-all font-mono bg-[rgb(var(--surface-2))] p-4 rounded-2xl mb-4 border border-[rgb(var(--border))]">
-              {wh.url}
-            </div>
-
-            <div className="text-sm mb-6">
-              Канал: <span className="font-medium text-white">{wh.channel}</span>
-            </div>
-
-            <div className="flex gap-3">
-              <Button variant="secondary" size="sm">Тест</Button>
-              <Button variant="secondary" size="sm">Сканировать</Button>
-              <Button variant="destructive" size="sm" className="ml-auto">
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
+            <CardContent className="space-y-4">
+              <div className="bg-[rgb(var(--surface-2))] p-3 rounded-2xl text-sm font-mono break-all">{hook.url}</div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[rgb(var(--text-secondary))]">Канал:</span>
+                <span>{hook.channel}</span>
+              </div>
+              <div className="flex items-center gap-3 pt-4 border-t border-[rgb(var(--border))]">
+                <Button variant="secondary" size="sm" onClick={() => copyUrl(hook.url)} className="flex-1">
+                  <Copy className="w-4 h-4 mr-2" /> Копировать
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => toggleWebhook(hook.id)}>
+                  <Switch checked={hook.active} /> {hook.active ? "Выключить" : "Включить"}
+                </Button>
+                <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-500">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
           </Card>
         ))}
       </div>
 
-      {showAdd && (
-        <Card className="p-6">
-          <h3 className="font-semibold mb-4">Добавить новый вебхук</h3>
-          <p className="text-[rgb(var(--text-secondary))] mb-6">
-            Полноценная форма добавления вебхука будет добавлена в следующих обновлениях.
-          </p>
-          <Button onClick={() => setShowAdd(false)} variant="secondary">
-            Закрыть
-          </Button>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Создать новый вебхук</CardTitle>
+          <CardDescription>Настройте новое подключение к внешнему сервису</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button className="w-full">Добавить вебхук</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
