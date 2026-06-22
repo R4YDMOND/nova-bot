@@ -1,4 +1,5 @@
 'use client';
+
 import { Bell, Search } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -15,11 +16,14 @@ export function Header() {
         <ThemeToggle />
         <button className="p-2.5 hover:bg-[rgb(var(--surface-2))] rounded-2xl transition-all relative">
           <Bell className="w-5 h-5 text-[rgb(var(--text-secondary))]" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
         </button>
         <div className="flex items-center gap-3 pl-6 border-l border-[rgb(var(--border))]">
-          <div className="text-right"><p className="text-sm font-medium text-[rgb(var(--text))]">Администратор</p><p className="text-xs text-[rgb(var(--text-secondary))]">Online</p></div>
-          <div className="w-8 h-8 bg-nova-500 rounded-2xl flex items-center justify-center text-black font-bold">A</div>
+          <div className="text-right">
+            <p className="text-sm font-medium text-[rgb(var(--text))]">Администратор</p>
+            <p className="text-xs text-[rgb(var(--text-secondary))]">Online</p>
+          </div>
+          <div className="w-9 h-9 bg-nova-500 rounded-2xl flex items-center justify-center text-black font-bold">A</div>
         </div>
       </div>
     </header>
