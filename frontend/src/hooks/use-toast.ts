@@ -20,12 +20,11 @@ export function useToast() {
       {toasts.map(t => (
         <div
           key={t.id}
-          className={`
-            px-5 py-4 rounded-2xl shadow-xl text-sm font-medium animate-slide-up
-            ${t.type === 'success' ? 'bg-emerald-500 text-black' : ''}
-            ${t.type === 'error' ? 'bg-red-500 text-white' : ''}
-            ${t.type === 'info' ? 'bg-[rgb(var(--surface))] border border-[rgb(var(--border))] text-[rgb(var(--text))]' : ''}
-          `}
+          className={`px-5 py-4 rounded-2xl shadow-xl text-sm font-medium animate-slide-up ${
+            t.type === 'success' ? 'bg-emerald-500 text-black' :
+            t.type === 'error' ? 'bg-red-500 text-white' :
+            'bg-[rgb(var(--surface))] border border-[rgb(var(--border))] text-[rgb(var(--text))]'
+          }`}
         >
           {t.type === 'success' && '✅ '}
           {t.type === 'error' && '❌ '}
@@ -33,13 +32,7 @@ export function useToast() {
           {t.message}
         </div>
       ))}
-      <style>{`
-        @keyframes slide-up {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-slide-up { animation: slide-up 0.3s ease-out; }
-      `}</style>
+      <style>{`@keyframes slide-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } } .animate-slide-up { animation: slide-up 0.3s ease-out; }`}</style>
     </div>
   );
 
