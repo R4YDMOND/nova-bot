@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
-import { Toggle } from "@/components/ui/Toggle";
+import { Switch } from "@/components/ui/Toggle";
 
 const API_BASE = "https://nova-bot-rpsy.onrender.com";
 
