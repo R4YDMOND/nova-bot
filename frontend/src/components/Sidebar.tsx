@@ -29,7 +29,7 @@ export function Sidebar() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tighter text-[rgb(var(--text))]">Nova</h1>
-            <p className="text-xs text-[rgb(var(--text-secondary))]">DISCORD BOT</p>
+            <p className="text-xs text-[rgb(var(--text-secondary))] tracking-wide">Lolka • VK Bot</p>
           </div>
         </Link>
       </div>
