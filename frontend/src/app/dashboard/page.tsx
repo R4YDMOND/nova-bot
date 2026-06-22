@@ -24,13 +24,6 @@ export default function DashboardPage() {
     { icon: "🔍", label: "Сканировать", desc: "Популярный контент", href: "/dashboard/webhooks" },
   ];
 
-  const recentActivity = [
-    { text: "Тестовый вебхук отправлен", time: "Только что", icon: "🧪" },
-    { text: "Сервер Phoenix Gaming добавлен", time: "5 мин назад", icon: "🖥️" },
-    { text: "Сканирование завершено", time: "1 час назад", icon: "🔍" },
-    { text: "Обновлены настройки AI", time: "Вчера", icon: "🤖" },
-  ];
-
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-start flex-wrap gap-4">
@@ -45,12 +38,12 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: "Серверов", value: stats.serversCount ?? "-", icon: "🖥️", color: "border-t-nova-500" },
-          { label: "Пользователей", value: stats.totalUsers ?? "-", icon: "👥", color: "border-t-emerald-500" },
-          { label: "Новых за неделю", value: stats.newUsers ?? "-", icon: "⭐", color: "border-t-amber-500" },
-          { label: "Команд", value: stats.commandsUsed ?? "-", icon: "⚡", color: "border-t-purple-500" },
+          { label: "Серверов", value: stats.serversCount ?? 0, icon: "🖥️" },
+          { label: "Пользователей", value: stats.totalUsers ?? 0, icon: "👥" },
+          { label: "Новых за неделю", value: stats.newUsers ?? 0, icon: "⭐" },
+          { label: "Команд", value: stats.commandsUsed ?? 0, icon: "⚡" },
         ].map((card, i) => (
-          <Card key={i} className={`border-t-2 ${card.color} flex items-center gap-4`}>
+          <Card key={i} className="flex items-center gap-4">
             <span className="text-2xl">{card.icon}</span>
             <div>
               <div className="text-xl font-bold">{loading ? "..." : card.value}</div>
@@ -73,19 +66,6 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
-      </div>
-
-      <div>
-        <h3 className="text-lg font-semibold mb-4">📋 Последняя активность</h3>
-        <Card className="divide-y divide-[rgb(var(--border))]">
-          {recentActivity.map((item, i) => (
-            <div key={i} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-              <span className="text-lg">{item.icon}</span>
-              <span className="flex-1 text-sm">{item.text}</span>
-              <span className="text-xs text-[rgb(var(--text-muted))]">{item.time}</span>
-            </div>
-          ))}
-        </Card>
       </div>
     </div>
   );
