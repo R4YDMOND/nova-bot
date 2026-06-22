@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Toggle';
-import { Input } from '@/components/ui/input';
 import { Save, User, Bell, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,7 +40,6 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Профиль */}
         <Card>
           <CardHeader>
             <CardTitle>Профиль</CardTitle>
@@ -50,7 +48,8 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium block mb-1.5">Имя пользователя</label>
-              <Input 
+              <input 
+                className="input"
                 value={settings.username} 
                 onChange={(e) => setSettings(prev => ({...prev, username: e.target.value}))}
               />
@@ -62,7 +61,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Уведомления */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -94,7 +92,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Безопасность */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -115,7 +112,8 @@ export default function SettingsPage() {
             <div>
               <label className="text-sm font-medium block mb-1.5">API Ключ</label>
               <div className="flex gap-2">
-                <Input 
+                <input 
+                  className="input"
                   type={settings.apiKeyVisible ? "text" : "password"} 
                   value="nova_sk_xxxxxxxxxxxxxxxxxxxxxxxx" 
                   readOnly 
