@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Switch } from '@/components/ui/Toggle';
+import { Badge } from '@/components/ui/Badge';
 import { Zap, Copy, Trash2, Plus, ExternalLink } from 'lucide-react';
 
 export default function WebhooksPage() {
