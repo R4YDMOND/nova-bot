@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
-import { Toggle } from "@/components/ui/Toggle";
+import { Switch } from "@/components/ui/Toggle";
 
 const sanitize = (text: string): string => {
   if (!text) return "";
@@ -74,7 +74,7 @@ export default function CommandsPage() {
                 <td className="py-3 px-4"><span className="bg-[rgb(var(--surface-2))] px-2 py-0.5 rounded-lg text-xs text-[rgb(var(--text-secondary))]">{cmd.category}</span></td>
                 <td className="py-3 px-4 text-[rgb(var(--text-secondary))]">{cmd.cooldown}с</td>
                 <td className="py-3 px-4 text-[rgb(var(--text-muted))] text-xs">{sanitize(cmd.allowedRoles) || "Все"}</td>
-                <td className="py-3 px-4"><Toggle checked={cmd.enabled} onCheckedChange={() => toggle(cmd.name)} /></td>
+                <td className="py-3 px-4"><Switch checked={cmd.enabled} onCheckedChange={() => toggle(cmd.name)} /></td>
               </tr>
             ))}
             {filtered.length === 0 && <tr><td colSpan={6} className="py-10 text-center text-[rgb(var(--text-muted))]">Команды не найдены</td></tr>}
