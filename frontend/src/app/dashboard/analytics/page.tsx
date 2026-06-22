@@ -65,7 +65,7 @@ export default function AnalyticsPage() {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <span>Включить автоотчёты</span>
-            <Toggle checked={reports.enabled} onCheckedChange={(v) => updateReport('enabled', v)} />
+            <Switch checked={reports.enabled} onCheckedChange={(v) => updateReport('enabled', v)} />
           </div>
           <div><label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">📢 Канал для отчётов</label><input type="text" value={reports.channel || ''} onChange={e => updateReport('channel', e.target.value)} placeholder="#отчёты" className="input" /></div>
           <div><label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">🔗 Webhook URL</label><input type="text" value={reports.webhook_url || ''} onChange={e => updateReport('webhook_url', e.target.value)} placeholder="https://lolka.app/api/webhooks/xxx" className="input" /></div>
