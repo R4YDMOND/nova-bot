@@ -4,11 +4,9 @@ import { Toaster } from '@/components/Toaster';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Nova Bot - Панель управления',
-  description: 'Современная панель управления Discord ботом Nova',
-  icons: {
-    icon: '/favicon.ico',
-  },
+  title: 'Nova Bot — Панель управления',
+  description: 'Умный помощник для серверов Lolka и сообществ VK',
+  icons: { icon: '/favicon.ico' },
 };
 
 export default function RootLayout({
