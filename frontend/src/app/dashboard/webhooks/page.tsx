@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/toggle';        // ← исправлено
+import { Switch } from '@/components/ui/toggle';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Copy, Trash2, Plus, ExternalLink } from 'lucide-react';
+import { Zap, Copy, Trash2, Plus } from 'lucide-react';
 
 export default function WebhooksPage() {
   const [webhooks, setWebhooks] = useState([
@@ -28,14 +28,12 @@ export default function WebhooksPage() {
   ]);
 
   const toggleWebhook = (id: number) => {
-    setWebhooks(prev => prev.map(h =>
-      h.id === id ? { ...h, active: !h.active } : h
-    ));
+    setWebhooks(prev => prev.map(h => h.id === id ? { ...h, active: !h.active } : h));
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert('✅ URL скопирован в буфер обмена!');
+    alert('✅ URL скопирован!');
   };
 
   return (
@@ -80,11 +78,7 @@ export default function WebhooksPage() {
                 <p className="text-xs text-[rgb(var(--text-secondary))] mb-1">URL</p>
                 <div className="bg-[rgb(var(--surface-2))] p-3 rounded-2xl font-mono text-sm break-all flex items-center justify-between">
                   {hook.url}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyToClipboard(hook.url)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(hook.url)}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
@@ -96,11 +90,7 @@ export default function WebhooksPage() {
               </div>
 
               <div className="pt-4 border-t border-[rgb(var(--border))] flex gap-3">
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={() => toggleWebhook(hook.id)}
-                >
+                <Button variant="secondary" className="flex-1" onClick={() => toggleWebhook(hook.id)}>
                   <Switch checked={hook.active} className="mr-2" />
                   {hook.active ? 'Выключить' : 'Включить'}
                 </Button>
@@ -112,22 +102,6 @@ export default function WebhooksPage() {
           </Card>
         ))}
       </div>
-
-      {/* Пустая карточка для создания */}
-      <Card className="border-dashed border-[rgb(var(--border))]">
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-[rgb(var(--surface-2))] flex items-center justify-center mb-6">
-            <Plus className="w-8 h-8 text-[rgb(var(--text-secondary))]" />
-          </div>
-          <h3 className="text-xl font-semibold mb-2">Новый вебхук</h3>
-          <p className="text-[rgb(var(--text-secondary))] max-w-sm">
-            Подключите Lolka.app, VK или любой внешний сервис
-          </p>
-          <Button className="mt-6">
-            Создать вебхук
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }
