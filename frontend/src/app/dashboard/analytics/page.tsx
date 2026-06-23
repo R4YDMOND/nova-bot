@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/toggle";   // ← исправлено
+import { Switch } from "@/components/ui/toggle";
 
 const API_BASE = "https://nova-bot-rpsy.onrender.com";
 
@@ -59,7 +59,6 @@ export default function AnalyticsPage() {
         </p>
       </div>
 
-      {/* Статистика */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "🖥️ Серверов", value: stats.serversCount || 0 },
@@ -73,82 +72,6 @@ export default function AnalyticsPage() {
           </Card>
         ))}
       </div>
-
-      {/* Топ команд */}
-      <Card>
-        <h3 className="text-lg font-semibold mb-4">⚡ Топ команд</h3>
-        {(stats.topCommands || []).length === 0 ? (
-          <p className="text-[rgb(var(--text-secondary))] text-sm py-8 text-center">
-            Нет данных
-          </p>
-        ) : (
-          (stats.topCommands || []).map((cmd: any, i: number) => (
-            <div key={i} className="flex justify-between py-3 border-b border-[rgb(var(--border))] last:border-0">
-              <span className="text-sm font-medium">{cmd.name}</span>
-              <span className="text-sm font-semibold text-nova-400">{cmd.count}</span>
-            </div>
-          ))
-        )}
-      </Card>
-
-      {/* Настройки отчётов */}
-      <Card>
-        <h3 className="text-lg font-semibold mb-4">📋 Настройки отчётов</h3>
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <span className="text-sm">Включить автоотчёты</span>
-            <Switch
-              checked={reports.enabled || false}
-              onCheckedChange={(v) => updateReport('enabled', v)}
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">
-              📢 Канал для отчётов
-            </label>
-            <input
-              type="text"
-              value={reports.channel || ''}
-              onChange={e => updateReport('channel', e.target.value)}
-              placeholder="#отчёты"
-              className="input w-full"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">
-              🔗 Webhook URL
-            </label>
-            <input
-              type="text"
-              value={reports.webhook_url || ''}
-              onChange={e => updateReport('webhook_url', e.target.value)}
-              placeholder="https://discord.com/api/webhooks/..."
-              className="input w-full"
-            />
-          </div>
-
-          <div className="flex gap-4 pt-4">
-            <button
-              onClick={saveReports}
-              className={`px-6 py-3 rounded-2xl font-semibold text-sm transition-all ${
-                saved ? 'bg-emerald-500 text-black' : 'bg-nova-500 hover:bg-nova-600 text-black'
-              }`}
-            >
-              {saved ? '✅ Сохранено' : '💾 Сохранить настройки'}
-            </button>
-
-            <button
-              onClick={sendTestReport}
-              disabled={sending || !reports.webhook_url}
-              className="px-6 py-3 rounded-2xl font-semibold text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition-all text-white"
-            >
-              {sending ? '⏳ Отправка...' : '🧪 Тестовый отчёт'}
-            </button>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }
