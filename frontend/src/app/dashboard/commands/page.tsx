@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";   // ← исправлено
+import { Switch } from "@/components/ui/switch";
 
 const sanitize = (text: string): string => {
   if (!text) return "";
@@ -32,14 +32,14 @@ export default function CommandsPage() {
 
   const filtered = commands.filter((c) => {
     const matchCat = activeCategory === "Все" || c.category === activeCategory;
-    const matchSearch = 
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchSearch =
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.desc.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
   });
 
   const toggle = (name: string) => {
-    setCommands(commands.map((c) => 
+    setCommands(prev => prev.map((c) =>
       c.name === name ? { ...c, enabled: !c.enabled } : c
     ));
   };
@@ -58,11 +58,11 @@ export default function CommandsPage() {
             Управляйте доступными командами бота
           </p>
         </div>
-        <button 
-          onClick={save} 
+        <button
+          onClick={save}
           className={`px-6 py-3 rounded-2xl font-semibold text-sm transition-all ${
-            saved 
-              ? 'bg-emerald-500 text-black' 
+            saved
+              ? 'bg-emerald-500 text-black'
               : 'bg-nova-500 hover:bg-nova-600 text-black'
           }`}
         >
@@ -72,22 +72,22 @@ export default function CommandsPage() {
 
       {/* Поиск и фильтры */}
       <div className="flex gap-3 flex-wrap items-center">
-        <input 
-          type="text" 
-          value={searchQuery} 
-          onChange={(e) => setSearchQuery(e.target.value)} 
-          placeholder="🔍 Поиск команд..." 
-          className="input w-72" 
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="🔍 Поиск команд..."
+          className="input w-72"
         />
-        
+
         <div className="flex gap-1.5 flex-wrap">
           {categories.map((cat) => (
-            <button 
-              key={cat} 
-              onClick={() => setActiveCategory(cat)} 
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
               className={`px-4 py-2 rounded-2xl text-sm font-medium border transition-all ${
-                activeCategory === cat 
-                  ? 'bg-[rgb(var(--surface-2))] border-[rgb(var(--border))] text-white' 
+                activeCategory === cat
+                  ? 'bg-[rgb(var(--surface-2))] border-[rgb(var(--border))] text-white'
                   : 'border-transparent text-[rgb(var(--text-secondary))] hover:text-white hover:bg-[rgb(var(--surface-2))]'
               }`}
             >
@@ -124,9 +124,9 @@ export default function CommandsPage() {
                 <td className="py-4 px-4 text-[rgb(var(--text-secondary))]">{cmd.cooldown}с</td>
                 <td className="py-4 px-4 text-xs text-[rgb(var(--text-secondary))]">{sanitize(cmd.allowedRoles) || "Все роли"}</td>
                 <td className="py-4 px-4">
-                  <Switch 
-                    checked={cmd.enabled} 
-                    onCheckedChange={() => toggle(cmd.name)} 
+                  <Switch
+                    checked={cmd.enabled}
+                    onCheckedChange={() => toggle(cmd.name)}
                   />
                 </td>
               </tr>
