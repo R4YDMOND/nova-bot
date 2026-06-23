@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "@/components/ui/toggle";   // ← ИСПРАВЛЕНО
 
 const sanitize = (text: string): string => {
   if (!text) return "";
