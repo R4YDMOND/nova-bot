@@ -3,13 +3,10 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/toggle';           // ← правильно
+import { Switch } from '@/components/ui/toggle';
 import { Save, User, Bell, Shield } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';             // ← добавлено
 
 export default function SettingsPage() {
-  const { toast } = useToast();
-
   const [settings, setSettings] = useState({
     username: "Администратор",
     emailNotifications: true,
@@ -23,7 +20,7 @@ export default function SettingsPage() {
   };
 
   const saveSettings = () => {
-    toast('✅ Настройки успешно сохранены!', 'success');
+    alert('✅ Настройки успешно сохранены!');
     console.log('Сохранённые настройки:', settings);
   };
 
@@ -40,7 +37,6 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Профиль */}
         <Card>
           <CardHeader>
             <CardTitle>Профиль</CardTitle>
@@ -62,7 +58,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Уведомления */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -94,7 +89,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Безопасность */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
