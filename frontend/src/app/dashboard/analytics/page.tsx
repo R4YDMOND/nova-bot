@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/toggle";   // ← ИСПРАВЛЕНО
+import { Switch } from "@/components/ui/toggle";   // ← исправлено
 
 const API_BASE = "https://nova-bot-rpsy.onrender.com";
 
@@ -133,9 +133,7 @@ export default function AnalyticsPage() {
             <button
               onClick={saveReports}
               className={`px-6 py-3 rounded-2xl font-semibold text-sm transition-all ${
-                saved
-                  ? 'bg-emerald-500 text-black'
-                  : 'bg-nova-500 hover:bg-nova-600 text-black'
+                saved ? 'bg-emerald-500 text-black' : 'bg-nova-500 hover:bg-nova-600 text-black'
               }`}
             >
               {saved ? '✅ Сохранено' : '💾 Сохранить настройки'}
