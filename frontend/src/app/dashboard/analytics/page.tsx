@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";   // ← исправлено
+import { Switch } from "@/components/ui/switch";
 
 const API_BASE = "https://nova-bot-rpsy.onrender.com";
 
@@ -25,7 +25,7 @@ export default function AnalyticsPage() {
   }, []);
 
   const updateReport = (key: string, value: any) => {
-    setReports({ ...reports, [key]: value });
+    setReports(prev => ({ ...prev, [key]: value }));
   };
 
   const saveReports = async () => {
@@ -97,9 +97,9 @@ export default function AnalyticsPage() {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <span className="text-sm">Включить автоотчёты</span>
-            <Switch 
-              checked={reports.enabled || false} 
-              onCheckedChange={(v) => updateReport('enabled', v)} 
+            <Switch
+              checked={reports.enabled || false}
+              onCheckedChange={(v) => updateReport('enabled', v)}
             />
           </div>
 
@@ -133,8 +133,8 @@ export default function AnalyticsPage() {
             <button
               onClick={saveReports}
               className={`px-6 py-3 rounded-2xl font-semibold text-sm transition-all ${
-                saved 
-                  ? 'bg-emerald-500 text-black' 
+                saved
+                  ? 'bg-emerald-500 text-black'
                   : 'bg-nova-500 hover:bg-nova-600 text-black'
               }`}
             >
