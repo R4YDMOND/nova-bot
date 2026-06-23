@@ -1,15 +1,12 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Switch } from '@/components/ui/Toggle';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/toggle';        // ← исправлено
 import { Save, User, Bell, Shield } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
-  const { toast } = useToast();
-
   const [settings, setSettings] = useState({
     username: "Администратор",
     emailNotifications: true,
@@ -23,8 +20,8 @@ export default function SettingsPage() {
   };
 
   const saveSettings = () => {
-    toast('Настройки успешно сохранены!', 'success');
     console.log('Сохранённые настройки:', settings);
+    alert('✅ Настройки успешно сохранены!');
   };
 
   return (
@@ -40,6 +37,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Профиль */}
         <Card>
           <CardHeader>
             <CardTitle>Профиль</CardTitle>
@@ -48,9 +46,9 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium block mb-1.5">Имя пользователя</label>
-              <input 
-                className="input"
-                value={settings.username} 
+              <input
+                className="input w-full"
+                value={settings.username}
                 onChange={(e) => setSettings(prev => ({...prev, username: e.target.value}))}
               />
             </div>
@@ -61,6 +59,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Уведомления */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -73,7 +72,7 @@ export default function SettingsPage() {
                 <p className="font-medium">Email-уведомления</p>
                 <p className="text-sm text-[rgb(var(--text-secondary))]">О новых сообщениях и событиях</p>
               </div>
-              <Switch 
+              <Switch
                 checked={settings.emailNotifications}
                 onCheckedChange={() => toggleSetting('emailNotifications')}
               />
@@ -84,7 +83,7 @@ export default function SettingsPage() {
                 <p className="font-medium">Telegram-уведомления</p>
                 <p className="text-sm text-[rgb(var(--text-secondary))]">Мгновенные оповещения</p>
               </div>
-              <Switch 
+              <Switch
                 checked={settings.telegramNotifications}
                 onCheckedChange={() => toggleSetting('telegramNotifications')}
               />
@@ -92,6 +91,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Безопасность */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -103,7 +103,7 @@ export default function SettingsPage() {
               <div>
                 <p className="font-medium">Автомодерация</p>
               </div>
-              <Switch 
+              <Switch
                 checked={settings.autoModeration}
                 onCheckedChange={() => toggleSetting('autoModeration')}
               />
@@ -112,14 +112,14 @@ export default function SettingsPage() {
             <div>
               <label className="text-sm font-medium block mb-1.5">API Ключ</label>
               <div className="flex gap-2">
-                <input 
-                  className="input"
-                  type={settings.apiKeyVisible ? "text" : "password"} 
-                  value="nova_sk_xxxxxxxxxxxxxxxxxxxxxxxx" 
-                  readOnly 
+                <input
+                  className="input flex-1"
+                  type={settings.apiKeyVisible ? "text" : "password"}
+                  value="nova_sk_xxxxxxxxxxxxxxxxxxxxxxxx"
+                  readOnly
                 />
-                <Button 
-                  variant="secondary" 
+                <Button
+                  variant="secondary"
                   onClick={() => toggleSetting('apiKeyVisible')}
                 >
                   👁
