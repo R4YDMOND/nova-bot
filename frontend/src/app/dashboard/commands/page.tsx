@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/toggle";   // ← ИСПРАВЛЕНО
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/toggle";
 
 const sanitize = (text: string): string => {
   if (!text) return "";
@@ -32,7 +33,7 @@ export default function CommandsPage() {
 
   const filtered = commands.filter((c) => {
     const matchCat = activeCategory === "Все" || c.category === activeCategory;
-    const matchSearch =
+    const matchSearch = 
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.desc.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
@@ -58,16 +59,9 @@ export default function CommandsPage() {
             Управляйте доступными командами бота
           </p>
         </div>
-        <button
-          onClick={save}
-          className={`px-6 py-3 rounded-2xl font-semibold text-sm transition-all ${
-            saved
-              ? 'bg-emerald-500 text-black'
-              : 'bg-nova-500 hover:bg-nova-600 text-black'
-          }`}
-        >
+        <Button onClick={save}>
           {saved ? "✅ Сохранено" : "💾 Сохранить изменения"}
-        </button>
+        </Button>
       </div>
 
       {/* Поиск и фильтры */}
@@ -99,48 +93,53 @@ export default function CommandsPage() {
 
       {/* Таблица команд */}
       <Card>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[rgb(var(--border))] text-left text-xs uppercase text-[rgb(var(--text-secondary))]">
-              {["Команда", "Описание", "Категория", "Кулдаун", "Роли", "Статус"].map((h, i) => (
-                <th key={i} className="py-4 px-4 font-semibold">{h}</th>
+        <CardHeader>
+          <CardTitle>Список команд</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[rgb(var(--border))] text-left text-xs uppercase text-[rgb(var(--text-secondary))]">
+                {["Команда", "Описание", "Категория", "Кулдаун", "Роли", "Статус"].map((h, i) => (
+                  <th key={i} className="py-4 px-4 font-semibold">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((cmd, i) => (
+                <tr key={i} className="border-b border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-2))] transition-colors">
+                  <td className="py-4 px-4">
+                    <code className="bg-[rgb(var(--surface-2))] px-2.5 py-1 rounded-lg text-nova-400 font-mono text-xs">
+                      {sanitize(cmd.name)}
+                    </code>
+                  </td>
+                  <td className="py-4 px-4 text-[rgb(var(--text))]">{sanitize(cmd.desc)}</td>
+                  <td className="py-4 px-4">
+                    <span className="bg-[rgb(var(--surface-2))] px-3 py-1 rounded-full text-xs text-[rgb(var(--text-secondary))]">
+                      {cmd.category}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-[rgb(var(--text-secondary))]">{cmd.cooldown}с</td>
+                  <td className="py-4 px-4 text-xs text-[rgb(var(--text-secondary))]">{sanitize(cmd.allowedRoles) || "Все роли"}</td>
+                  <td className="py-4 px-4">
+                    <Switch
+                      checked={cmd.enabled}
+                      onCheckedChange={() => toggle(cmd.name)}
+                    />
+                  </td>
+                </tr>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((cmd, i) => (
-              <tr key={i} className="border-b border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-2))] transition-colors">
-                <td className="py-4 px-4">
-                  <code className="bg-[rgb(var(--surface-2))] px-2.5 py-1 rounded-lg text-nova-400 font-mono text-xs">
-                    {sanitize(cmd.name)}
-                  </code>
-                </td>
-                <td className="py-4 px-4 text-[rgb(var(--text))]">{sanitize(cmd.desc)}</td>
-                <td className="py-4 px-4">
-                  <span className="bg-[rgb(var(--surface-2))] px-3 py-1 rounded-full text-xs text-[rgb(var(--text-secondary))]">
-                    {cmd.category}
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-[rgb(var(--text-secondary))]">{cmd.cooldown}с</td>
-                <td className="py-4 px-4 text-xs text-[rgb(var(--text-secondary))]">{sanitize(cmd.allowedRoles) || "Все роли"}</td>
-                <td className="py-4 px-4">
-                  <Switch
-                    checked={cmd.enabled}
-                    onCheckedChange={() => toggle(cmd.name)}
-                  />
-                </td>
-              </tr>
-            ))}
 
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-16 text-center text-[rgb(var(--text-secondary))]">
-                  Команды не найдены
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-16 text-center text-[rgb(var(--text-secondary))]">
+                    Команды не найдены
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </CardContent>
       </Card>
     </div>
   );
