@@ -79,7 +79,7 @@ export default function WebhooksPage() {
             <CardContent className="space-y-5">
               <div>
                 <p className="text-xs text-[rgb(var(--text-secondary))] mb-1">URL</p>
-                <div className="bg-[rgb(var(--surface-2))] p-3 rounded-2xl font-mono text-sm break-all flex items-center justify-between">
+                <div className="bg-[rgb(var(--surface-2))] p-3 rounded-2xl font-mono text-sm break-all flex items-center justify-between group-hover:bg-[rgb(var(--surface-2))]">
                   {hook.url}
                   <Button 
                     variant="ghost" 
