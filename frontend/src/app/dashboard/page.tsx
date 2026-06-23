@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";        // ← исправлено
+import { Card } from "@/components/ui/card";
 
 const API_BASE = "https://nova-bot-rpsy.onrender.com";
 
