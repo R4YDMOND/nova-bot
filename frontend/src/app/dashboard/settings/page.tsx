@@ -1,12 +1,15 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/toggle';        // ← исправлено
+import { Switch } from '@/components/ui/toggle';           // ← правильно
 import { Save, User, Bell, Shield } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';             // ← добавлено
 
 export default function SettingsPage() {
+  const { toast } = useToast();
+
   const [settings, setSettings] = useState({
     username: "Администратор",
     emailNotifications: true,
@@ -20,8 +23,8 @@ export default function SettingsPage() {
   };
 
   const saveSettings = () => {
+    toast('✅ Настройки успешно сохранены!', 'success');
     console.log('Сохранённые настройки:', settings);
-    alert('✅ Настройки успешно сохранены!');
   };
 
   return (
