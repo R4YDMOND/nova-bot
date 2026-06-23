@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/Card";
+import { Card } from "@/components/ui/card";        // ← исправлено
 
 const API_BASE = "https://nova-bot-rpsy.onrender.com";
 
@@ -13,7 +13,10 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch(`${API_BASE}/api/stats/dashboard`)
       .then((r) => r.json())
-      .then((d) => { setStats(d); setLoading(false); })
+      .then((d) => {
+        setStats(d);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -28,40 +31,53 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <div className="flex justify-between items-start flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">👋 Добро пожаловать в Nova</h1>
-          <p className="text-[rgb(var(--text-secondary))]">Управляйте серверами, музыкой, событиями и аналитикой</p>
+          <h1 className="text-3xl font-bold">👋 Добро пожаловать в Nova</h1>
+          <p className="text-[rgb(var(--text-secondary))] mt-1">
+            Управляйте серверами, музыкой, событиями и аналитикой
+          </p>
         </div>
-        <Link href="/dashboard/servers" className="px-5 py-2.5 bg-nova-500 hover:bg-nova-600 text-black rounded-2xl font-semibold text-sm transition-all">
+        <Link
+          href="/dashboard/servers"
+          className="px-6 py-3 bg-nova-500 hover:bg-nova-600 text-black rounded-2xl font-semibold text-sm transition-all active:scale-95"
+        >
           + Подключить сервер
         </Link>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      {/* Статистика */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Серверов", value: stats.serversCount ?? 0, icon: "🖥️" },
           { label: "Пользователей", value: stats.totalUsers ?? 0, icon: "👥" },
           { label: "Новых за неделю", value: stats.newUsers ?? 0, icon: "⭐" },
           { label: "Команд", value: stats.commandsUsed ?? 0, icon: "⚡" },
         ].map((card, i) => (
-          <Card key={i} className="flex items-center gap-4">
-            <span className="text-2xl">{card.icon}</span>
+          <Card key={i} className="flex items-center gap-4 p-6">
+            <span className="text-3xl">{card.icon}</span>
             <div>
-              <div className="text-xl font-bold">{loading ? "..." : card.value}</div>
-              <div className="text-xs text-[rgb(var(--text-secondary))]">{card.label}</div>
+              <div className="text-2xl font-bold">
+                {loading ? "—" : card.value}
+              </div>
+              <div className="text-sm text-[rgb(var(--text-secondary))]">{card.label}</div>
             </div>
           </Card>
         ))}
       </div>
 
+      {/* Быстрые действия */}
       <div>
         <h3 className="text-lg font-semibold mb-4">⚡ Быстрые действия</h3>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {quickActions.map((action, i) => (
-            <Link key={i} href={action.href} className="card flex items-center gap-4 hover:border-nova-400/30 transition-all">
-              <span className="text-2xl">{action.icon}</span>
+            <Link
+              key={i}
+              href={action.href}
+              className="group flex items-center gap-4 p-6 rounded-3xl border border-[rgb(var(--border))] hover:border-nova-400/50 bg-[rgb(var(--surface))] hover:bg-[rgb(var(--surface-2))] transition-all"
+            >
+              <span className="text-3xl transition-transform group-hover:scale-110">{action.icon}</span>
               <div>
-                <div className="font-semibold text-sm">{action.label}</div>
-                <div className="text-xs text-[rgb(var(--text-secondary))]">{action.desc}</div>
+                <div className="font-semibold">{action.label}</div>
+                <div className="text-sm text-[rgb(var(--text-secondary))]">{action.desc}</div>
               </div>
             </Link>
           ))}
