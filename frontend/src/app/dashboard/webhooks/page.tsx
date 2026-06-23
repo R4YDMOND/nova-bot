@@ -28,12 +28,14 @@ export default function WebhooksPage() {
   ]);
 
   const toggleWebhook = (id: number) => {
-    setWebhooks(prev => prev.map(h => h.id === id ? { ...h, active: !h.active } : h));
+    setWebhooks(prev => prev.map(h => 
+      h.id === id ? { ...h, active: !h.active } : h
+    ));
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert('✅ URL скопирован!');
+    alert('✅ URL скопирован в буфер обмена!');
   };
 
   return (
@@ -73,12 +75,17 @@ export default function WebhooksPage() {
                 </Badge>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-5">
               <div>
                 <p className="text-xs text-[rgb(var(--text-secondary))] mb-1">URL</p>
                 <div className="bg-[rgb(var(--surface-2))] p-3 rounded-2xl font-mono text-sm break-all flex items-center justify-between">
                   {hook.url}
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(hook.url)}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => copyToClipboard(hook.url)}
+                  >
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
@@ -90,11 +97,19 @@ export default function WebhooksPage() {
               </div>
 
               <div className="pt-4 border-t border-[rgb(var(--border))] flex gap-3">
-                <Button variant="secondary" className="flex-1" onClick={() => toggleWebhook(hook.id)}>
+                <Button 
+                  variant="secondary" 
+                  className="flex-1"
+                  onClick={() => toggleWebhook(hook.id)}
+                >
                   <Switch checked={hook.active} className="mr-2" />
                   {hook.active ? 'Выключить' : 'Включить'}
                 </Button>
-                <Button variant="ghost" className="text-red-400 hover:text-red-500 hover:bg-red-500/10">
+
+                <Button 
+                  variant="ghost" 
+                  className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                >
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
