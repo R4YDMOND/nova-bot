@@ -25,7 +25,7 @@ export default function AnalyticsPage() {
   }, []);
 
   const updateReport = (key: string, value: any) => {
-    setReports(prev => ({ ...prev, [key]: value }));
+    setReports((prev: Record<string, any>) => ({ ...prev, [key]: value }));
   };
 
   const saveReports = async () => {
