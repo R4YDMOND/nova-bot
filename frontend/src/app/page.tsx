@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -8,120 +7,88 @@ import { ArrowRight } from 'lucide-react';
 
 const API_BASE = 'https://nova-bot-rpsy.onrender.com';
 
-const FALLBACK_STATS = {
-  servers: 1247,
-  users: 87450,
-  responseTime: 0.68,
-};
+const FALLBACK_STATS = { servers: 1247, users: 87450, responseTime: 0.68 };
 
 const FEATURES = [
-  { icon: '🛡️', title: 'Модерация', desc: 'Авто-мод, фильтры, анти-спам' },
+  { icon: '🛡️', title: 'Модерация', desc: 'Авто-мод, фильтры, антиспам' },
   { icon: '🤖', title: 'AI-Помощник', desc: 'Умные ответы и генерация контента' },
-  { icon: '🏆', title: 'Система уровней', desc: 'Ранги, награды, лидерборды' },
-  { icon: '🎵', title: 'Музыка', desc: 'YouTube, Spotify, радио' },
+  { icon: '🪪', title: 'Система уровней', desc: 'Ранги, награды, лидерборды' },
+  { icon: '🎵', title: 'Музыка', desc: 'YouTube, Яндекс.Музыка, радио' },
   { icon: '🔗', title: 'Вебхуки', desc: 'Гибкие уведомления и интеграции' },
   { icon: '📊', title: 'Аналитика', desc: 'Подробная статистика сервера' },
 ];
 
-// Строит ссылку на Discord OAuth2. Если client id ещё не настроен в
-// переменных окружения — кнопка просто ведёт в дашборд, а не в никуда.
-function getDiscordLoginUrl() {
-  const clientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
-  const redirectUri =
-    process.env.NEXT_PUBLIC_DISCORD_REDIRECT_URI ??
-    'https://nova-bot-4vmp.vercel.app/api/auth/callback/discord';
-
-  if (!clientId) return '/dashboard';
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: 'identify guilds',
-  });
-
-  return `https://discord.com/oauth2/authorize?${params.toString()}`;
-}
-
-// Анимация нарастания числа от 0 до target, запускается один раз, когда trigger становится true.
 function useCountUp(target: number, trigger: boolean, durationMs = 1200) {
   const [value, setValue] = useState(0);
-
   useEffect(() => {
     if (!trigger) return;
-
     let raf = 0;
     const start = performance.now();
-
     function tick(now: number) {
       const progress = Math.min((now - start) / durationMs, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
       setValue(eased * target);
       if (progress < 1) raf = requestAnimationFrame(tick);
     }
-
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [target, trigger, durationMs]);
-
   return value;
 }
 
 export default function HomePage() {
   const [stats, setStats] = useState(FALLBACK_STATS);
   const [loaded, setLoaded] = useState(false);
-  const discordLoginUrl = getDiscordLoginUrl();
+  const [authLoading, setAuthLoading] = useState<'vk' | 'lolka' | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-
-    async function loadStats() {
-      try {
-        const res = await fetch(`${API_BASE}/api/stats`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`Backend вернул статус ${res.status}`);
-        const data = await res.json();
-
-        if (isMounted) {
-          setStats({
-            servers: data.servers ?? data.total_servers ?? FALLBACK_STATS.servers,
-            users: data.users ?? data.total_users ?? FALLBACK_STATS.users,
-            responseTime:
-              data.responseTime ?? data.response_time ?? FALLBACK_STATS.responseTime,
-          });
-        }
-      } catch (error) {
-        // Backend недоступен — остаёмся на правдоподобных fallback-цифрах,
-        // страница не должна выглядеть пустой или битой.
-        console.error('Не удалось получить статистику, использую fallback:', error);
-      } finally {
-        if (isMounted) setLoaded(true);
-      }
-    }
-
-    loadStats();
-    return () => {
-      isMounted = false;
-    };
+    fetch(`${API_BASE}/api/stats`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(data => {
+        if (isMounted) setStats({
+          servers: data.servers ?? data.total_servers ?? FALLBACK_STATS.servers,
+          users: data.users ?? data.total_users ?? FALLBACK_STATS.users,
+          responseTime: data.responseTime ?? data.response_time ?? FALLBACK_STATS.responseTime,
+        });
+      })
+      .catch(() => {})
+      .finally(() => { if (isMounted) setLoaded(true); });
+    return () => { isMounted = false; };
   }, []);
 
   const servers = Math.round(useCountUp(stats.servers, loaded));
   const users = useCountUp(stats.users, loaded);
   const responseTime = useCountUp(stats.responseTime, loaded);
 
+  async function handleAuth(provider: 'vk' | 'lolka') {
+    setAuthLoading(provider);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/${provider}`);
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else window.location.href = '/dashboard';
+    } catch {
+      window.location.href = '/dashboard';
+    } finally {
+      setAuthLoading(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[rgb(var(--background))] text-[rgb(var(--text))]">
-      {/* Hero Section */}
+      {/* Hero */}
       <div className="pt-24 pb-16 px-6 text-center">
         <div className="max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-2 bg-[rgb(var(--surface-2))] px-4 py-1.5 rounded-full mb-6">
-            <span className="text-nova-400">⚡</span>
+            <span className="text-cyan-400">⚡</span>
             <span className="text-sm font-medium">Nova Bot v2.4.1 — Активен</span>
           </div>
 
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-6">
             Умный бот для
             <br />
-            <span className="bg-gradient-to-r from-nova-400 to-cyan-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-cyan-400 to-indigo-400 bg-clip-text text-transparent">
               Lolka-сообществ
             </span>
           </h1>
@@ -131,18 +98,32 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href={discordLoginUrl}>
-              <Button size="lg" className="text-lg px-10 py-7 rounded-3xl font-semibold gap-2">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" aria-hidden="true">
-                  <path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.2 14.2 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.029 19.9 19.9 0 0 0 6.002-3.03.077.077 0 0 0 .032-.057c.5-5.177-.838-9.673-3.549-13.66a.06.06 0 0 0-.031-.028ZM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.418 2.157-2.418 1.21 0 2.176 1.094 2.157 2.418 0 1.334-.955 2.419-2.157 2.419Zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.418 2.157-2.418 1.21 0 2.176 1.094 2.157 2.418 0 1.334-.946 2.419-2.157 2.419Z" />
-                </svg>
-                Войти через Discord
-              </Button>
-            </a>
+            {/* VK */}
+            <button
+              onClick={() => handleAuth('vk')}
+              disabled={authLoading !== null}
+              className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#0077FF] hover:bg-[#006CE0] transition-colors disabled:opacity-60 text-lg"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C5.21 11.336 4.8 9.726 4.8 9.317c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.677.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V11.79c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.34-.491.78-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.202 1.253.745.847 1.32 1.558 1.473 2.05.17.491-.085.745-.576.745z"/>
+              </svg>
+              {authLoading === 'vk' ? 'Входим...' : 'Войти через VK'}
+            </button>
 
+            {/* Lolka */}
+            <button
+              onClick={() => handleAuth('lolka')}
+              disabled={authLoading !== null}
+              className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors disabled:opacity-60 text-lg"
+            >
+              <span className="text-xl">🎮</span>
+              {authLoading === 'lolka' ? 'Входим...' : 'Войти через Lolka'}
+            </button>
+
+            {/* Dashboard */}
             <Link href="/dashboard">
-              <Button variant="secondary" size="lg" className="text-lg px-10 py-7 rounded-3xl font-semibold gap-2">
-                Открыть панель управления
+              <Button variant="secondary" size="lg" className="text-lg px-8 py-4 rounded-2xl font-semibold gap-2">
+                Открыть панель
                 <ArrowRight className="h-5 w-5" />
               </Button>
             </Link>
@@ -154,21 +135,19 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto px-6 pb-20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="p-8 text-center">
-            <div className="text-5xl font-bold text-nova-400 mb-3">
+            <div className="text-5xl font-bold text-cyan-400 mb-3">
               {loaded ? servers.toLocaleString('ru-RU') : '---'}+
             </div>
             <div className="text-[rgb(var(--text-secondary))]">Серверов подключено</div>
           </Card>
-
           <Card className="p-8 text-center">
-            <div className="text-5xl font-bold text-nova-400 mb-3">
+            <div className="text-5xl font-bold text-cyan-400 mb-3">
               {loaded ? (users / 1000).toFixed(1) : '---'}K+
             </div>
             <div className="text-[rgb(var(--text-secondary))]">Активных пользователей</div>
           </Card>
-
           <Card className="p-8 text-center">
-            <div className="text-5xl font-bold text-nova-400 mb-3">
+            <div className="text-5xl font-bold text-cyan-400 mb-3">
               {loaded ? responseTime.toFixed(2) : '---'}с
             </div>
             <div className="text-[rgb(var(--text-secondary))]">Среднее время ответа</div>
@@ -180,13 +159,12 @@ export default function HomePage() {
       <div className="bg-[rgb(var(--surface))] py-20">
         <div className="max-w-6xl mx-auto px-6">
           <h2 className="text-4xl font-bold text-center mb-12">Возможности Nova</h2>
-
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map((feature, i) => (
-              <Card key={i} className="p-8 hover:scale-[1.02] transition-transform">
-                <div className="text-4xl mb-6">{feature.icon}</div>
-                <h3 className="text-2xl font-semibold mb-3">{feature.title}</h3>
-                <p className="text-[rgb(var(--text-secondary))]">{feature.desc}</p>
+            {FEATURES.map((f, i) => (
+              <Card key={i} className="p-8 hover:scale-[1.02] transition-transform cursor-default">
+                <div className="text-4xl mb-4">{f.icon}</div>
+                <h3 className="text-xl font-semibold mb-2">{f.title}</h3>
+                <p className="text-[rgb(var(--text-secondary))]">{f.desc}</p>
               </Card>
             ))}
           </div>
