@@ -5,10 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 
-interface Server {
-  id: number;
-  name: string;
-}
+interface Server { id: number; name: string; }
 
 export default function ServersPage() {
   const [servers, setServers] = useState<Server[]>([]);
@@ -19,8 +16,7 @@ export default function ServersPage() {
   const [saving, setSaving] = useState(false);
 
   function loadServers() {
-    setLoading(true);
-    setError(false);
+    setLoading(true); setError(false);
     api.servers.list()
       .then((data) => setServers((data.servers as Server[]) || []))
       .catch(() => setError(true))
@@ -37,11 +33,8 @@ export default function ServersPage() {
       setShowModal(false);
       setForm({ name: '', server_id: '', webhook_url: '' });
       loadServers();
-    } catch {
-      alert('Не удалось добавить сервер');
-    } finally {
-      setSaving(false);
-    }
+    } catch { alert('Не удалось добавить сервер'); }
+    finally { setSaving(false); }
   }
 
   return (
@@ -54,7 +47,6 @@ export default function ServersPage() {
         <Button onClick={() => setShowModal(true)}>+ Добавить сервер</Button>
       </div>
 
-      {/* Статистика */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Всего серверов', value: loading ? '...' : servers.length, icon: '🌐' },
@@ -72,12 +64,9 @@ export default function ServersPage() {
         ))}
       </div>
 
-      {/* Список серверов */}
       <Card>
         {loading ? (
-          <div className="py-16 text-center text-[rgb(var(--text-secondary))]">
-            <p>Загрузка серверов...</p>
-          </div>
+          <div className="py-16 text-center text-[rgb(var(--text-secondary))]"><p>Загрузка серверов...</p></div>
         ) : error ? (
           <div className="py-16 text-center">
             <p className="text-[rgb(var(--text-secondary))] mb-4">Не удалось загрузить серверы</p>
@@ -115,8 +104,7 @@ export default function ServersPage() {
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400">Активен</span>
                   </td>
                   <td className="py-4 px-4">
-                    <Button variant="secondary" size="sm"
-                      onClick={() => window.location.href = '/dashboard/commands'}>
+                    <Button variant="secondary" size="sm" onClick={() => window.location.href = '/dashboard/commands'}>
                       Настроить
                     </Button>
                   </td>
@@ -127,12 +115,10 @@ export default function ServersPage() {
         )}
       </Card>
 
-      {/* Модальное окно добавления */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl p-6 w-full max-w-md space-y-4">
             <h2 className="text-xl font-semibold">Добавить сервер</h2>
-
             <div>
               <label className="text-sm font-medium mb-1 block">Название сервера</label>
               <input className="input w-full" placeholder="Мой сервер"
@@ -148,7 +134,6 @@ export default function ServersPage() {
               <input className="input w-full" placeholder="https://..."
                 value={form.webhook_url} onChange={(e) => setForm((f) => ({ ...f, webhook_url: e.target.value }))} />
             </div>
-
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="ghost" onClick={() => setShowModal(false)}>Отмена</Button>
               <Button onClick={handleAdd} disabled={saving || !form.name || !form.server_id}>
