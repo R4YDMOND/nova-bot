@@ -6,14 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/toggle';
 import { Zap, Copy, Trash2, Plus } from 'lucide-react';
 
-type Webhook = {
-  id: number;
-  name: string;
-  project: string;
-  url: string;
-  event: string;
-  active: boolean;
-};
+type Webhook = { id: number; name: string; project: string; url: string; event: string; active: boolean };
 
 export default function WebhooksPage() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([
@@ -24,10 +17,8 @@ export default function WebhooksPage() {
 
   const toggleWebhook = (id: number) =>
     setWebhooks(prev => prev.map(h => h.id === id ? { ...h, active: !h.active } : h));
-
   const deleteWebhook = (id: number) =>
     setWebhooks(prev => prev.filter(h => h.id !== id));
-
   const copyUrl = (id: number, url: string) => {
     navigator.clipboard.writeText(url);
     setCopied(id);
@@ -63,9 +54,7 @@ export default function WebhooksPage() {
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-xl">
-                    🔗
-                  </div>
+                  <div className="w-11 h-11 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-xl">🔗</div>
                   <div>
                     <CardTitle className="text-white text-lg">{hook.name}</CardTitle>
                     <CardDescription className="text-white/40">{hook.project}</CardDescription>
@@ -76,43 +65,29 @@ export default function WebhooksPage() {
                 </Badge>
               </div>
             </CardHeader>
-
             <CardContent className="space-y-4">
               <div>
                 <p className="text-white/40 text-xs mb-1">URL</p>
                 <div className="bg-white/5 border border-white/10 px-3 py-2 rounded-xl font-mono text-sm text-white/70 flex items-center justify-between gap-2">
                   <span className="truncate">{hook.url}</span>
-                  <button
-                    onClick={() => copyUrl(hook.id, hook.url)}
-                    className="shrink-0 text-white/40 hover:text-white transition-colors"
-                    title="Скопировать"
-                  >
+                  <button onClick={() => copyUrl(hook.id, hook.url)} className="shrink-0 text-white/40 hover:text-white transition-colors" title="Скопировать">
                     <Copy className="w-4 h-4" />
                   </button>
                 </div>
-                {copied === hook.id && (
-                  <p className="text-green-400 text-xs mt-1">✅ Скопировано!</p>
-                )}
+                {copied === hook.id && <p className="text-green-400 text-xs mt-1">✅ Скопировано!</p>}
               </div>
-
               <div className="flex items-center justify-between text-sm">
                 <span className="text-white/40">Событие:</span>
                 <span className="text-white font-medium">{hook.event}</span>
               </div>
-
               <div className="pt-3 border-t border-white/10 flex gap-3">
-                <button
-                  onClick={() => toggleWebhook(hook.id)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm"
-                >
+                <button onClick={() => toggleWebhook(hook.id)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm">
                   <Switch checked={hook.active} onCheckedChange={() => toggleWebhook(hook.id)} />
                   {hook.active ? 'Выключить' : 'Включить'}
                 </button>
-                <button
-                  onClick={() => deleteWebhook(hook.id)}
-                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-colors"
-                  title="Удалить"
-                >
+                <button onClick={() => deleteWebhook(hook.id)}
+                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-colors" title="Удалить">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

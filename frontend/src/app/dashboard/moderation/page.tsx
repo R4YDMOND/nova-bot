@@ -90,24 +90,15 @@ export default function ModerationPage() {
       <h1 className="text-3xl font-bold text-white mb-1">🛡️ Модерация</h1>
       <p className="text-white/50 text-lg mb-6">Защита, автомодерация, правила и журнал</p>
 
-      {/* Tabs */}
       <div className="flex flex-wrap gap-1 mb-6">
         {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-white/10 text-white'
-                : 'text-white/50 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            {tab.label}
-          </button>
+              activeTab === tab.id ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}>{tab.label}</button>
         ))}
       </div>
 
-      {/* Protection */}
       {activeTab === 'protection' && (
         <Card className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-xl font-semibold text-white mb-4">🛡️ Базовая защита</h3>
@@ -123,16 +114,12 @@ export default function ModerationPage() {
                 <div className="text-white font-medium">{item.label}</div>
                 <div className="text-white/50 text-sm">{item.desc}</div>
               </div>
-              <Switch
-                checked={settings[item.key] as boolean}
-                onCheckedChange={() => toggle(item.key)}
-              />
+              <Switch checked={settings[item.key] as boolean} onCheckedChange={() => toggle(item.key)} />
             </div>
           ))}
         </Card>
       )}
 
-      {/* Auto moderation */}
       {activeTab === 'auto' && (
         <Card className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-xl font-semibold text-white mb-4">🤖 Автомодерация</h3>
@@ -145,23 +132,16 @@ export default function ModerationPage() {
             <div key={item.toggleKey} className={`flex justify-between items-center py-3 ${i < arr.length - 1 ? 'border-b border-white/10' : ''}`}>
               <span className="text-white font-medium">{item.label}</span>
               <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={settings[item.numKey]}
+                <input type="number" value={settings[item.numKey]}
                   onChange={e => update(item.numKey, parseInt(e.target.value) || 0)}
-                  className="w-16 text-center px-2 py-1 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                />
-                <Switch
-                  checked={settings[item.toggleKey] as boolean}
-                  onCheckedChange={() => toggle(item.toggleKey)}
-                />
+                  className="w-16 text-center px-2 py-1 bg-white/10 border border-white/20 rounded-lg text-white text-sm" />
+                <Switch checked={settings[item.toggleKey] as boolean} onCheckedChange={() => toggle(item.toggleKey)} />
               </div>
             </div>
           ))}
         </Card>
       )}
 
-      {/* Punishments */}
       {activeTab === 'punish' && (
         <div className="flex flex-col gap-4">
           <Card className="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -180,21 +160,19 @@ export default function ModerationPage() {
               <div>
                 <label className="text-white/50 text-sm block mb-1">📩 Канал для апелляций</label>
                 <input type="text" value={settings.appealChannel} onChange={e => update('appealChannel', e.target.value)}
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white" placeholder="#апелляции" />
+                  placeholder="#апелляции" className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white" />
               </div>
               <div>
                 <label className="text-white/50 text-sm block mb-1">🔇 Длительность мута (минут): {settings.muteDuration}м</label>
                 <input type="range" min="1" max="1440" step="5" value={settings.muteDuration}
-                  onChange={e => update('muteDuration', parseInt(e.target.value))}
-                  className="w-full accent-cyan-400" />
+                  onChange={e => update('muteDuration', parseInt(e.target.value))} className="w-full accent-cyan-400" />
               </div>
               <div>
                 <label className="text-white/50 text-sm block mb-1">
                   🔨 Длительность бана: {settings.banDuration === 0 ? 'Навсегда' : `${Math.floor(settings.banDuration / 60)}ч`}
                 </label>
                 <input type="range" min="0" max="10080" step="60" value={settings.banDuration}
-                  onChange={e => update('banDuration', parseInt(e.target.value))}
-                  className="w-full accent-red-400" />
+                  onChange={e => update('banDuration', parseInt(e.target.value))} className="w-full accent-red-400" />
               </div>
             </div>
           </Card>
@@ -216,7 +194,6 @@ export default function ModerationPage() {
         </div>
       )}
 
-      {/* Rules */}
       {activeTab === 'rules' && (
         <Card className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="text-xl font-semibold text-white mb-4">📜 Правила сервера</h3>
@@ -240,7 +217,6 @@ export default function ModerationPage() {
         </Card>
       )}
 
-      {/* Moderator */}
       {activeTab === 'moderator' && (
         <div className="flex flex-col gap-4">
           <Card className="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -255,11 +231,8 @@ export default function ModerationPage() {
               {MOD_AVATARS.map(av => (
                 <button key={av.id} onClick={() => update('modAvatarStyle', av.id)}
                   className={`p-3 rounded-xl border-2 transition-all text-center ${
-                    settings.modAvatarStyle === av.id
-                      ? 'border-cyan-400 bg-cyan-400/10'
-                      : 'border-white/10 bg-white/5 hover:border-white/30'
-                  }`}
-                >
+                    settings.modAvatarStyle === av.id ? 'border-cyan-400 bg-cyan-400/10' : 'border-white/10 bg-white/5 hover:border-white/30'
+                  }`}>
                   <div className="text-2xl mb-1">{av.icon}</div>
                   <div className={`text-xs font-medium ${settings.modAvatarStyle === av.id ? av.color : 'text-white/50'}`}>{av.label}</div>
                 </button>
@@ -268,8 +241,7 @@ export default function ModerationPage() {
             <div>
               <label className="text-white/50 text-sm block mb-1">Или укажите URL своего аватара</label>
               <input type="text" value={settings.modAvatarUrl} onChange={e => update('modAvatarUrl', e.target.value)}
-                placeholder="https://example.com/avatar.png"
-                className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white" />
+                placeholder="https://example.com/avatar.png" className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white" />
             </div>
           </Card>
           <Card className="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -296,7 +268,6 @@ export default function ModerationPage() {
         </div>
       )}
 
-      {/* Log */}
       {activeTab === 'log' && (
         <Card className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
@@ -347,16 +318,13 @@ export default function ModerationPage() {
         </Card>
       )}
 
-      {/* Save */}
       <div className="mt-8">
-        <button onClick={save}
-          className={`px-7 py-3 rounded-xl font-semibold text-black transition-all ${
-            saved ? 'bg-green-400 shadow-[0_0_20px_rgba(34,197,94,0.3)]' : 'bg-cyan-400 hover:bg-cyan-300 shadow-[0_0_20px_rgba(0,229,255,0.2)]'
-          }`}>
+        <button onClick={save} className={`px-7 py-3 rounded-xl font-semibold text-black transition-all ${
+          saved ? 'bg-green-400' : 'bg-cyan-400 hover:bg-cyan-300'
+        }`}>
           {saved ? '✅ Сохранено!' : '💾 Сохранить настройки'}
         </button>
       </div>
-
       {saved && (
         <div className="fixed bottom-6 right-6 bg-green-400 text-black px-5 py-3 rounded-2xl font-semibold shadow-xl z-50 animate-bounce">
           ✅ Настройки модерации сохранены!
