@@ -1,5 +1,4 @@
 'use client';
-
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useEffect, useState } from 'react';
@@ -21,11 +20,7 @@ export function ThemeToggle() {
       aria-label="Переключить тему"
     >
       <div className={`transition-transform duration-500 ${isAnimating ? 'rotate-180 scale-90' : ''}`}>
-        {theme === 'dark' ? (
-          <Sun className="w-5 h-5" />
-        ) : (
-          <Moon className="w-5 h-5" />
-        )}
+        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
       </div>
     </button>
   );
