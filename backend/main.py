@@ -330,7 +330,8 @@ def auth_vk():
     app_id = os.getenv("VK_APP_ID", "")
     redirect_uri = os.getenv("VK_REDIRECT_URI", "")
     state = secrets.token_hex(16)
-    url = f"https://oauth.vk.com/authorize?client_id={app_id}&redirect_uri={redirect_uri}&response_type=code&scope=email&v=5.199&state={state}"
+    # VK ID OAuth 2.1
+    url = f"https://id.vk.com/oauth2/auth?client_id={app_id}&redirect_uri={redirect_uri}&response_type=code&scope=vkid.personal_info&state={state}"
     return {"url": url, "state": state}
 
 
