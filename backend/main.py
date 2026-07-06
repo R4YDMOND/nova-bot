@@ -331,33 +331,32 @@ def auth_vk():
     redirect_uri = os.getenv("VK_REDIRECT_URI", "")
     state = secrets.token_hex(16)
     # VK ID OAuth 2.1
-    url = f"https://id.vk.com/oauth2/auth?client_id={app_id}&redirect_uri={redirect_uri}&response_type=code&scope=vkid.personal_info&state={state}"
+    url = f"https://oauth.vk.com/authorize?client_id={app_id}&redirect_uri={redirect_uri}&response_type=code&scope=email&v=5.199&state={state}"
     return {"url": url, "state": state}
-
-
 @app.get("/api/auth/vk/callback")
-def auth_vk_callback(code: str, state: str = ""):
+def auth_vk_callback(code: str = None, state: str = ""):
+    if not code:
+        raise HTTPException(status_code=400, detail="No code")
     app_id = os.getenv("VK_APP_ID", "")
     secret_key = os.getenv("VK_SECRET_KEY", "")
     redirect_uri = os.getenv("VK_REDIRECT_URI", "")
-    
     try:
         resp = requests.get("https://oauth.vk.com/access_token", params={
-            "client_id": app_id, "client_secret": secret_key,
-            "code": code, "redirect_uri": redirect_uri,
+            "client_id": app_id,
+            "client_secret": secret_key,
+            "code": code,
+            "redirect_uri": redirect_uri,
         }, timeout=10)
         token_data = resp.json()
-        access_token = token_data.get("access_token", "")
+        if "error" in token_data:
+            raise HTTPException(status_code=400, detail=token_data.get("error_description", "VK error"))
         user_id = token_data.get("user_id", 0)
-        email = token_data.get("email", "")
+        nova_token = secrets.token_hex(32)
+        return {"token": nova_token, "vk_user_id": user_id, "ok": True}
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"error": f"Ошибка обмена кода: {str(e)}"}
-    
-    return {
-        "status": "ok",
-        "user": {"id": user_id, "email": email},
-        "access_token": access_token[:20] + "..."
-    }
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==================== Отправка сообщений ====================
