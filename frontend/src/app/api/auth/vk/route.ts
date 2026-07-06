@@ -7,8 +7,7 @@ export async function GET(request: NextRequest) {
   const state = generateState();
 
   // Определяем базовый URL из запроса (работает и на Vercel, и локально)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-    || `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+  const baseUrl = `${request.nextUrl.protocol}//${request.nextUrl.host}`;
 
   const params = new URLSearchParams({
     client_id:              process.env.VK_CLIENT_ID || '54666725',
@@ -28,13 +27,13 @@ export async function GET(request: NextRequest) {
   response.cookies.set('vk_code_verifier', verifier, {
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 600,
+    maxAge: 900,
     path: '/',
   });
   response.cookies.set('vk_oauth_state', state, {
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 600,
+    maxAge: 900,
     path: '/',
   });
 
