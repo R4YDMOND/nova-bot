@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/toggle';
 
-import { api } from '@/lib/api';
+const API_URL = 'https://nova-bot-rpsy.onrender.com';
 
 const TABS = [
   { id: 'protection', label: '🛡️ Защита' },
@@ -66,17 +66,15 @@ export default function ModerationPage() {
   });
 
   useEffect(() => {
-    api.moderation.getLog()
-      .then(d => { setAuditLog((d.entries as LogEntry[]) || []); setLogLoading(false); })
+    fetch(`${API_URL}/api/moderation/log`)
+      .then(r => r.json())
+      .then(d => { setAuditLog(d.entries || []); setLogLoading(false); })
       .catch(() => setLogLoading(false));
   }, []);
 
   const update = (key: keyof Settings, value: any) => setSettings(s => ({ ...s, [key]: value }));
   const toggle = (key: keyof Settings) => setSettings(s => ({ ...s, [key]: !s[key] }));
-  const save = () => {
-  try { localStorage.setItem('nova-mod-settings', JSON.stringify(settings)); } catch {}
-  setSaved(true); setTimeout(() => setSaved(false), 2500);
-   };
+  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
 
   const filteredLog = auditLog.filter(e => {
     const matchType = logFilter === 'all'
