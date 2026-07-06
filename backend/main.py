@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
+import hashlib
+import base64
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
 from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event
@@ -8,6 +10,9 @@ import re
 import os
 import secrets
 from datetime import datetime
+
+# Временное хранилище PKCE code_verifier (ключ = state)
+vk_pkce_store: dict = {}
 
 app = FastAPI(title="Nova API", version="0.7.0")
 
@@ -330,33 +335,76 @@ def auth_vk():
     app_id = os.getenv("VK_APP_ID", "")
     redirect_uri = os.getenv("VK_REDIRECT_URI", "")
     state = secrets.token_hex(16)
-    # VK ID OAuth 2.1
-    url = f"https://oauth.vk.com/authorize?client_id={app_id}&redirect_uri={redirect_uri}&response_type=code&scope=email&v=5.199&state={state}"
+
+    # VK ID OAuth 2.1 требует PKCE (code_challenge)
+    code_verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(code_verifier.encode()).digest()
+    code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
+    vk_pkce_store[state] = code_verifier
+
+    url = (
+        f"https://id.vk.com/oauth2/auth"
+        f"?client_id={app_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_type=code"
+        f"&scope=vkid.personal_info+email"
+        f"&state={state}"
+        f"&code_challenge={code_challenge}"
+        f"&code_challenge_method=S256"
+    )
     return {"url": url, "state": state}
 @app.get("/api/auth/vk/callback")
-def auth_vk_callback(code: str = None, state: str = ""):
+def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
     if not code:
         raise HTTPException(status_code=400, detail="No code")
+
     app_id = os.getenv("VK_APP_ID", "")
     secret_key = os.getenv("VK_SECRET_KEY", "")
     redirect_uri = os.getenv("VK_REDIRECT_URI", "")
+
+    code_verifier = vk_pkce_store.pop(state, "")
+    if not code_verifier:
+        raise HTTPException(status_code=400, detail="Сессия истекла или state не найден")
+
     try:
-        resp = requests.get("https://oauth.vk.com/access_token", params={
+        resp = requests.post("https://id.vk.com/oauth2/token", data={
+            "grant_type": "authorization_code",
             "client_id": app_id,
             "client_secret": secret_key,
             "code": code,
+            "code_verifier": code_verifier,
             "redirect_uri": redirect_uri,
+            "device_id": device_id or "web",
+            "state": state,
         }, timeout=10)
         token_data = resp.json()
         if "error" in token_data:
-            raise HTTPException(status_code=400, detail=token_data.get("error_description", "VK error"))
-        user_id = token_data.get("user_id", 0)
-        nova_token = secrets.token_hex(32)
-        return {"token": nova_token, "vk_user_id": user_id, "ok": True}
+            raise HTTPException(status_code=400, detail=token_data.get("error_description", token_data["error"]))
+        access_token = token_data.get("access_token", "")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Ошибка обмена кода: {str(e)}")
+
+    try:
+        user_resp = requests.get("https://id.vk.com/oauth2/user_info", headers={
+            "Authorization": f"Bearer {access_token}"
+        }, timeout=10)
+        user_data = user_resp.json().get("user", {})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка получения пользователя: {str(e)}")
+
+    nova_token = secrets.token_hex(32)
+    return {
+        "status": "ok",
+        "token": nova_token,
+        "user": {
+            "id": user_data.get("user_id"),
+            "username": f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip(),
+            "avatar": user_data.get("avatar"),
+        },
+    }
 
 
 # ==================== Отправка сообщений ====================
