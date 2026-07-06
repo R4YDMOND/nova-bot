@@ -6,7 +6,6 @@ export async function GET(request: NextRequest) {
   const challenge = generateCodeChallenge(verifier);
   const state = generateState();
 
-  // Определяем базовый URL из запроса (работает и на Vercel, и локально)
   const baseUrl = `${request.nextUrl.protocol}//${request.nextUrl.host}`;
 
   const params = new URLSearchParams({
@@ -23,7 +22,6 @@ export async function GET(request: NextRequest) {
 
   const response = NextResponse.redirect(vkAuthUrl);
 
-  // Сохраняем verifier и state в httpOnly-куках (10 минут)
   response.cookies.set('vk_code_verifier', verifier, {
     httpOnly: true,
     sameSite: 'lax',
