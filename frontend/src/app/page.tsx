@@ -1,15 +1,14 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { X } from 'lucide-react';
 
 const API_BASE = 'https://nova-bot-rpsy.onrender.com';
-const VK_APP_ID = 54666725;
 const FALLBACK_STATS = { servers: 1247, users: 87450, responseTime: 0.68 };
 const FEATURES = [
   { icon: '🛡️', title: 'Модерация', desc: 'Авто-мод, фильтры, антиспам' },
   { icon: '🤖', title: 'AI-Помощник', desc: 'Умные ответы и генерация контента' },
-  { icon: '🪪', title: 'Система уровней', desc: 'Ранги, награды, лидерборды' },
+  { icon: '🏆', title: 'Система уровней', desc: 'Ранги, награды, лидерборды' },
   { icon: '🎵', title: 'Музыка', desc: 'YouTube, Яндекс.Музыка, радио' },
   { icon: '🔗', title: 'Вебхуки', desc: 'Гибкие уведомления и интеграции' },
   { icon: '📊', title: 'Аналитика', desc: 'Подробная статистика сервера' },
@@ -33,16 +32,10 @@ function useCountUp(target: number, trigger: boolean, durationMs = 1200) {
   return value;
 }
 
-declare global { interface Window { VKIDSDK?: any; } }
-
 export default function HomePage() {
   const [stats, setStats] = useState(FALLBACK_STATS);
   const [loaded, setLoaded] = useState(false);
-  const [vkSdkLoaded, setVkSdkLoaded] = useState(false);
-  const [vkSdkError, setVkSdkError] = useState(false);
   const [showLolkaModal, setShowLolkaModal] = useState(false);
-  const [vkLoading, setVkLoading] = useState(false);
-  const vkContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/stats`, { cache: 'no-store' })
@@ -55,60 +48,6 @@ export default function HomePage() {
       .catch(() => {})
       .finally(() => setLoaded(true));
   }, []);
-
-  // Загружаем VK ID SDK
-  useEffect(() => {
-    const existing = document.getElementById('vkid-sdk');
-    if (existing) {
-      if (window.VKIDSDK) setVkSdkLoaded(true);
-      else setVkSdkError(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.id = 'vkid-sdk';
-    script.src = 'https://unpkg.com/@vkid/sdk@2.6.1/dist-sdk/umd/index.js';
-    script.onload = () => setVkSdkLoaded(true);
-    script.onerror = () => setVkSdkError(true);
-    document.head.appendChild(script);
-    // Таймаут — если SDK не загрузился за 5 сек, показываем обычную кнопку
-    setTimeout(() => {
-      if (!window.VKIDSDK) setVkSdkError(true);
-    }, 5000);
-  }, []);
-
-  // Инициализируем VK ID кнопку
-  useEffect(() => {
-    if (!vkSdkLoaded || !window.VKIDSDK || !vkContainerRef.current) return;
-    try {
-      const VKID = window.VKIDSDK;
-      VKID.Config.init({
-        app: VK_APP_ID,
-        redirectUrl: `${window.location.origin}/api/auth/vk/callback`,
-        responseMode: VKID.ConfigResponseMode.Redirect,
-        source: VKID.ConfigSource.LOWCODE,
-        scope: 'email',
-      });
-      const oneTap = new VKID.OneTap();
-      oneTap.render({ container: vkContainerRef.current, showAlternativeLogin: false });
-    } catch (e) {
-      console.error('VK ID SDK error:', e);
-      setVkSdkError(true);
-    }
-  }, [vkSdkLoaded]);
-
-  // Фолбэк — обычный редирект через backend
-  const handleVkFallback = async () => {
-    setVkLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/vk`);
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch {
-      alert('Ошибка авторизации VK. Попробуйте позже.');
-    } finally {
-      setVkLoading(false);
-    }
-  };
 
   const servers = Math.round(useCountUp(stats.servers, loaded));
   const users = useCountUp(stats.users, loaded);
@@ -136,30 +75,16 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col items-center gap-4">
-            {/* VK кнопка */}
-            <div className="w-full max-w-sm">
-              {!vkSdkError ? (
-                <>
-                  <div ref={vkContainerRef} className="w-full" />
-                  {!vkSdkLoaded && (
-                    <div className="w-full h-12 bg-[#0077FF]/20 rounded-xl animate-pulse flex items-center justify-center text-white/40 text-sm">
-                      Загрузка VK ID...
-                    </div>
-                  )}
-                </>
-              ) : (
-                <button
-                  onClick={handleVkFallback}
-                  disabled={vkLoading}
-                  className="w-full flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#0077FF] hover:bg-[#006CE0] transition-colors disabled:opacity-60 text-lg"
-                >
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                    <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C5.21 11.336 4.8 9.726 4.8 9.317c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.677.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V11.79c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.34-.491.78-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.202 1.253.745.847 1.32 1.558 1.473 2.05.17.491-.085.745-.576.745z"/>
-                  </svg>
-                  {vkLoading ? 'Перенаправление...' : 'Войти через VK'}
-                </button>
-              )}
-            </div>
+            {/* VK кнопка — через наш серверный PKCE-роут */}
+            
+              href="/api/auth/vk"
+              className="w-full max-w-sm flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#0077FF] hover:bg-[#006CE0] transition-colors text-lg"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.118-5.335-3.202C5.21 11.336 4.8 9.726 4.8 9.317c0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.677.863 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V11.79c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.34-.491.78-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.202 1.253.745.847 1.32 1.558 1.473 2.05.17.491-.085.745-.576.745z"/>
+              </svg>
+              Войти через VK
+            </a>
 
             {/* Lolka */}
             <button
