@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { X } from 'lucide-react';
@@ -75,8 +75,8 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col items-center gap-4">
-            {/* VK кнопка — через наш серверный PKCE-роут */}
             
+            <a
               href="/api/auth/vk"
               className="w-full max-w-sm flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#0077FF] hover:bg-[#006CE0] transition-colors text-lg"
             >
@@ -86,7 +86,6 @@ export default function HomePage() {
               Войти через VK
             </a>
 
-            {/* Lolka */}
             <button
               onClick={() => setShowLolkaModal(true)}
               className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors text-lg"
@@ -98,7 +97,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="max-w-6xl mx-auto px-6 pb-20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
@@ -114,7 +112,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Features */}
       <div className="bg-[rgb(var(--surface))] py-20">
         <div className="max-w-6xl mx-auto px-6">
           <h2 className="text-4xl font-bold text-center mb-12">Возможности Nova</h2>
@@ -134,7 +131,6 @@ export default function HomePage() {
         Nova Bot © 2026 — Для Lolka-сообществ
       </div>
 
-      {/* Lolka Modal */}
       {showLolkaModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowLolkaModal(false)}>
           <div className="bg-[rgb(var(--surface))] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center relative shadow-2xl" onClick={e => e.stopPropagation()}>
