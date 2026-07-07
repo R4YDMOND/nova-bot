@@ -26,4 +26,5 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
-    print("OK: Database ready")
+    db_type = "PostgreSQL" if DATABASE_URL.startswith("postgresql") else "SQLite"
+    print(f"OK: Database ready — using {db_type} ({DATABASE_URL[:40]}...)")
