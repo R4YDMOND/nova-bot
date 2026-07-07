@@ -19,56 +19,71 @@ interface VKUser {
   screen_name?: string;
 }
 
-export const dynamic = 'force-dynamic';
+// Та же логика, что и в /api/auth/vk/route.ts — важно, чтобы baseUrl
+// совпадал байт-в-байт на обоих этапах, иначе VK отклонит redirect_uri.
+function getBaseUrl(req: NextRequest): string {
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+  const proto = req.headers.get('x-forwarded-proto') || 'https';
+  if (host) return `${proto}://${host}`;
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://nova-bot-4vmp.vercel.app';
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const code  = searchParams.get('code');
+  const code = searchParams.get('code');
   const state = searchParams.get('state');
   const error = searchParams.get('error');
+  const deviceId = searchParams.get('device_id');
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-    || `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+  const baseUrl = getBaseUrl(request);
 
-  // РћС€РёР±РєР° РёР»Рё РѕС‚РјРµРЅР° РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј
+  // Ошибка или отмена пользователем
   if (error || !code) {
     console.error('[VK OAuth] Error from VK:', error);
     return NextResponse.redirect(`${baseUrl}/login?error=vk_denied`);
   }
 
-  // РџСЂРѕРІРµСЂСЏРµРј state
+  // Проверяем state
   const storedState = request.cookies.get('vk_oauth_state')?.value;
   if (!storedState || state !== storedState) {
     console.error('[VK OAuth] State mismatch');
     return NextResponse.redirect(`${baseUrl}/login?error=invalid_state`);
   }
 
-  // Р§РёС‚Р°РµРј code_verifier
+  // Читаем code_verifier
   const codeVerifier = request.cookies.get('vk_code_verifier')?.value;
   if (!codeVerifier) {
     console.error('[VK OAuth] No code_verifier in cookies');
     return NextResponse.redirect(`${baseUrl}/login?error=no_verifier`);
   }
 
-  // РћР±РјРµРЅРёРІР°РµРј code РЅР° access_token
+  // device_id обязателен для обмена кода на токен в VK ID OAuth 2.1
+  if (!deviceId) {
+    console.error('[VK OAuth] No device_id in callback query params');
+    return NextResponse.redirect(`${baseUrl}/login?error=no_device_id`);
+  }
+
+  // Обмениваем code на access_token
   let tokenData: VKTokenResponse;
   try {
     const tokenRes = await fetch('https://id.vk.com/oauth2/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        grant_type:    'authorization_code',
+        grant_type: 'authorization_code',
         code,
         code_verifier: codeVerifier,
-        client_id:     VK_CLIENT_ID,
-        redirect_uri:  `${baseUrl}/api/auth/vk/callback`,
+        client_id: VK_CLIENT_ID,
+        device_id: deviceId,
+        redirect_uri: `${baseUrl}/api/auth/vk/callback`,
       }),
     });
-
     tokenData = await tokenRes.json();
-
     if (tokenData.error || !tokenData.access_token) {
       console.error('[VK OAuth] Token exchange failed:', tokenData);
-      return NextResponse.redirect(`${baseUrl}/login?error=token_failed`);
+      return NextResponse.redirect(
+        `${baseUrl}/login?error=token_failed&reason=${encodeURIComponent(tokenData.error || 'unknown')}`,
+      );
     }
   } catch (e) {
     console.error('[VK OAuth] Token exchange exception:', e);
@@ -77,7 +92,7 @@ export async function GET(request: NextRequest) {
 
   const { access_token, user_id } = tokenData;
 
-  // РџРѕР»СѓС‡Р°РµРј РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+  // Получаем данные пользователя
   let user: VKUser | null = null;
   try {
     const userRes = await fetch(
@@ -89,30 +104,29 @@ export async function GET(request: NextRequest) {
     console.warn('[VK OAuth] Failed to fetch user info:', e);
   }
 
-  // Р¤РѕСЂРјРёСЂСѓРµРј СЃРµСЃСЃРёСЋ
+  // Формируем сессию
   const session = {
-    userId:      user_id,
-    name:        user ? `${user.first_name} ${user.last_name}` : `VK User ${user_id}`,
-    avatar:      user?.photo_100 ?? '',
-    screenName:  user?.screen_name ?? '',
+    userId: user_id,
+    name: user ? `${user.first_name} ${user.last_name}` : `VK User ${user_id}`,
+    avatar: user?.photo_100 ?? '',
+    screenName: user?.screen_name ?? '',
     accessToken: access_token,
-    loginAt:     Date.now(),
+    loginAt: Date.now(),
   };
 
-  // Р РµРґРёСЂРµРєС‚РёРј РЅР° РґР°С€Р±РѕСЂРґ, СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃРµСЃСЃРёСЋ
+  // Редиректим на дашборд, устанавливаем сессию
   const response = NextResponse.redirect(`${baseUrl}/dashboard`);
-
   response.cookies.set('nova_session', JSON.stringify(session), {
     httpOnly: true,
+    secure: true,
     sameSite: 'lax',
-    maxAge:   60 * 60 * 24 * 7, // 7 РґРЅРµР№
-    path:     '/',
+    maxAge: 60 * 60 * 24 * 7, // 7 дней
+    path: '/',
   });
 
-  // РЈРґР°Р»СЏРµРј РІСЂРµРјРµРЅРЅС‹Рµ РєСѓРєРё
+  // Удаляем временные куки
   response.cookies.delete('vk_code_verifier');
   response.cookies.delete('vk_oauth_state');
 
   return response;
 }
-
