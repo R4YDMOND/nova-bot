@@ -23,7 +23,9 @@ export async function GET(req: NextRequest) {
   const codeVerifier = base64url(crypto.randomBytes(32));
   const codeChallenge = base64url(crypto.createHash('sha256').update(codeVerifier).digest());
 
-  const authUrl = new URL('https://id.vk.com/oauth2/auth');
+  // ВАЖНО: для запроса кода используется /authorize, а не /oauth2/auth.
+  // /oauth2/auth — это отдельный эндпоинт, только для POST-обмена code -> access_token (в callback/route.ts).
+  const authUrl = new URL('https://id.vk.com/authorize');
   authUrl.searchParams.set('client_id', VK_CLIENT_ID);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
