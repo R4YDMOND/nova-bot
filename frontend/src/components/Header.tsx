@@ -2,6 +2,8 @@
 import { Bell, Search } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { ThemeToggle } from './ThemeToggle';
 
 interface Profile {
   name: string;
@@ -66,10 +68,13 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-3">
+        <ThemeToggle />
+
         <button className="p-2.5 hover:bg-[rgb(var(--surface-2))] rounded-xl transition-all relative">
           <Bell className="w-5 h-5 text-[rgb(var(--text-secondary))]" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full" />
         </button>
+
         <div className="flex items-center gap-3 pl-4 border-l border-[rgb(var(--border))]">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-medium text-[rgb(var(--text))]">
@@ -80,11 +85,12 @@ export function Header() {
             </p>
           </div>
           {profile?.avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={profile.avatar}
               alt={profile.name}
-              className="w-9 h-9 rounded-xl object-cover"
+              width={36}
+              height={36}
+              className="rounded-xl object-cover"
             />
           ) : (
             <div className="w-9 h-9 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center text-white font-bold text-sm">

@@ -16,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru" suppressHydrationWarning>
-      <body className="bg-[rgb(var(--background))] text-[rgb(var(--text))] antialiased">
+      <body className="bg-[rgb(var(--bg))] text-[rgb(var(--text))] antialiased">
         <ThemeProvider>
           {children}
           <Toaster />
