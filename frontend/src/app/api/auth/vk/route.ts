@@ -1,6 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { generateCodeVerifier, generateCodeChallenge, generateState } from '@/lib/pkce';
 
+export const dynamic = 'force-dynamic';
+
+export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const verifier = generateCodeVerifier();
   const challenge = generateCodeChallenge(verifier);
