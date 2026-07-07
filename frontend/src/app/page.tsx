@@ -1,7 +1,7 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { X } from 'lucide-react';
+import { X, Mail } from 'lucide-react';
 
 const API_BASE = 'https://nova-bot-rpsy.onrender.com';
 const FALLBACK_STATS = { servers: 1247, users: 87450, responseTime: 0.68 };
@@ -36,6 +36,7 @@ export default function HomePage() {
   const [stats, setStats] = useState(FALLBACK_STATS);
   const [loaded, setLoaded] = useState(false);
   const [showLolkaModal, setShowLolkaModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/stats`, { cache: 'no-store' })
@@ -63,10 +64,10 @@ export default function HomePage() {
           </div>
 
           <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-6">
-            Умный бот для
+            Умный ассистент
             <br />
             <span className="bg-gradient-to-r from-cyan-400 to-indigo-400 bg-clip-text text-transparent">
-              Lolka-сообществ
+              для VK и LOLKA
             </span>
           </h1>
 
@@ -75,7 +76,7 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col items-center gap-4">
-            
+
             <a
               href="/api/auth/vk"
               className="w-full max-w-sm flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#0077FF] hover:bg-[#006CE0] transition-colors text-lg"
@@ -88,10 +89,18 @@ export default function HomePage() {
 
             <button
               onClick={() => setShowLolkaModal(true)}
-              className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors text-lg"
+              className="w-full max-w-sm inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors text-lg"
             >
               <span className="text-xl">🎮</span>
               Войти через Lolka
+            </button>
+
+            <button
+              onClick={() => setShowEmailModal(true)}
+              className="w-full max-w-sm inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-semibold text-[rgb(var(--text))] border border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-2))] transition-colors text-lg"
+            >
+              <Mail className="w-5 h-5" />
+              Войти по e-mail
             </button>
           </div>
         </div>
@@ -128,7 +137,7 @@ export default function HomePage() {
       </div>
 
       <div className="text-center py-12 text-[rgb(var(--text-secondary))]">
-        Nova Bot © 2026 — Для Lolka-сообществ
+        Nova Bot © 2026 — Умный ассистент для VK и Lolka
       </div>
 
       {showLolkaModal && (
@@ -148,6 +157,26 @@ export default function HomePage() {
               <div className="flex items-center gap-2 text-sm text-white/60"><span className="text-yellow-400">⏳</span> Публичные интеграции — в разработке</div>
             </div>
             <button onClick={() => setShowLolkaModal(false)} className="w-full px-5 py-3 border border-white/20 text-white/70 rounded-xl hover:bg-white/10 transition-colors">
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowEmailModal(false)}>
+          <div className="bg-[rgb(var(--surface))] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center relative shadow-2xl" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowEmailModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="w-16 h-16 bg-cyan-400/20 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-4">
+              <Mail className="w-8 h-8 text-cyan-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Вход по e-mail — скоро</h2>
+            <p className="text-white/50 text-sm leading-relaxed mb-6">
+              Регистрация и вход по e-mail и паролю сейчас в разработке. Пока используйте VK.
+            </p>
+            <button onClick={() => setShowEmailModal(false)} className="w-full px-5 py-3 border border-white/20 text-white/70 rounded-xl hover:bg-white/10 transition-colors">
               Закрыть
             </button>
           </div>

@@ -28,6 +28,30 @@ const API_ENDPOINTS = [
   { method: 'POST', path: '/api/settings/ai', desc: 'AI-настройки' },
 ];
 
+const SUPPORT_LINKS = [
+  {
+    icon: '🌐',
+    title: 'Сообщество VK',
+    desc: 'Новости, обновления и помощь от сообщества',
+    href: 'https://vk.com/nova_bot_official',
+    label: 'Перейти в VK',
+  },
+  {
+    icon: '🛠️',
+    title: 'Dev Server Lolka',
+    desc: 'Помощь по интеграции платформы, обсуждение разработки',
+    href: 'https://lolka.gg/gcAyrZ1cO',
+    label: 'Открыть Lolka',
+  },
+  {
+    icon: '💬',
+    title: 'Чат поддержки MAX',
+    desc: 'Быстрый контакт с командой',
+    href: 'https://max.ru/join/Tx_efS7L_T4g04mUlq17pUrDLzveAPB4z43VU4zpakE',
+    label: 'Написать в MAX',
+  },
+];
+
 export default function DocsPage() {
   return (
     <div className="p-8 max-w-4xl space-y-6">
@@ -40,10 +64,10 @@ export default function DocsPage() {
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
         <h2 className="text-xl font-semibold text-white mb-4">🚀 Быстрый старт</h2>
         <ol className="space-y-2 text-white/60 leading-relaxed">
-          <li>1. Перейдите на страницу <a href="/login" className="text-cyan-400 hover:underline">авторизации</a></li>
-          <li>2. Выберите способ входа: <strong className="text-white">Lolka.app</strong> или <strong className="text-white">VK</strong></li>
+          <li>1. Перейдите на страницу <a href="/" className="text-cyan-400 hover:underline">авторизации</a></li>
+          <li>2. Выберите способ входа: <strong className="text-white">VK</strong> или <strong className="text-white">Lolka</strong></li>
           <li>3. Подтвердите доступ к вашему серверу</li>
-          <li>4. Настройте модули в <a href="/dashboard/modules" className="text-cyan-400 hover:underline">Центре управления</a></li>
+          <li>4. Настройте модули в <a href="/dashboard/servers" className="text-cyan-400 hover:underline">Центре управления</a></li>
           <li>5. Бот готов к работе! 🎉</li>
         </ol>
       </div>
@@ -62,10 +86,10 @@ export default function DocsPage() {
           </div>
           <div className="bg-white/5 border border-white/10 rounded-xl p-4">
             <h3 className="text-white font-semibold mb-2">🌐 ВКонтакте</h3>
-            <p className="text-white/50 text-sm mb-3">Вход через VK ID. Поддерживается авторизация через сообщества и приложения.</p>
+            <p className="text-white/50 text-sm mb-3">Вход через VK ID (OAuth 2.1 + PKCE). Поддерживается авторизация через сообщества и приложения.</p>
             <div className="bg-black/30 rounded-lg p-3 font-mono text-xs text-cyan-400">
-              GET /oauth/vk/callback<br/>
-              Scopes: email, groups, messages
+              GET /api/auth/vk/callback<br/>
+              Scopes: vkid.personal_info, email
             </div>
           </div>
         </div>
@@ -120,12 +144,26 @@ export default function DocsPage() {
       </div>
 
       {/* Support */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center">
-        <h2 className="text-xl font-semibold text-white mb-2">🛟 Нужна помощь?</h2>
-        <p className="text-white/50 mb-4">Присоединяйтесь к нашему сообществу или напишите в поддержку</p>
-        <div className="flex gap-3 justify-center">
-          <a href="#" className="px-5 py-2.5 bg-cyan-400 text-black font-semibold rounded-xl text-sm hover:bg-cyan-300 transition-colors">💬 Сообщество Lolka</a>
-          <a href="/login" className="px-5 py-2.5 border border-white/20 text-white font-medium rounded-xl text-sm hover:bg-white/10 transition-colors">🔧 Поддержка</a>
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <h2 className="text-xl font-semibold text-white mb-1 text-center">🛟 Нужна помощь?</h2>
+        <p className="text-white/50 mb-6 text-center">Мы поможем решить вопросы по настройке и работе Nova Bot</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {SUPPORT_LINKS.map((s, i) => (
+            <a
+              key={i}
+              href={s.href}
+              target="_blank"
+              rel="noreferrer"
+              className="flex flex-col items-center text-center bg-white/5 border border-white/10 rounded-xl p-5 hover:border-cyan-400/40 hover:bg-white/10 transition-colors"
+            >
+              <span className="text-3xl mb-3">{s.icon}</span>
+              <div className="text-white font-semibold mb-1">{s.title}</div>
+              <div className="text-white/40 text-xs mb-4">{s.desc}</div>
+              <span className="mt-auto px-4 py-2 bg-cyan-400 text-black font-semibold rounded-xl text-sm">
+                {s.label}
+              </span>
+            </a>
+          ))}
         </div>
       </div>
     </div>
