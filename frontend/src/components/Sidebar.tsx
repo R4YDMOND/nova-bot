@@ -47,8 +47,8 @@ export function Sidebar() {
         {/* Логотип */}
         <div className="p-6 border-b border-[rgb(var(--border))]">
           <Link href="/" className="flex items-center gap-3" onClick={() => setIsOpen(false)}>
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-black font-bold text-xl">N</span>
+            <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-xl">N</span>
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-[rgb(var(--text))]">Nova</h1>
@@ -66,16 +66,16 @@ export function Sidebar() {
               onClick={() => setIsOpen(false)}
               className={`group flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium transition-all text-sm ${
                 isActive(item.href)
-                  ? 'bg-[rgb(var(--surface-2))] text-white'
+                  ? 'bg-[rgb(var(--surface-2))] text-[rgb(var(--text))]'
                   : 'text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-2))] hover:text-[rgb(var(--text))]'
               }`}
             >
               <item.icon className={`w-4 h-4 shrink-0 transition-colors ${
-                isActive(item.href) ? 'text-cyan-400' : 'group-hover:text-cyan-400'
+                isActive(item.href) ? 'text-primary' : 'group-hover:text-primary'
               }`} />
               <span>{item.label}</span>
               {isActive(item.href) && (
-                <div className="ml-auto w-1.5 h-1.5 bg-cyan-400 rounded-full" />
+                <div className="ml-auto w-1.5 h-1.5 bg-primary rounded-full" />
               )}
             </Link>
           ))}
