@@ -1,9 +1,13 @@
 from fastapi import FastAPI, Query, HTTPException
+from fastapi.responses import RedirectResponse, JSONResponse
+from pydantic import BaseModel, EmailStr
 import hashlib
 import base64
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User
+from auth_utils import hash_password, verify_password, generate_verification_token, token_expiry
+from email_utils import send_verification_email
 import requests
 import random
 import re
@@ -13,6 +17,16 @@ from datetime import datetime
 
 # Временное хранилище PKCE code_verifier (ключ = state)
 vk_pkce_store: dict = {}
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
 app = FastAPI(title="Nova API", version="0.7.0")
 
@@ -405,6 +419,93 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
             "avatar": user_data.get("avatar"),
         },
     }
+
+
+# ==================== E-mail регистрация ====================
+
+@app.post("/api/auth/register")
+def register(data: RegisterRequest):
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.email == data.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+
+        if len(data.password) < 8:
+            raise HTTPException(status_code=400, detail="Пароль должен быть не короче 8 символов")
+
+        token = generate_verification_token()
+        user = User(
+            email=data.email,
+            password_hash=hash_password(data.password),
+            verification_token=token,
+            verification_token_expires=token_expiry(),
+        )
+        db.add(user)
+        db.commit()
+
+        base_url = "https://nova-bot-rpsy.onrender.com"
+        send_verification_email(data.email, token, base_url)
+
+        return {"status": "ok", "message": "Проверьте почту для подтверждения"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@app.get("/api/auth/verify")
+def verify_email(token: str):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.verification_token == token).first()
+        if not user:
+            raise HTTPException(status_code=400, detail="Неверный токен")
+        if user.verification_token_expires < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Токен истёк, запросите письмо заново")
+
+        user.is_verified = True
+        user.verification_token = None
+        db.commit()
+
+        return RedirectResponse(url="https://nova-bot-4vmp.vercel.app/login?verified=true")
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@app.post("/api/auth/login")
+def login(data: LoginRequest):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == data.email).first()
+        if not user or not verify_password(data.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Неверный email или пароль")
+        if not user.is_verified:
+            raise HTTPException(status_code=403, detail="Подтвердите e-mail перед входом")
+
+        response = JSONResponse({"status": "ok", "email": user.email})
+        response.set_cookie(
+            "nova_session",
+            value=str(user.id),
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 24 * 7,
+        )
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 # ==================== Отправка сообщений ====================
