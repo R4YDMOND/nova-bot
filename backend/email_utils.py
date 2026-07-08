@@ -4,7 +4,12 @@ import os
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 EMAIL_FROM = os.getenv("EMAIL_FROM", "Nova Bot <onboarding@resend.dev>")
 
+
 def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
+    if not RESEND_API_KEY:
+        print("[Resend] ОШИБКА: переменная RESEND_API_KEY не задана или пуста")
+        return False
+
     verify_link = f"{base_url}/api/auth/verify?token={token}"
     try:
         response = requests.post(
@@ -26,7 +31,10 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
             },
             timeout=10,
         )
-        return response.status_code == 200
+        if response.status_code != 200:
+            print(f"[Resend] Ошибка отправки письма: HTTP {response.status_code} — {response.text}")
+            return False
+        return True
     except Exception as e:
-        print(f"[Resend] Ошибка отправки письма: {e}")
+        print(f"[Resend] Исключение при отправке письма: {e}")
         return False
