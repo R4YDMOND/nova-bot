@@ -422,7 +422,6 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
 
 
 # ==================== E-mail регистрация ====================
-
 @app.post("/api/auth/register")
 def register(data: RegisterRequest):
     db = SessionLocal()
@@ -430,10 +429,8 @@ def register(data: RegisterRequest):
         existing = db.query(User).filter(User.email == data.email).first()
         if existing:
             raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
-
         if len(data.password) < 8:
             raise HTTPException(status_code=400, detail="Пароль должен быть не короче 8 символов")
-
         token = generate_verification_token()
         user = User(
             email=data.email,
@@ -443,11 +440,15 @@ def register(data: RegisterRequest):
         )
         db.add(user)
         db.commit()
-
         base_url = "https://nova-bot-rpsy.onrender.com"
-        send_verification_email(data.email, token, base_url)
-
-        return {"status": "ok", "message": "Проверьте почту для подтверждения"}
+        email_sent = send_verification_email(data.email, token, base_url)
+        if not email_sent:
+            print(f"[register] Пользователь {data.email} создан, но письмо НЕ отправлено")
+        return {
+            "status": "ok",
+            "message": "Проверьте почту для подтверждения" if email_sent else "Аккаунт создан, но письмо не отправлено — попробуйте позже",
+            "email_sent": email_sent,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -459,19 +460,22 @@ def register(data: RegisterRequest):
 
 @app.get("/api/auth/verify")
 def verify_email(token: str):
+    """Подтверждение e-mail по ссылке из письма"""
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.verification_token == token).first()
         if not user:
-            raise HTTPException(status_code=400, detail="Неверный токен")
-        if user.verification_token_expires < datetime.utcnow():
-            raise HTTPException(status_code=400, detail="Токен истёк, запросите письмо заново")
+            raise HTTPException(status_code=400, detail="Неверный или уже использованный токен")
+        if user.verification_token_expires and user.verification_token_expires < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Срок действия ссылки истёк, зарегистрируйтесь заново")
 
-        user.is_verified = True
+        user.email_verified = True  # <-- замените на реальное имя поля из models.py, если отличается
         user.verification_token = None
+        user.verification_token_expires = None
         db.commit()
 
-        return RedirectResponse(url="https://nova-bot-4vmp.vercel.app/login?verified=true")
+        frontend_url = "https://nova-bot-4vmp.vercel.app"
+        return RedirectResponse(url=f"{frontend_url}/login?verified=1")
     except HTTPException:
         raise
     except Exception as e:
@@ -483,23 +487,21 @@ def verify_email(token: str):
 
 @app.post("/api/auth/login")
 def login(data: LoginRequest):
+    """Вход по e-mail и паролю"""
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == data.email).first()
         if not user or not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Неверный email или пароль")
-        if not user.is_verified:
-            raise HTTPException(status_code=403, detail="Подтвердите e-mail перед входом")
+        if not user.email_verified:  # <-- замените на реальное имя поля из models.py, если отличается
+            raise HTTPException(status_code=403, detail="Подтвердите email перед входом")
 
-        response = JSONResponse({"status": "ok", "email": user.email})
-        response.set_cookie(
-            "nova_session",
-            value=str(user.id),
-            httponly=True,
-            samesite="lax",
-            max_age=60 * 60 * 24 * 7,
-        )
-        return response
+        nova_token = secrets.token_hex(32)
+        return {
+            "status": "ok",
+            "token": nova_token,
+            "user": {"id": user.id, "email": user.email},
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -516,14 +518,14 @@ def send_to_lolka_webhook(data: dict):
     message = data.get("message", "")
     username = data.get("username", "Нова")
     avatar_url = data.get("avatar_url", "")
-    
+
     if not webhook_url or not message:
         return {"status": "error", "message": "webhook_url и message обязательны"}
-    
+
     payload = {"content": message, "username": username}
     if avatar_url:
         payload["avatar_url"] = avatar_url
-    
+
     try:
         resp = requests.post(webhook_url, json=payload, timeout=10)
         return {"status": "ok", "sent": resp.ok, "platform": "lolka"}
