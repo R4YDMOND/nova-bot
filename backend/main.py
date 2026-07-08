@@ -469,7 +469,7 @@ def verify_email(token: str):
         if user.verification_token_expires and user.verification_token_expires < datetime.utcnow():
             raise HTTPException(status_code=400, detail="Срок действия ссылки истёк, зарегистрируйтесь заново")
 
-        user.email_verified = True  # <-- замените на реальное имя поля из models.py, если отличается
+        user.is_verified = True
         user.verification_token = None
         user.verification_token_expires = None
         db.commit()
@@ -493,7 +493,7 @@ def login(data: LoginRequest):
         user = db.query(User).filter(User.email == data.email).first()
         if not user or not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Неверный email или пароль")
-        if not user.email_verified:  # <-- замените на реальное имя поля из models.py, если отличается
+        if not user.is_verified:
             raise HTTPException(status_code=403, detail="Подтвердите email перед входом")
 
         nova_token = secrets.token_hex(32)
