@@ -5,9 +5,9 @@ import hashlib
 import base64
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings
 from auth_utils import hash_password, verify_password, generate_verification_token, token_expiry
-from email_utils import send_verification_email
+from email_utils import send_verification_email, send_email
 import requests
 import random
 import re
@@ -302,7 +302,108 @@ def save_ai_settings(data: dict):
         db.close()
 
 
-# ==================== OAuth ====================
+# ==================== API для уведомлений (VK / MAX / Email) ====================
+# Ранее здесь были уведомления через Telegram — полностью заменены на VK, MAX и Email.
+
+@app.get("/api/settings/notifications")
+def get_notification_settings(server_id: str = Query("default")):
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            return {"settings": {
+                "email": {"enabled": True, "address": ""},
+                "vk": {"enabled": False, "webhook_url": ""},
+                "max": {"enabled": False, "webhook_url": ""},
+            }}
+
+        n = db.query(NotificationSettings).filter(NotificationSettings.server_id == server.id).first()
+        if not n:
+            return {"settings": {
+                "email": {"enabled": True, "address": ""},
+                "vk": {"enabled": False, "webhook_url": ""},
+                "max": {"enabled": False, "webhook_url": ""},
+            }}
+
+        return {"settings": {
+            "email": {"enabled": n.email_enabled, "address": n.email_address or ""},
+            "vk": {"enabled": n.vk_enabled, "webhook_url": n.vk_webhook_url or ""},
+            "max": {"enabled": n.max_enabled, "webhook_url": n.max_webhook_url or ""},
+        }}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/settings/notifications")
+def save_notification_settings(data: dict):
+    db = SessionLocal()
+    try:
+        server_id = data.get("server_id", "default")
+        email = data.get("email", {}) or {}
+        vk = data.get("vk", {}) or {}
+        max_ = data.get("max", {}) or {}
+
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            server = Server(name="Auto-created", server_id=server_id)
+            db.add(server)
+            db.commit()
+            db.refresh(server)
+
+        n = db.query(NotificationSettings).filter(NotificationSettings.server_id == server.id).first()
+        if not n:
+            n = NotificationSettings(server_id=server.id)
+            db.add(n)
+
+        n.email_enabled = bool(email.get("enabled", True))
+        n.email_address = email.get("address", "") or ""
+        n.vk_enabled = bool(vk.get("enabled", False))
+        n.vk_webhook_url = vk.get("webhook_url", "") or ""
+        n.max_enabled = bool(max_.get("enabled", False))
+        n.max_webhook_url = max_.get("webhook_url", "") or ""
+        n.updated_at = datetime.utcnow()
+
+        db.commit()
+        return {"status": "saved"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/settings/notifications/test")
+def test_notification(data: dict):
+    """Отправить тестовое уведомление по выбранному каналу: vk | max | email"""
+    channel = data.get("channel", "")
+    title = "🔔 Тестовое уведомление Nova Bot"
+    message = "Это тестовое уведомление — если вы его видите, канал настроен верно."
+
+    try:
+        if channel in ("vk", "max"):
+            webhook_url = data.get("webhook_url", "")
+            if not webhook_url:
+                return {"error": "webhook_url required"}
+            resp = requests.post(webhook_url, json={
+                "content": f"**{title}**\n\n{message}",
+                "username": "Нова 🔔",
+            }, timeout=10)
+            return {"status": "sent", "http_status": resp.status_code}
+
+        if channel == "email":
+            address = data.get("address", "")
+            if not address:
+                return {"error": "address required"}
+            ok = send_email(address, title, f"<h2>{title}</h2><p>{message}</p>")
+            if not ok:
+                return {"error": "Не удалось отправить письмо. Проверьте RESEND_API_KEY на сервере."}
+            return {"status": "sent"}
+
+        return {"error": "Неизвестный канал уведомлений"}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/api/auth/lolka")
 def auth_lolka():

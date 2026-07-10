@@ -131,3 +131,22 @@ class User(Base):
     verification_token = Column(String, nullable=True, index=True)
     verification_token_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class NotificationSettings(Base):
+    """Настройки уведомлений сервера: VK, MAX, Email (заменяет Telegram)."""
+    __tablename__ = "notification_settings"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(Integer, unique=True, nullable=False)
+
+    email_enabled = Column(Boolean, default=True)
+    email_address = Column(String, default="")
+
+    vk_enabled = Column(Boolean, default=False)
+    vk_webhook_url = Column(String, default="")
+
+    max_enabled = Column(Boolean, default=False)
+    max_webhook_url = Column(String, default="")
+
+    updated_at = Column(DateTime, default=datetime.utcnow)

@@ -1,6 +1,12 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || 'https://nova-bot-rpsy.onrender.com';
 
+export type NotificationSettings = {
+  email: { enabled: boolean; address: string };
+  vk: { enabled: boolean; webhook_url: string };
+  max: { enabled: boolean; webhook_url: string };
+};
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -36,6 +42,11 @@ export const api = {
   ai: {
     get: (serverId = 'default') => apiFetch<{ settings: object | null }>(`/api/settings/ai?server_id=${serverId}`),
     save: (data: object) => apiFetch<{ status: string }>('/api/settings/ai', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  notifications: {
+    get: (serverId = 'default') => apiFetch<{ settings: NotificationSettings }>(`/api/settings/notifications?server_id=${serverId}`),
+    save: (data: object) => apiFetch<{ status: string }>('/api/settings/notifications', { method: 'POST', body: JSON.stringify(data) }),
+    test: (data: object) => apiFetch<{ status?: string; error?: string }>('/api/settings/notifications/test', { method: 'POST', body: JSON.stringify(data) }),
   },
   music: {
     getProviders: (serverId = 'default') => apiFetch<{ providers: object[]; available_types: object[] }>(`/api/music/providers?server_id=${serverId}`),
