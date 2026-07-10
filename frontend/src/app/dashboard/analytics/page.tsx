@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
         {statCards.map((card, i) => (
           <Card key={i} className="p-5 text-center">
             {loading ? (
-              <div className="h-8 w-16 bg-white/10 rounded-lg mx-auto mb-2 animate-pulse" />
+              <div className="h-8 w-16 bg-[rgb(var(--surface-2))] rounded-lg mx-auto mb-2 animate-pulse" />
             ) : (
               <div className="text-3xl font-bold text-cyan-400">
                 {typeof card.value === 'number' ? card.value.toLocaleString('ru-RU') : card.value}
@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
             type="text"
             value={reports.webhook_url || ''}
             onChange={e => updateReport('webhook_url', e.target.value)}
-            placeholder="https://vk.com/... или https://lolka.app/webhooks/..."
+            placeholder="https://vk.com/dev/callback_api или https://lolka.gg/api/webhooks/..."
             className="input w-full"
           />
         </div>

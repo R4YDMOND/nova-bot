@@ -90,7 +90,7 @@ export default function DashboardPage() {
             <div>
               <div className="text-2xl font-bold">
                 {loading ? (
-                  <span className="inline-block w-12 h-6 bg-white/10 rounded animate-pulse" />
+                  <span className="inline-block w-12 h-6 bg-[rgb(var(--surface-2))] rounded animate-pulse" />
                 ) : (
                   card.value.toLocaleString('ru-RU')
                 )}
@@ -129,10 +129,10 @@ export default function DashboardPage() {
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+                  <div className="w-8 h-8 rounded-full bg-[rgb(var(--surface-2))] animate-pulse" />
                   <div className="flex-1 space-y-1">
-                    <div className="h-3 bg-white/10 rounded animate-pulse w-3/4" />
-                    <div className="h-2 bg-white/10 rounded animate-pulse w-1/2" />
+                    <div className="h-3 bg-[rgb(var(--surface-2))] rounded animate-pulse w-3/4" />
+                    <div className="h-2 bg-[rgb(var(--surface-2))] rounded animate-pulse w-1/2" />
                   </div>
                 </div>
               ))
