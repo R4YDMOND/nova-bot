@@ -58,10 +58,11 @@ class MusicProvider(Base):
     id = Column(Integer, primary_key=True)
     server_id = Column(String(255), nullable=False, index=True)
     provider_type = Column(String(50), nullable=False)
-    name = Column(String(255), default="Мой провайдер")  # было битой кириллицей
+    name = Column(String(255), default="Мой провайдер")
     api_key = Column(String(1024), default="")
     webhook_url = Column(String(1024), default="")
     stream_url = Column(String(1024), default="")
+    channels = Column(Text, default="[]")  # JSON-строка со списком ссылок на каналы воспроизведения
     is_enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

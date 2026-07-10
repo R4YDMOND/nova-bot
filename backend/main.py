@@ -1052,13 +1052,43 @@ RADIO_STATIONS = {
     "shanson": {"name": "Радио Шансон", "icon": "🎹", "url": "https://radioshanson.ru", "stream": "https://radioshanson.ru/player"},
 }
 
+
+def _parse_channels(raw) -> list:
+    """channels может прийти как JSON-строка из БД, список из фронта, или строка через запятую"""
+    import json
+    if isinstance(raw, list):
+        return [c.strip() for c in raw if isinstance(c, str) and c.strip()]
+    if isinstance(raw, str):
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [c.strip() for c in parsed if isinstance(c, str) and c.strip()]
+        except Exception:
+            pass
+        return [c.strip() for c in raw.split(",") if c.strip()]
+    return []
+
+
 @app.get("/api/music/providers")
 def get_music_providers(server_id: str = Query("default")):
     db = SessionLocal()
     try:
         providers = db.query(MusicProvider).filter(MusicProvider.server_id == server_id).all()
         return {
-            "providers": [{"id": p.id, "type": p.provider_type, "name": p.name, "hasKey": bool(p.api_key), "enabled": p.is_enabled, "streamUrl": p.stream_url or ""} for p in providers],
+            "providers": [
+                {
+                    "id": p.id,
+                    "type": p.provider_type,
+                    "name": p.name,
+                    "hasKey": bool(p.api_key),
+                    "enabled": p.is_enabled,
+                    "streamUrl": p.stream_url or "",
+                    "channels": _parse_channels(p.channels),
+                }
+                for p in providers
+            ],
             "available_types": [
                 {"value": "youtube", "label": "YouTube Music", "icon": "▶️", "category": "search"},
                 {"value": "yandex", "label": "Яндекс.Музыка", "icon": "🎧", "category": "search"},
@@ -1080,14 +1110,19 @@ def get_music_providers(server_id: str = Query("default")):
     finally:
         db.close()
 
+
 @app.post("/api/music/providers")
 def add_music_provider(data: dict):
+    import json
     db = SessionLocal()
     try:
         provider_type = data["type"]
         stream_url = data.get("stream_url", "")
         if provider_type in RADIO_STATIONS:
             stream_url = RADIO_STATIONS[provider_type]["stream"]
+
+        channels = _parse_channels(data.get("channels", []))
+
         provider = MusicProvider(
             server_id=data.get("server_id", "default"),
             provider_type=provider_type,
@@ -1095,6 +1130,7 @@ def add_music_provider(data: dict):
             api_key=data.get("api_key", ""),
             webhook_url=data.get("webhook_url", ""),
             stream_url=stream_url,
+            channels=json.dumps(channels, ensure_ascii=False),
         )
         db.add(provider)
         db.commit()
@@ -1105,6 +1141,37 @@ def add_music_provider(data: dict):
         return {"error": str(e)}
     finally:
         db.close()
+
+
+@app.put("/api/music/providers/{provider_id}")
+def update_music_provider(provider_id: int, data: dict):
+    """Редактирование провайдера — например, замена каналов или API-ключа без пересоздания"""
+    import json
+    db = SessionLocal()
+    try:
+        provider = db.query(MusicProvider).filter(MusicProvider.id == provider_id).first()
+        if not provider:
+            return {"error": "Провайдер не найден"}
+
+        if "name" in data:
+            provider.name = data["name"]
+        if "api_key" in data:
+            provider.api_key = data["api_key"]
+        if "webhook_url" in data:
+            provider.webhook_url = data["webhook_url"]
+        if "enabled" in data:
+            provider.is_enabled = data["enabled"]
+        if "channels" in data:
+            provider.channels = json.dumps(_parse_channels(data["channels"]), ensure_ascii=False)
+
+        db.commit()
+        return {"status": "updated"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
 
 @app.delete("/api/music/providers/{provider_id}")
 def delete_music_provider(provider_id: int):
