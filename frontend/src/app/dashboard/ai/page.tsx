@@ -32,7 +32,7 @@ const DEFAULT: AISettings = {
   geminiEnabled: true, geminiTemperature: 0.8, geminiStyle: 'friendly', geminiCustomPrompt: '',
   deepseekEnabled: true, deepseekTemperature: 0.7, deepseekStyle: 'creative', deepseekCustomPrompt: '',
   useContext: true, contextMessages: 10, systemPrompt: 'Ты — дружелюбный AI-помощник. Отвечай на русском языке. 🤖',
-  autoModeration: false, serverName: '', platform: 'Discord', avatarStyle: 'nova', avatarUrl: '',
+  autoModeration: false, serverName: '', platform: 'VK', avatarStyle: 'nova', avatarUrl: '',
 };
 
 const GEMINI_STYLES = [
@@ -290,9 +290,9 @@ export default function AIPage() {
               <div>
                 <label className="text-sm text-[rgb(var(--text-secondary))] block mb-2">Платформа</label>
                 <select value={settings.platform} onChange={e => update('platform', e.target.value)} className="input w-full">
-                  <option value="Discord">🎮 Discord</option>
                   <option value="VK">💬 VK</option>
                   <option value="Lolka">⚡ Lolka</option>
+                  <option value="MAX">🚀 MAX</option>
                 </select>
               </div>
               <div>

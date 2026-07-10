@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
             type="text"
             value={reports.webhook_url || ''}
             onChange={e => updateReport('webhook_url', e.target.value)}
-            placeholder="https://discord.com/api/webhooks/..."
+            placeholder="https://vk.com/... или https://lolka.app/webhooks/..."
             className="input w-full"
           />
         </div>

@@ -113,7 +113,7 @@ class EventNotification(Base):
 
     id = Column(Integer, primary_key=True)
     event_id = Column(Integer, nullable=False, index=True)
-    channel = Column(String(100), nullable=False)   # vk | lolka | telegram
+    channel = Column(String(100), nullable=False)   # vk | lolka | max | email
     offset_minutes = Column(Integer, default=60)    # за сколько минут до события
     message = Column(Text, default="")
     is_sent = Column(Boolean, default=False)
