@@ -51,6 +51,7 @@ export const api = {
   music: {
     getProviders: (serverId = 'default') => apiFetch<{ providers: object[]; available_types: object[] }>(`/api/music/providers?server_id=${serverId}`),
     addProvider: (data: object) => apiFetch<{ status: string; id: number }>('/api/music/providers', { method: 'POST', body: JSON.stringify(data) }),
+    updateProvider: (id: number, data: object) => apiFetch<{ status: string }>(`/api/music/providers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteProvider: (id: number) => apiFetch<{ status: string }>(`/api/music/providers/${id}`, { method: 'DELETE' }),
   },
   events: {

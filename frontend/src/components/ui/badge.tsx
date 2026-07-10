@@ -7,9 +7,9 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 
 const variantClasses: Record<string, string> = {
   default:     "bg-indigo-600 text-white",
-  secondary:   "bg-white/10 text-white/70 border border-white/20",
+  secondary:   "bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] border border-[rgb(var(--border))]",
   destructive: "bg-red-500/20 text-red-400 border border-red-500/30",
-  outline:     "border border-white/20 text-white/70",
+  outline:     "border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]",
   success:     "bg-green-500/20 text-green-400 border border-green-500/30",
   warning:     "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30",
 };

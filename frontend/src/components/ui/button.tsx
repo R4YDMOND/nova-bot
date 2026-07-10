@@ -8,10 +8,10 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const variantClasses: Record<string, string> = {
   default:     "bg-indigo-600 text-white hover:bg-indigo-700",
-  secondary:   "bg-white/10 text-white border border-white/20 hover:bg-white/20",
+  secondary:   "bg-[rgb(var(--surface-2))] text-[rgb(var(--text))] border border-[rgb(var(--border))] hover:bg-[rgb(var(--surface))]",
   destructive: "bg-red-500 text-white hover:bg-red-600",
-  outline:     "border border-white/20 bg-transparent hover:bg-white/10",
-  ghost:       "hover:bg-white/10",
+  outline:     "border border-[rgb(var(--border))] bg-transparent text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))]",
+  ghost:       "text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))]",
   link:        "text-indigo-400 underline-offset-4 hover:underline",
 };
 
