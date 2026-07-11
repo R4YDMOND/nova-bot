@@ -734,16 +734,14 @@ def get_lolka_bot_info():
 
 @app.get("/api/lolka/bot/invite")
 def lolka_bot_invite(server_id: str = Query("")):
-    """Ссылка авторизации для добавления бота на сервер (аналог Discord OAuth2 scope=bot)"""
+    """Ссылка авторизации для добавления бота на сервер.
+    Реальный формат из портала разработчика Lolka: просто /bot-authorize?client_id=...
+    (без redirect_uri/response_type/scope — это НЕ oauth2/authorize, у ботов свой,
+    более простой эндпоинт установки)."""
     client_id = os.getenv("LOLKA_CLIENT_ID", "")
-    redirect_uri = os.getenv("LOLKA_REDIRECT_URI", "")
-    url = (
-        f"https://lolka.app/oauth2/authorize"
-        f"?client_id={client_id}&redirect_uri={redirect_uri}"
-        f"&response_type=code&scope=bot"
-        + (f"&guild_id={server_id}" if server_id else "")
-    )
-    return {"url": url}
+    if not client_id:
+        return {"error": "LOLKA_CLIENT_ID не настроен на сервере"}
+    return {"url": f"https://lolka.app/bot-authorize?client_id={client_id}"}
 
 
 @app.post("/api/lolka/bot/add")

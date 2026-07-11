@@ -85,4 +85,8 @@ export const api = {
     getLolkaUrl: () => apiFetch<{ url: string; state: string }>('/api/auth/lolka'),
     getVkUrl: () => apiFetch<{ url: string; state: string }>('/api/auth/vk'),
   },
+  lolkaBot: {
+    getStatus: () => apiFetch<{ configured: boolean; connected: boolean; bot: { username?: string; avatar?: string } | null }>('/api/lolka/bot'),
+    getInviteUrl: (serverId = '') => apiFetch<{ url?: string; error?: string }>(`/api/lolka/bot/invite?server_id=${serverId}`),
+  },
 };

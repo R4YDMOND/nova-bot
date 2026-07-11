@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 
 interface Server { id: number; name: string; }
+interface LolkaBotStatus { configured: boolean; connected: boolean; bot: { username?: string; avatar?: string } | null }
 
 export default function ServersPage() {
   const [servers, setServers] = useState<Server[]>([]);
@@ -15,6 +16,10 @@ export default function ServersPage() {
   const [form, setForm] = useState({ name: '', server_id: '', webhook_url: '' });
   const [saving, setSaving] = useState(false);
 
+  const [botStatus, setBotStatus] = useState<LolkaBotStatus | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
   function loadServers() {
     setLoading(true); setError(false);
     api.servers.list()
@@ -23,7 +28,28 @@ export default function ServersPage() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { loadServers(); }, []);
+  function loadBotStatus() {
+    api.lolkaBot.getStatus().then(setBotStatus).catch(() => {});
+  }
+
+  useEffect(() => { loadServers(); loadBotStatus(); }, []);
+
+  async function inviteBot() {
+    setInviteLoading(true);
+    setInviteError(null);
+    try {
+      const res = await api.lolkaBot.getInviteUrl();
+      if (res.url) {
+        window.open(res.url, '_blank', 'noopener,noreferrer');
+      } else {
+        setInviteError(res.error || 'Не удалось получить ссылку приглашения');
+      }
+    } catch {
+      setInviteError('Не удалось получить ссылку приглашения');
+    } finally {
+      setInviteLoading(false);
+    }
+  }
 
   async function handleAdd() {
     if (!form.name.trim() || !form.server_id.trim()) return;
@@ -46,6 +72,42 @@ export default function ServersPage() {
         </div>
         <Button onClick={() => setShowModal(true)}>+ Добавить сервер</Button>
       </div>
+
+      <Card className="p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl shrink-0">
+              🎮
+            </div>
+            <div>
+              <div className="font-semibold flex items-center gap-2">
+                Бот Nova в Lolka
+                {botStatus?.configured && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    botStatus.connected ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'
+                  }`}>
+                    {botStatus.connected ? '🟢 Подключён' : '🟡 Токен задан, ждём соединения'}
+                  </span>
+                )}
+                {botStatus && !botStatus.configured && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400">
+                    🔴 Не настроен
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-[rgb(var(--text-secondary))] mt-0.5">
+                {botStatus?.bot?.username
+                  ? `@${botStatus.bot.username} — добавьте бота на нужные серверы`
+                  : 'Добавьте бота на свой сервер в Lolka, чтобы начать пользоваться модерацией, музыкой и командами'}
+              </p>
+              {inviteError && <p className="text-red-400 text-xs mt-1">{inviteError}</p>}
+            </div>
+          </div>
+          <Button variant="secondary" onClick={inviteBot} disabled={inviteLoading} className="shrink-0">
+            {inviteLoading ? 'Открываем...' : '🔗 Добавить бота на сервер'}
+          </Button>
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
