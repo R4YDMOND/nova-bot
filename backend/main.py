@@ -13,10 +13,15 @@ import random
 import re
 import os
 import secrets
+import asyncio
 from datetime import datetime
 
 # Временное хранилище PKCE code_verifier (ключ = state)
 vk_pkce_store: dict = {}
+LOLKA_BOT_BASE_URL = "https://lolka.app/api/bot/v10"
+LOLKA_GATEWAY_URL = "wss://lolka.app/ws/bot"
+
+lolka_gateway_instance = None
 
 
 class RegisterRequest(BaseModel):
@@ -42,8 +47,17 @@ app.add_middleware(
 )
 
 @app.on_event("startup")
-def startup():
+async def startup():
     init_db()
+    global lolka_gateway_instance
+    token = os.getenv("LOLKA_BOT_TOKEN", "")
+    if token:
+        from lolka_gateway import LolkaGateway
+        lolka_gateway_instance = LolkaGateway(token, LOLKA_GATEWAY_URL, LOLKA_BOT_BASE_URL)
+        asyncio.create_task(lolka_gateway_instance.run_forever())
+        print("OK: Lolka Gateway task запущена")
+    else:
+        print("INFO: LOLKA_BOT_TOKEN не задан — Gateway не подключается")
 
 @app.get("/")
 def root():
@@ -405,12 +419,19 @@ def test_notification(data: dict):
     except Exception as e:
         return {"error": str(e)}
 
+
+# ==================== Lolka OAuth (вход пользователя) ====================
+
 @app.get("/api/auth/lolka")
 def auth_lolka():
     client_id = os.getenv("LOLKA_CLIENT_ID", "")
     redirect_uri = os.getenv("LOLKA_REDIRECT_URI", "")
     state = secrets.token_hex(16)
-    url = f"https://lolka.app/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=identify+servers&state={state}"
+    url = (
+        f"https://lolka.app/oauth2/authorize"
+        f"?client_id={client_id}&redirect_uri={redirect_uri}"
+        f"&response_type=code&scope=identify+guilds&state={state}"
+    )
     return {"url": url, "state": state}
 
 
@@ -419,9 +440,9 @@ def auth_lolka_callback(code: str, state: str = ""):
     client_id = os.getenv("LOLKA_CLIENT_ID", "")
     client_secret = os.getenv("LOLKA_CLIENT_SECRET", "")
     redirect_uri = os.getenv("LOLKA_REDIRECT_URI", "")
-    
+
     try:
-        resp = requests.post("https://lolka.app/oauth/token", data={
+        resp = requests.post("https://lolka.app/oauth2/token", data={
             "client_id": client_id, "client_secret": client_secret,
             "code": code, "redirect_uri": redirect_uri, "grant_type": "authorization_code",
         }, timeout=10)
@@ -429,15 +450,15 @@ def auth_lolka_callback(code: str, state: str = ""):
         access_token = token_data.get("access_token", "")
     except Exception as e:
         return {"error": f"Ошибка обмена кода: {str(e)}"}
-    
+
     try:
-        user_resp = requests.get("https://lolka.app/api/users/@me", headers={
+        user_resp = requests.get(f"{LOLKA_BOT_BASE_URL}/users/@me", headers={
             "Authorization": f"Bearer {access_token}"
         }, timeout=10)
         user_data = user_resp.json()
     except Exception as e:
         return {"error": f"Ошибка получения пользователя: {str(e)}"}
-    
+
     return {
         "status": "ok",
         "user": {"id": user_data.get("id"), "username": user_data.get("username"), "avatar": user_data.get("avatar")},
@@ -673,6 +694,116 @@ def send_broadcast(data: dict):
         "sent_count": len([r for r in results if r.get("sent")]),
         "total": len(results)
     }
+
+
+# ==================== Lolka Bot (REST API) ====================
+
+def _lolka_bot_headers():
+    token = os.getenv("LOLKA_BOT_TOKEN", "")
+    return {"Authorization": f"Bot {token}"} if token else {}
+
+
+@app.get("/api/lolka/bot/gateway")
+def get_lolka_gateway():
+    """URL и лимиты для подключения к Gateway (как discord /gateway/bot)"""
+    return {
+        "url": LOLKA_GATEWAY_URL,
+        "shards": 1,
+        "session_start_limit": {"total": 1000, "remaining": 1000, "reset_after": 0, "max_concurrency": 1},
+    }
+
+
+@app.get("/api/lolka/bot")
+def get_lolka_bot_info():
+    """Статус собственного бота: подключён ли Gateway, какой токен настроен"""
+    token = os.getenv("LOLKA_BOT_TOKEN", "")
+    if not token:
+        return {"configured": False, "connected": False, "bot": None}
+
+    connected = lolka_gateway_instance is not None and getattr(lolka_gateway_instance, "connected", False)
+    bot_info = None
+    try:
+        resp = requests.get(f"{LOLKA_BOT_BASE_URL}/users/@me", headers=_lolka_bot_headers(), timeout=10)
+        if resp.ok:
+            bot_info = resp.json()
+    except Exception:
+        pass
+
+    return {"configured": True, "connected": connected, "bot": bot_info}
+
+
+@app.get("/api/lolka/bot/invite")
+def lolka_bot_invite(server_id: str = Query("")):
+    """Ссылка авторизации для добавления бота на сервер (аналог Discord OAuth2 scope=bot)"""
+    client_id = os.getenv("LOLKA_CLIENT_ID", "")
+    redirect_uri = os.getenv("LOLKA_REDIRECT_URI", "")
+    url = (
+        f"https://lolka.app/oauth2/authorize"
+        f"?client_id={client_id}&redirect_uri={redirect_uri}"
+        f"&response_type=code&scope=bot"
+        + (f"&guild_id={server_id}" if server_id else "")
+    )
+    return {"url": url}
+
+
+@app.post("/api/lolka/bot/add")
+def add_lolka_bot(data: dict):
+    """Совместимо со старой сигнатурой из ТЗ: возвращает ту же invite-ссылку"""
+    server_id = data.get("server_id", "")
+    return lolka_bot_invite(server_id=server_id)
+
+
+@app.post("/api/lolka/bot/message/send")
+def lolka_send_message(data: dict):
+    """Отправить сообщение в канал от имени бота (не webhook, а REST bot API)"""
+    channel_id = data.get("channel_id", "")
+    content = data.get("content", "")
+    if not channel_id or not content:
+        return {"error": "channel_id и content обязательны"}
+    if not os.getenv("LOLKA_BOT_TOKEN", ""):
+        return {"error": "LOLKA_BOT_TOKEN не настроен"}
+    try:
+        resp = requests.post(
+            f"{LOLKA_BOT_BASE_URL}/channels/{channel_id}/messages",
+            headers={**_lolka_bot_headers(), "Content-Type": "application/json"},
+            json={"content": content},
+            timeout=10,
+        )
+        return {"status": "ok" if resp.ok else "error", "response": resp.json() if resp.content else {}}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/lolka/bot/server/{server_id}/members")
+def lolka_get_server_members(server_id: str):
+    if not os.getenv("LOLKA_BOT_TOKEN", ""):
+        return {"error": "LOLKA_BOT_TOKEN не настроен"}
+    try:
+        resp = requests.get(
+            f"{LOLKA_BOT_BASE_URL}/guilds/{server_id}/members",
+            headers=_lolka_bot_headers(), timeout=10,
+        )
+        return {"status": "ok" if resp.ok else "error", "members": resp.json() if resp.ok else []}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.put("/api/lolka/bot/member/{user_id}/role")
+def lolka_add_member_role(user_id: str, data: dict):
+    server_id = data.get("server_id", "")
+    role_id = data.get("role_id", "")
+    if not os.getenv("LOLKA_BOT_TOKEN", ""):
+        return {"error": "LOLKA_BOT_TOKEN не настроен"}
+    if not server_id or not role_id:
+        return {"error": "server_id и role_id обязательны"}
+    try:
+        resp = requests.put(
+            f"{LOLKA_BOT_BASE_URL}/guilds/{server_id}/members/{user_id}/roles/{role_id}",
+            headers=_lolka_bot_headers(), timeout=10,
+        )
+        return {"status": "ok" if resp.ok else "error"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ==================== Forward + AI ====================

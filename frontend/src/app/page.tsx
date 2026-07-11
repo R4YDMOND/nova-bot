@@ -267,7 +267,7 @@ export default function HomePage() {
 
                 <button
                   onClick={() => setShowLolkaModal(true)}
-                  className="inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors"
+                  className="inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-opacity"
                 >
                   <span className="text-xl">🎮</span>
                   Войти через Lolka
@@ -339,7 +339,7 @@ export default function HomePage() {
               <button onClick={() => setShowLolkaModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
                 <X className="w-5 h-5" />
               </button>
-              <div className="w-16 h-16 bg-[#5865F2]/20 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-4">🎮</div>
+              <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-4">🎮</div>
               <h2 className="text-2xl font-bold text-[rgb(var(--text))] mb-2">Lolka — скоро</h2>
               <p className="text-[rgb(var(--text-secondary))] text-sm leading-relaxed mb-6">
                 OAuth2-авторизация и публичные интеграции для сторонних сервисов.
