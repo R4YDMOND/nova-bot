@@ -70,7 +70,7 @@ function NovaLogo({ size = 320 }: { size?: number }) {
           <stop offset="0%" stopColor="#8B5CF6" />
           <stop offset="100%" stopColor="#7B2FBE" />
         </linearGradient>
-        <linearGradient id="nDiag" x1="0%" y1="100%" x2="100%" y2="0%">
+        <linearGradient id="nDiag" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#22D3EE" />
           <stop offset="100%" stopColor="#8B5CF6" />
         </linearGradient>
@@ -86,7 +86,7 @@ function NovaLogo({ size = 320 }: { size?: number }) {
       <circle cx="150" cy="150" r="150" fill="url(#nGlow)" opacity="0.4" />
 
       {/* диагональная перемычка N (рисуется первой, снизу) */}
-      <polygon points="210,20 280,20 90,280 20,280" fill="url(#nDiag)" />
+      <polygon points="20,20 90,20 280,280 210,280" fill="url(#nDiag)" />
 
       {/* левая нога (голубая) */}
       <polygon points="20,20 90,20 90,280 20,280" fill="url(#nCyan)" />
@@ -116,12 +116,12 @@ function NovaLogoMark({ size = 22 }: { size?: number }) {
           <stop offset="0%" stopColor="#8B5CF6" />
           <stop offset="100%" stopColor="#7B2FBE" />
         </linearGradient>
-        <linearGradient id="nDiagSm" x1="0%" y1="100%" x2="100%" y2="0%">
+        <linearGradient id="nDiagSm" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#22D3EE" />
           <stop offset="100%" stopColor="#8B5CF6" />
         </linearGradient>
       </defs>
-      <polygon points="210,20 280,20 90,280 20,280" fill="url(#nDiagSm)" />
+      <polygon points="20,20 90,20 280,280 210,280" fill="url(#nDiagSm)" />
       <polygon points="20,20 90,20 90,280 20,280" fill="url(#nCyanSm)" />
       <polygon points="210,20 280,20 280,280 210,280" fill="url(#nPurpleSm)" />
     </svg>
