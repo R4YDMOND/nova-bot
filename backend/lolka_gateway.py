@@ -21,6 +21,42 @@ COMMAND_RESPONSES = {
 }
 
 
+# Discord-совместимые биты интентов Gateway (см. документацию Lolka — протокол идентичен discord.py).
+# ВАЖНО: привилегированные интенты (Members, Presences, Message Content) должны быть явно
+# включены в портале разработчика (вкладка "Бот" → "Привилегированные интенты"). Если запросить
+# бит, который не включён в портале — Lolka разрывает соединение сразу после Identify.
+INTENT_GUILDS = 1 << 0
+INTENT_GUILD_MEMBERS = 1 << 1          # привилегированный — вкл. в портале (Server Members Intent)
+INTENT_GUILD_MODERATION = 1 << 2
+INTENT_GUILD_WEBHOOKS = 1 << 5
+INTENT_GUILD_INVITES = 1 << 6
+INTENT_GUILD_VOICE_STATES = 1 << 7
+INTENT_GUILD_PRESENCES = 1 << 8        # привилегированный — у нас ВЫКЛЮЧЕН в портале, не запрашиваем!
+INTENT_GUILD_MESSAGES = 1 << 9
+INTENT_GUILD_MESSAGE_REACTIONS = 1 << 10
+INTENT_GUILD_MESSAGE_TYPING = 1 << 11
+INTENT_DIRECT_MESSAGES = 1 << 12
+INTENT_DIRECT_MESSAGE_REACTIONS = 1 << 13
+INTENT_MESSAGE_CONTENT = 1 << 15       # привилегированный — вкл. в портале (Message Content Intent)
+
+# Набор интентов, которые реально включены в портале разработчика Nova Bot.
+# Если позже включите Presence Intent в портале — добавьте сюда INTENT_GUILD_PRESENCES.
+BOT_INTENTS = (
+    INTENT_GUILDS
+    | INTENT_GUILD_MEMBERS
+    | INTENT_GUILD_MODERATION
+    | INTENT_GUILD_WEBHOOKS
+    | INTENT_GUILD_INVITES
+    | INTENT_GUILD_VOICE_STATES
+    | INTENT_GUILD_MESSAGES
+    | INTENT_GUILD_MESSAGE_REACTIONS
+    | INTENT_GUILD_MESSAGE_TYPING
+    | INTENT_DIRECT_MESSAGES
+    | INTENT_DIRECT_MESSAGE_REACTIONS
+    | INTENT_MESSAGE_CONTENT
+)
+
+
 class LolkaGateway:
     def __init__(self, token: str, gateway_url: str, api_base_url: str):
         self.token = token
@@ -54,11 +90,12 @@ class LolkaGateway:
             await self.listen()
 
     async def identify(self):
+        print(f"LOLKA GATEWAY: отправляю Identify (intents={BOT_INTENTS})")
         await self.ws.send(json.dumps({
             "op": 2,  # Identify
             "d": {
                 "token": self.token,
-                "intents": 32767,
+                "intents": BOT_INTENTS,
                 "properties": {
                     "os": "linux",
                     "browser": "Nova Bot",
