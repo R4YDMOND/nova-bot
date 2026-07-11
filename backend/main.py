@@ -64,11 +64,24 @@ def root():
     return {"status": "ok", "version": "0.7.0"}
 
 @app.get("/api/servers")
-def get_servers():
+def get_servers(platform: str = Query("")):
     db = SessionLocal()
     try:
-        servers = db.query(Server).all()
-        result = [{"id": s.id, "name": s.name} for s in servers]
+        query = db.query(Server)
+        if platform:
+            query = query.filter(Server.platform == platform)
+        servers = query.all()
+        result = [
+            {
+                "id": s.id,
+                "name": s.name,
+                "server_id": s.server_id,
+                "platform": s.platform or "vk",
+                "icon_url": s.icon_url or "",
+                "member_count": s.member_count or 0,
+            }
+            for s in servers
+        ]
         return {"servers": result, "total": len(result)}
     except Exception as e:
         return {"error": str(e)}
@@ -79,15 +92,16 @@ def get_servers():
 def create_server(
     name: str = Query(...),
     server_id: str = Query(...),
-    webhook_url: str = Query("")
+    webhook_url: str = Query(""),
+    platform: str = Query("vk"),
 ):
     db = SessionLocal()
     try:
-        server = Server(name=name, server_id=server_id, webhook_url=webhook_url)
+        server = Server(name=name, server_id=server_id, webhook_url=webhook_url, platform=platform)
         db.add(server)
         db.commit()
         db.refresh(server)
-        return {"status": "created", "server": {"id": server.id, "name": server.name}}
+        return {"status": "created", "server": {"id": server.id, "name": server.name, "platform": server.platform}}
     except Exception as e:
         db.rollback()
         return {"error": str(e)}
@@ -421,48 +435,24 @@ def test_notification(data: dict):
 
 
 # ==================== Lolka OAuth (вход пользователя) ====================
+# OAuth2-логин через приложения Lolka ещё не запущен платформой (раздел
+# "Приложения" в их портале помечен как "скоро"). Пока это так, не дёргаем
+# несуществующие oauth2/authorize и oauth2/token — фронтенд получит понятный
+# статус и покажет "скоро" вместо зависшего редиректа/непонятной ошибки.
 
 @app.get("/api/auth/lolka")
 def auth_lolka():
-    client_id = os.getenv("LOLKA_CLIENT_ID", "")
-    redirect_uri = os.getenv("LOLKA_REDIRECT_URI", "")
-    state = secrets.token_hex(16)
-    url = (
-        f"https://lolka.app/oauth2/authorize"
-        f"?client_id={client_id}&redirect_uri={redirect_uri}"
-        f"&response_type=code&scope=identify+guilds&state={state}"
-    )
-    return {"url": url, "state": state}
+    return {
+        "error": "not_available",
+        "message": "Вход через Lolka пока недоступен — OAuth2-приложения на платформе Lolka ещё не запущены.",
+    }
 
 
 @app.get("/api/auth/lolka/callback")
-def auth_lolka_callback(code: str, state: str = ""):
-    client_id = os.getenv("LOLKA_CLIENT_ID", "")
-    client_secret = os.getenv("LOLKA_CLIENT_SECRET", "")
-    redirect_uri = os.getenv("LOLKA_REDIRECT_URI", "")
-
-    try:
-        resp = requests.post("https://lolka.app/oauth2/token", data={
-            "client_id": client_id, "client_secret": client_secret,
-            "code": code, "redirect_uri": redirect_uri, "grant_type": "authorization_code",
-        }, timeout=10)
-        token_data = resp.json()
-        access_token = token_data.get("access_token", "")
-    except Exception as e:
-        return {"error": f"Ошибка обмена кода: {str(e)}"}
-
-    try:
-        user_resp = requests.get(f"{LOLKA_BOT_BASE_URL}/users/@me", headers={
-            "Authorization": f"Bearer {access_token}"
-        }, timeout=10)
-        user_data = user_resp.json()
-    except Exception as e:
-        return {"error": f"Ошибка получения пользователя: {str(e)}"}
-
+def auth_lolka_callback(code: str = "", state: str = ""):
     return {
-        "status": "ok",
-        "user": {"id": user_data.get("id"), "username": user_data.get("username"), "avatar": user_data.get("avatar")},
-        "access_token": access_token[:20] + "..."
+        "error": "not_available",
+        "message": "Вход через Lolka пока недоступен — OAuth2-приложения на платформе Lolka ещё не запущены.",
     }
 
 
@@ -730,6 +720,77 @@ def get_lolka_bot_info():
         pass
 
     return {"configured": True, "connected": connected, "bot": bot_info}
+
+
+@app.get("/api/lolka/bot/guilds")
+def get_lolka_bot_guilds():
+    """Список серверов (гильдий), где реально состоит бот Nova в Lolka."""
+    if not os.getenv("LOLKA_BOT_TOKEN", ""):
+        return {"error": "LOLKA_BOT_TOKEN не настроен", "guilds": []}
+    try:
+        resp = requests.get(
+            f"{LOLKA_BOT_BASE_URL}/users/@me/guilds",
+            headers=_lolka_bot_headers(), timeout=10,
+        )
+        if not resp.ok:
+            return {"error": f"Lolka API вернул {resp.status_code}", "guilds": []}
+        guilds = resp.json()
+        return {
+            "guilds": [
+                {
+                    "id": g.get("id"),
+                    "name": g.get("name", "Без названия"),
+                    "icon": g.get("icon"),
+                    "member_count": g.get("member_count") or g.get("approximate_member_count") or 0,
+                }
+                for g in guilds
+            ]
+        }
+    except Exception as e:
+        return {"error": str(e), "guilds": []}
+
+
+@app.post("/api/servers/sync-lolka")
+def sync_lolka_servers():
+    """Подтягивает реальные Lolka-гильдии бота и добавляет/обновляет их в таблице servers."""
+    guilds_resp = get_lolka_bot_guilds()
+    if guilds_resp.get("error"):
+        return {"status": "error", "error": guilds_resp["error"]}
+
+    db = SessionLocal()
+    synced = 0
+    try:
+        for g in guilds_resp.get("guilds", []):
+            gid = str(g.get("id", ""))
+            if not gid:
+                continue
+            server = db.query(Server).filter(
+                Server.server_id == gid, Server.platform == "lolka"
+            ).first()
+            icon_url = ""
+            if g.get("icon"):
+                icon_url = f"https://cdn.lolka.app/icons/{gid}/{g['icon']}.png"
+            if server:
+                server.name = g.get("name", server.name)
+                server.icon_url = icon_url or server.icon_url
+                server.member_count = g.get("member_count", server.member_count)
+            else:
+                server = Server(
+                    name=g.get("name", "Без названия"),
+                    server_id=gid,
+                    platform="lolka",
+                    icon_url=icon_url,
+                    member_count=g.get("member_count", 0),
+                )
+                db.add(server)
+            synced += 1
+        db.commit()
+        return {"status": "ok", "synced": synced}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "error": str(e)}
+    finally:
+        db.close()
 
 
 @app.get("/api/lolka/bot/invite")
