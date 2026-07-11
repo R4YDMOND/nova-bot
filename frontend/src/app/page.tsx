@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useTheme } from '@/components/ThemeProvider';
 import {
   X,
   Mail,
@@ -17,6 +18,8 @@ import {
   Users,
   Zap,
   Bell,
+  Moon,
+  Sun,
 } from 'lucide-react';
 
 const API_BASE = 'https://nova-bot-rpsy.onrender.com';
@@ -49,53 +52,85 @@ function useCountUp(target: number, trigger: boolean, durationMs = 1200) {
   return value;
 }
 
-/** Стилизованный "кристальный" логотип N — гранёный вид через несколько
- * наложенных градиентных полигонов (полноценный 3D-рендер средствами SVG
- * недостижим, это ближайшее стилевое приближение к макету). */
-function CrystalLogo({ size = 360 }: { size?: number }) {
+/**
+ * Геометрический логотип N — фирменный знак Nova Bot: левая грань голубая,
+ * правая фиолетовая, между ними диагональная перемычка (как в брендбуке,
+ * вариация "02. Упрощённый знак"). Сплошная заливка + лёгкий теневой facet
+ * для эффекта гранёного кристалла.
+ */
+function NovaLogo({ size = 320 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 360 360" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 300 300" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="crystalCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="nCyan" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#22D3EE" />
-          <stop offset="100%" stopColor="rgb(var(--primary))" />
+          <stop offset="100%" stopColor="#0EA5E9" />
         </linearGradient>
-        <linearGradient id="crystalPurple" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="rgb(var(--primary))" />
-          <stop offset="100%" stopColor="rgb(var(--secondary))" />
+        <linearGradient id="nPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#8B5CF6" />
+          <stop offset="100%" stopColor="#7B2FBE" />
         </linearGradient>
-        <radialGradient id="crystalGlow" cx="50%" cy="55%" r="55%">
-          <stop offset="0%" stopColor="rgb(var(--secondary))" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="rgb(var(--secondary))" stopOpacity="0" />
+        <linearGradient id="nDiag" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#22D3EE" />
+          <stop offset="100%" stopColor="#8B5CF6" />
+        </linearGradient>
+        <radialGradient id="nGlow" cx="50%" cy="60%" r="55%">
+          <stop offset="0%" stopColor="#7B2FBE" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#7B2FBE" stopOpacity="0" />
         </radialGradient>
-        <filter id="crystalBlur"><feGaussianBlur stdDeviation="10" /></filter>
+        <filter id="nBlur"><feGaussianBlur stdDeviation="10" /></filter>
       </defs>
 
-      <ellipse cx="180" cy="300" rx="120" ry="18" fill="url(#crystalGlow)" filter="url(#crystalBlur)" />
-      <circle cx="180" cy="170" r="150" fill="url(#crystalGlow)" opacity="0.5" />
+      {/* фоновое свечение */}
+      <ellipse cx="150" cy="290" rx="110" ry="16" fill="url(#nGlow)" filter="url(#nBlur)" />
+      <circle cx="150" cy="150" r="150" fill="url(#nGlow)" opacity="0.4" />
 
-      {/* Левая грань N (голубая) */}
-      <polygon points="70,80 130,80 130,280 70,280" fill="none" stroke="url(#crystalCyan)" strokeWidth="6" strokeLinejoin="round" />
-      <polygon points="70,80 130,80 130,280 70,280" fill="url(#crystalCyan)" opacity="0.12" />
+      {/* диагональная перемычка N (рисуется первой, снизу) */}
+      <polygon points="210,20 280,20 90,280 20,280" fill="url(#nDiag)" />
 
-      {/* Диагональ N */}
-      <polygon points="130,80 210,80 130,280 70,280" fill="url(#crystalCyan)" opacity="0.18" />
-      <polygon points="130,80 210,80 130,280 70,280" fill="none" stroke="url(#crystalCyan)" strokeWidth="4" strokeLinejoin="round" />
+      {/* левая нога (голубая) */}
+      <polygon points="20,20 90,20 90,280 20,280" fill="url(#nCyan)" />
+      <polygon points="90,20 90,280 20,280" fill="#0B0F19" opacity="0.18" />
 
-      {/* Правая грань N (фиолетовая) */}
-      <polygon points="210,80 270,80 270,280 210,280" fill="none" stroke="url(#crystalPurple)" strokeWidth="6" strokeLinejoin="round" />
-      <polygon points="210,80 270,80 270,280 210,280" fill="url(#crystalPurple)" opacity="0.15" />
+      {/* правая нога (фиолетовая) */}
+      <polygon points="210,20 280,20 280,280 210,280" fill="url(#nPurple)" />
+      <polygon points="280,20 280,280 210,280" fill="#0B0F19" opacity="0.18" />
 
-      {/* Блики */}
-      <line x1="85" y1="95" x2="85" y2="180" stroke="white" strokeOpacity="0.5" strokeWidth="3" strokeLinecap="round" />
-      <line x1="225" y1="95" x2="225" y2="180" stroke="white" strokeOpacity="0.35" strokeWidth="3" strokeLinecap="round" />
+      {/* блики */}
+      <line x1="35" y1="35" x2="35" y2="140" stroke="white" strokeOpacity="0.45" strokeWidth="4" strokeLinecap="round" />
+      <line x1="225" y1="35" x2="225" y2="140" stroke="white" strokeOpacity="0.3" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Компактная версия того же логотипа для шапки */
+function NovaLogoMark({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 300 300" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="nCyanSm" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#22D3EE" />
+          <stop offset="100%" stopColor="#0EA5E9" />
+        </linearGradient>
+        <linearGradient id="nPurpleSm" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#8B5CF6" />
+          <stop offset="100%" stopColor="#7B2FBE" />
+        </linearGradient>
+        <linearGradient id="nDiagSm" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#22D3EE" />
+          <stop offset="100%" stopColor="#8B5CF6" />
+        </linearGradient>
+      </defs>
+      <polygon points="210,20 280,20 90,280 20,280" fill="url(#nDiagSm)" />
+      <polygon points="20,20 90,20 90,280 20,280" fill="url(#nCyanSm)" />
+      <polygon points="210,20 280,20 280,280 210,280" fill="url(#nPurpleSm)" />
     </svg>
   );
 }
 
 function LolkaAvatarIcon() {
   return (
-    <span className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-400 to-fuchsia-600 flex items-center justify-center shrink-0">
+    <span className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
       <Bot className="w-3.5 h-3.5 text-white" />
     </span>
   );
@@ -106,6 +141,7 @@ export default function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [showLolkaModal, setShowLolkaModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     fetch(`${API_BASE}/api/stats`, { cache: 'no-store' })
@@ -138,12 +174,33 @@ export default function HomePage() {
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 pt-12 pb-24">
-        {/* Logo */}
-        <div className="flex items-center justify-center lg:justify-start gap-2 font-bold text-xl mb-10">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
+        {/* Logo + theme toggle */}
+        <div className="flex items-center justify-between mb-10">
+          <div className="flex items-center gap-2 font-bold text-xl mx-auto lg:mx-0">
+            <div className="w-9 h-9 rounded-xl bg-[rgb(var(--surface-2))] flex items-center justify-center">
+              <NovaLogoMark size={22} />
+            </div>
+            NOVA <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">BOT</span>
           </div>
-          NOVA <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">BOT</span>
+
+          <button
+            onClick={toggleTheme}
+            aria-label="Переключить тему"
+            className="hidden lg:flex w-9 h-9 rounded-xl border border-[rgb(var(--border))] items-center justify-center hover:bg-[rgb(var(--surface-2))] transition-colors shrink-0"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* mobile theme toggle (под логотипом, по центру) */}
+        <div className="flex lg:hidden justify-center mb-6 -mt-6">
+          <button
+            onClick={toggleTheme}
+            aria-label="Переключить тему"
+            className="w-9 h-9 rounded-xl border border-[rgb(var(--border))] flex items-center justify-center hover:bg-[rgb(var(--surface-2))] transition-colors"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
         </div>
 
         {/* Hero */}
@@ -208,7 +265,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex-1 w-full flex justify-center">
-            <CrystalLogo />
+            <NovaLogo />
           </div>
         </div>
 
