@@ -11,6 +11,9 @@ class Server(Base):
     server_id = Column(String, unique=True)
     webhook_url = Column(String, default="")
     is_active = Column(Boolean, default=True)
+    platform = Column(String, default="vk")      # "vk" | "lolka"
+    icon_url = Column(String, default="")
+    member_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
