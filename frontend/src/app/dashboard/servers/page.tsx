@@ -5,16 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
 import { api } from '@/lib/api';
 import { useServer } from '@/context/ServerProvider';
-import { RefreshCw, Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 
 const PLATFORM_ICON: Record<string, string> = { lolka: '🎮', vk: '🔵' };
 const PLATFORM_LABEL: Record<string, string> = { lolka: 'Lolka', vk: 'VK' };
 
 export default function ServersPage() {
-  const { servers, loading, selectedServerId, selectServer, refresh, syncLolka } = useServer();
-
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const { servers, loading, selectedServerId, selectServer, refresh } = useServer();
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', server_id: '', platform: 'vk' as 'vk' | 'lolka', webhook_url: '' });
@@ -25,22 +22,12 @@ export default function ServersPage() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   useEffect(() => {
     api.lolkaBot.getStatus().then(setBotStatus).catch(() => {});
   }, []);
-
-  async function handleSync() {
-    setSyncing(true);
-    setSyncMsg(null);
-    const res = await syncLolka();
-    if (res.error) {
-      setSyncMsg(`⚠️ ${res.error}`);
-    } else {
-      setSyncMsg(`✅ Синхронизировано серверов: ${res.synced ?? 0}`);
-    }
-    setSyncing(false);
-    setTimeout(() => setSyncMsg(null), 5000);
-  }
 
   async function inviteBot() {
     setInviteLoading(true);
@@ -89,8 +76,21 @@ export default function ServersPage() {
 
   async function removeServer(id: number) {
     if (!confirm('Удалить сервер из панели Nova? Сам сервер в VK/Lolka не пострадает.')) return;
-    await api.servers.remove(id).catch(() => {});
-    await refresh();
+    setDeletingId(id);
+    setDeleteError(null);
+    try {
+      const res = await api.servers.remove(id);
+      if (res && (res as { error?: string }).error) {
+        setDeleteError((res as { error?: string }).error || 'Не удалось удалить сервер');
+        return;
+      }
+      await refresh();
+    } catch (e) {
+      setDeleteError('Не удалось удалить сервер — проверьте, что бэкенд обновлён');
+    } finally {
+      setDeletingId(null);
+      setTimeout(() => setDeleteError(null), 5000);
+    }
   }
 
   return (
@@ -98,23 +98,21 @@ export default function ServersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[rgb(var(--text))]">Серверы</h1>
-          <p className="text-[rgb(var(--text-secondary))] mt-1">Серверы Lolka и сообщества VK, подключённые к Nova</p>
+          <p className="text-[rgb(var(--text-secondary))] mt-1">Серверы Lolka и сообщества VK, которые вы подключили к Nova</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={handleSync} disabled={syncing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Синхронизация...' : 'Синхронизировать с Lolka'}
-          </Button>
-          <Button onClick={openModal}>
-            <Plus className="w-4 h-4 mr-2" />
-            Добавить вручную
-          </Button>
-        </div>
+        <Button onClick={openModal}>
+          <Plus className="w-4 h-4 mr-2" />
+          Добавить сервер
+        </Button>
       </div>
 
-      {syncMsg && <p className="text-sm text-[rgb(var(--text-secondary))]">{syncMsg}</p>}
+      {deleteError && (
+        <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
+          ⚠️ {deleteError}
+        </p>
+      )}
 
-      {/* Статус бота Lolka */}
+      {/* Статус бота Lolka — только для получения ссылки приглашения, не влияет на список серверов */}
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -136,7 +134,7 @@ export default function ServersPage() {
                 )}
               </div>
               <p className="text-sm text-[rgb(var(--text-secondary))] mt-0.5">
-                {botStatus?.bot?.username ? `@${botStatus.bot.username}` : 'Добавьте бота на сервер, чтобы он появился здесь автоматически'}
+                Добавьте бота на сервер, затем добавьте сам сервер в список ниже вручную (по ID)
               </p>
               {inviteError && <p className="text-red-400 text-xs mt-1">{inviteError}</p>}
             </div>
@@ -147,12 +145,16 @@ export default function ServersPage() {
         </div>
       </Card>
 
-      {/* Список серверов */}
+      {/* Список серверов — только те, что пользователь добавил сам */}
       {loading ? (
         <p className="text-[rgb(var(--text-secondary))]">Загрузка...</p>
       ) : servers.length === 0 ? (
         <div className="text-center py-16 text-[rgb(var(--text-secondary))]">
-          <p>Пока нет ни одного сервера. Добавьте бота в Lolka и нажмите «Синхронизировать» — или добавьте сервер вручную.</p>
+          <p className="mb-4">Пока нет ни одного сервера. Добавьте его вручную по ID.</p>
+          <Button onClick={openModal} className="inline-flex">
+            <Plus className="w-4 h-4 mr-2" />
+            Добавить сервер
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -183,7 +185,8 @@ export default function ServersPage() {
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
-                className="p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                disabled={deletingId === s.id}
+                className="p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 disabled:opacity-40"
                 title="Удалить из панели"
               >
                 <Trash2 className="w-4 h-4" />
@@ -199,7 +202,7 @@ export default function ServersPage() {
             <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
               <X className="w-5 h-5" />
             </button>
-            <h2 className="text-xl font-bold mb-6">Добавить сервер вручную</h2>
+            <h2 className="text-xl font-bold mb-6">Добавить сервер</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Платформа</label>
