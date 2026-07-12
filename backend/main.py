@@ -739,6 +739,40 @@ def debug_user(email: str = Query(...)):
         db.close()
 
 
+@app.post("/api/auth/resend-verification")
+def resend_verification(data: dict):
+    """Повторно отправить письмо с подтверждением уже существующему,
+    но ещё не подтверждённому аккаунту (без создания нового пользователя)."""
+    email = data.get("email", "")
+    if not email:
+        raise HTTPException(status_code=400, detail="email обязателен")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь с таким email не найден")
+        if user.is_verified:
+            return {"status": "already_verified", "email_sent": False}
+
+        token = generate_verification_token()
+        user.verification_token = token
+        user.verification_token_expires = token_expiry()
+        db.commit()
+
+        base_url = "https://nova-bot-rpsy.onrender.com"
+        email_sent = send_verification_email(user.email, token, base_url)
+        if not email_sent:
+            print(f"[resend-verification] Письмо для {user.email} НЕ отправлено")
+        return {"status": "ok", "email_sent": email_sent}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 # ==================== Отправка сообщений ====================
 
 @app.post("/api/send/lolka")
