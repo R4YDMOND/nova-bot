@@ -153,3 +153,16 @@ class NotificationSettings(Base):
     max_webhook_url = Column(String, default="")
 
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+    class Webhook(Base):
+    """Вебхук интеграции VK/Lolka, привязанный к конкретному серверу и платформе."""
+    __tablename__ = "webhooks"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    platform = Column(String(20), nullable=False, default="vk")  # "vk" | "lolka"
+    project = Column(String(255), default="")
+    url = Column(String(1024), nullable=False)
+    event = Column(String(255), default="")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

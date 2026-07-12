@@ -5,7 +5,7 @@ import hashlib
 import base64
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook
 from auth_utils import hash_password, verify_password, generate_verification_token, token_expiry
 from email_utils import send_verification_email, send_email
 import requests
@@ -1681,6 +1681,110 @@ def get_dashboard_stats():
 @app.get("/api/moderation/log")
 def get_moderation_log():
     return {"entries": [], "total": 0, "warns": 0, "mutes": 0, "bans": 0}
+
+
+# ==================== Вебхуки (CRUD) ====================
+
+@app.get("/api/webhooks")
+def get_webhooks(server_id: str = Query(...)):
+    """Список вебхуков конкретного сервера."""
+    db = SessionLocal()
+    try:
+        hooks = db.query(Webhook).filter(Webhook.server_id == server_id).order_by(Webhook.created_at.desc()).all()
+        return {
+            "webhooks": [
+                {
+                    "id": h.id,
+                    "server_id": h.server_id,
+                    "platform": h.platform,
+                    "project": h.project,
+                    "url": h.url,
+                    "event": h.event,
+                    "active": h.is_active,
+                }
+                for h in hooks
+            ]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/webhooks")
+def create_webhook(data: dict):
+    """Создать вебхук. Обязательные поля: server_id, platform, project, url."""
+    db = SessionLocal()
+    try:
+        server_id = data.get("server_id", "")
+        url = data.get("url", "").strip()
+        if not server_id or not url:
+            return {"error": "server_id и url обязательны"}
+        if not (url.startswith("http://") or url.startswith("https://")):
+            return {"error": "URL должен начинаться с http:// или https://"}
+
+        hook = Webhook(
+            server_id=server_id,
+            platform=data.get("platform", "vk"),
+            project=data.get("project", ""),
+            url=url,
+            event=data.get("event", ""),
+            is_active=True,
+        )
+        db.add(hook)
+        db.commit()
+        db.refresh(hook)
+        return {
+            "status": "created",
+            "webhook": {
+                "id": hook.id, "server_id": hook.server_id, "platform": hook.platform,
+                "project": hook.project, "url": hook.url, "event": hook.event, "active": hook.is_active,
+            },
+        }
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.put("/api/webhooks/{webhook_id}")
+def update_webhook(webhook_id: int, data: dict):
+    """Обновить вебхук — например, переключить active."""
+    db = SessionLocal()
+    try:
+        hook = db.query(Webhook).filter(Webhook.id == webhook_id).first()
+        if not hook:
+            return {"error": "Вебхук не найден"}
+        if "active" in data:
+            hook.is_active = bool(data["active"])
+        if "url" in data:
+            hook.url = data["url"]
+        if "project" in data:
+            hook.project = data["project"]
+        if "event" in data:
+            hook.event = data["event"]
+        db.commit()
+        return {"status": "updated"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.delete("/api/webhooks/{webhook_id}")
+def delete_webhook(webhook_id: int):
+    db = SessionLocal()
+    try:
+        db.query(Webhook).filter(Webhook.id == webhook_id).delete()
+        db.commit()
+        return {"status": "deleted"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
 
 
 @app.get("/api/ranking/members")
