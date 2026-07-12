@@ -44,6 +44,15 @@ class RefreshRequest(BaseModel):
 class LogoutRequest(BaseModel):
     refresh_token: str
 
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
 app = FastAPI(title="Nova API", version="0.7.0")
 
 app.add_middleware(
@@ -789,6 +798,73 @@ def resend_verification(data: dict):
         if not email_sent:
             print(f"[resend-verification] Письмо для {user.email} НЕ отправлено")
         return {"status": "ok", "email_sent": email_sent}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(data: ForgotPasswordRequest):
+    """Запросить восстановление пароля. Ответ одинаковый независимо от того,
+    существует ли такой email в базе — чтобы через этот эндпоинт нельзя было
+    проверять, какие адреса зарегистрированы."""
+    db = SessionLocal()
+    try:
+        email = data.email.strip().lower()
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            token = generate_verification_token()
+            user.password_reset_token = token
+            user.password_reset_expires = token_expiry(hours=1)
+            db.commit()
+
+            frontend_url = "https://nova-bot-4vmp.vercel.app"
+            reset_link = f"{frontend_url}/reset-password?token={token}"
+            sent = send_email(
+                user.email,
+                "Восстановление пароля — Nova Bot",
+                f"<h2>Восстановление пароля</h2>"
+                f"<p>Перейдите по ссылке, чтобы задать новый пароль:</p>"
+                f'<p><a href="{reset_link}">{reset_link}</a></p>'
+                f"<p>Ссылка действительна 1 час. Если вы не запрашивали восстановление — "
+                f"просто проигнорируйте это письмо.</p>",
+            )
+            if not sent:
+                print(f"[forgot-password] Письмо для {user.email} НЕ отправлено")
+
+        # Намеренно не сообщаем, найден ли email — одинаковый ответ в обоих случаях
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@app.post("/api/auth/reset-password")
+def reset_password(data: ResetPasswordRequest):
+    """Установить новый пароль по токену из письма. Заодно отзывает
+    все действующие refresh-токены — старые сессии придётся начать заново."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.password_reset_token == data.token).first()
+        if not user:
+            raise HTTPException(status_code=400, detail="Неверная или уже использованная ссылка")
+        if user.password_reset_expires and user.password_reset_expires < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Срок действия ссылки истёк, запросите восстановление заново")
+        if len(data.new_password) < 8:
+            raise HTTPException(status_code=400, detail="Пароль должен быть не короче 8 символов")
+
+        user.password_hash = hash_password(data.new_password)
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        user.refresh_token = None
+        db.commit()
+        return {"status": "ok"}
     except HTTPException:
         raise
     except Exception as e:
