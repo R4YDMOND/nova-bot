@@ -778,33 +778,48 @@ def sync_lolka_servers():
 
     db = SessionLocal()
     synced = 0
+    errors = []
     try:
         for g in guilds_resp.get("guilds", []):
             gid = str(g.get("id", ""))
             if not gid:
                 continue
-            server = db.query(Server).filter(
-                Server.server_id == gid, Server.platform == "lolka"
-            ).first()
-            icon_url = ""
-            if g.get("icon"):
-                icon_url = f"https://cdn.lolka.app/icons/{gid}/{g['icon']}.png"
-            if server:
-                server.name = g.get("name", server.name)
-                server.icon_url = icon_url or server.icon_url
-                server.member_count = g.get("member_count", server.member_count)
-            else:
-                server = Server(
-                    name=g.get("name", "Без названия"),
-                    server_id=gid,
-                    platform="lolka",
-                    icon_url=icon_url,
-                    member_count=g.get("member_count", 0),
-                )
-                db.add(server)
-            synced += 1
+            try:
+                # server_id уникален глобально (across VK и Lolka), поэтому ищем ТОЛЬКО по нему —
+                # без доп. фильтра по platform. Раньше фильтр "AND platform='lolka'" не находил
+                # существующую строку, если она почему-то была с другим platform, и код пытался
+                # сделать повторный INSERT, что падало с UniqueViolation на server_id.
+                server = db.query(Server).filter(Server.server_id == gid).first()
+
+                # Поле icon у гильдии Lolka — уже готовый полный URL (в отличие от Discord,
+                # где это просто хэш). Раньше сюда ещё раз оборачивали в шаблон
+                # cdn.lolka.app/icons/{id}/{icon}.png, из-за чего получался битый двойной URL.
+                icon_url = g.get("icon") or ""
+
+                if server:
+                    server.name = g.get("name", server.name)
+                    server.icon_url = icon_url or server.icon_url
+                    server.member_count = g.get("member_count", server.member_count)
+                    server.platform = "lolka"
+                else:
+                    server = Server(
+                        name=g.get("name", "Без названия"),
+                        server_id=gid,
+                        platform="lolka",
+                        icon_url=icon_url,
+                        member_count=g.get("member_count", 0),
+                    )
+                    db.add(server)
+                db.flush()
+                synced += 1
+            except Exception as item_err:
+                db.rollback()
+                errors.append(f"{gid}: {item_err}")
         db.commit()
-        return {"status": "ok", "synced": synced}
+        result = {"status": "ok", "synced": synced}
+        if errors:
+            result["errors"] = errors
+        return result
     except Exception as e:
         db.rollback()
         return {"status": "error", "error": str(e)}
