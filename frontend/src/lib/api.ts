@@ -16,6 +16,16 @@ export type DashboardServer = {
   member_count: number;
 };
 
+export type DashboardWebhook = {
+  id: number;
+  server_id: string;
+  platform: 'vk' | 'lolka';
+  project: string;
+  url: string;
+  event: string;
+  active: boolean;
+};
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -76,6 +86,20 @@ export const api = {
     getStats: (webhookId = '') => apiFetch<{ total_sent: number; today_sent: number; last_sent: string | null }>(`/api/webhooks/stats?webhook_id=${webhookId}`),
     getAutoForwardConfig: (serverId = 'default') => apiFetch<{ config: object }>(`/api/webhooks/auto-forward/config?server_id=${serverId}`),
     saveAutoForwardConfig: (data: object) => apiFetch<{ status: string }>('/api/webhooks/auto-forward/config', { method: 'POST', body: JSON.stringify(data) }),
+    list: (serverId: string) =>
+      apiFetch<{ webhooks: DashboardWebhook[]; error?: string }>(`/api/webhooks?server_id=${serverId}`),
+    create: (data: { server_id: string; platform: 'vk' | 'lolka'; project: string; url: string; event: string }) =>
+      apiFetch<{ status?: string; error?: string; webhook?: DashboardWebhook }>('/api/webhooks', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: Partial<{ active: boolean; url: string; project: string; event: string }>) =>
+      apiFetch<{ status?: string; error?: string }>(`/api/webhooks/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    remove: (id: number) =>
+      apiFetch<{ status?: string; error?: string }>(`/api/webhooks/${id}`, { method: 'DELETE' }),
   },
   analytics: {
     getReportsConfig: (serverId = 'default') => apiFetch<{ config: object }>(`/api/analytics/reports?server_id=${serverId}`),
