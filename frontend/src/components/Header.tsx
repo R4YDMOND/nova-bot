@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
+import { ServerSwitcher } from './ServerSwitcher';
 
 interface Profile {
   name: string;
@@ -53,6 +54,8 @@ export function Header() {
             </span>
           ))}
         </nav>
+
+        <ServerSwitcher />
 
         <div className="relative w-72 ml-auto md:ml-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--text-secondary))] w-4 h-4" />

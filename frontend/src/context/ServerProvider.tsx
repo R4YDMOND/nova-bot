@@ -1,28 +1,25 @@
 'use client';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { api, DashboardServer } from '@/lib/api';
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { api, type Server } from '@/lib/api';
-
-const STORAGE_KEY = 'nova_selected_server_id';
-
-type ServerContextValue = {
-  servers: Server[];
-  selectedServer: Server | null;
-  selectedServerId: string;
-  setSelectedServerId: (id: string) => void;
+interface ServerContextValue {
+  servers: DashboardServer[];
   loading: boolean;
+  selectedServerId: string;
+  selectedServer: DashboardServer | null;
+  selectServer: (serverId: string) => void;
   refresh: () => Promise<void>;
-  syncLolka: () => Promise<{ status: string; synced?: number; error?: string }>;
-  syncing: boolean;
-};
+  syncLolka: () => Promise<{ status?: string; synced?: number; error?: string }>;
+}
+
+const STORAGE_KEY = 'nova:selectedServerId';
 
 const ServerContext = createContext<ServerContextValue | null>(null);
 
-export function ServerProvider({ children }: { children: ReactNode }) {
-  const [servers, setServers] = useState<Server[]>([]);
-  const [selectedServerId, setSelectedServerIdState] = useState<string>('default');
+export function ServerProvider({ children }: { children: React.ReactNode }) {
+  const [servers, setServers] = useState<DashboardServer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [selectedServerId, setSelectedServerId] = useState<string>('default');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -32,46 +29,46 @@ export function ServerProvider({ children }: { children: ReactNode }) {
       setServers(list);
 
       const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-      if (saved && list.some((s) => s.server_id === saved)) {
-        setSelectedServerIdState(saved);
+      const stillExists = saved && list.some(s => s.server_id === saved);
+      if (stillExists && saved) {
+        setSelectedServerId(saved);
       } else if (list.length > 0) {
-        setSelectedServerIdState(list[0].server_id);
-      } else {
-        setSelectedServerIdState('default');
+        setSelectedServerId(list[0].server_id);
+        if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, list[0].server_id);
       }
     } catch {
-      setServers([]);
+      // остаёмся на 'default', страницы продолжат работать с дефолтным сервером
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  function setSelectedServerId(id: string) {
-    setSelectedServerIdState(id);
-    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, id);
-  }
-
-  async function syncLolka() {
-    setSyncing(true);
+  const syncLolka = useCallback(async () => {
     try {
       const res = await api.servers.syncLolka();
       await refresh();
       return res;
-    } finally {
-      setSyncing(false);
+    } catch {
+      return { error: 'Не удалось синхронизировать серверы Lolka' };
     }
-  }
+  }, [refresh]);
 
-  const selectedServer = servers.find((s) => s.server_id === selectedServerId) || null;
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    if (saved) setSelectedServerId(saved);
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const selectServer = useCallback((serverId: string) => {
+    setSelectedServerId(serverId);
+    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, serverId);
+  }, []);
+
+  const selectedServer = servers.find(s => s.server_id === selectedServerId) || null;
 
   return (
-    <ServerContext.Provider
-      value={{ servers, selectedServer, selectedServerId, setSelectedServerId, loading, refresh, syncLolka, syncing }}
-    >
+    <ServerContext.Provider value={{ servers, loading, selectedServerId, selectedServer, selectServer, refresh, syncLolka }}>
       {children}
     </ServerContext.Provider>
   );
@@ -80,7 +77,15 @@ export function ServerProvider({ children }: { children: ReactNode }) {
 export function useServer() {
   const ctx = useContext(ServerContext);
   if (!ctx) {
-    throw new Error('useServer() должен использоваться внутри <ServerProvider>');
+    return {
+      servers: [] as DashboardServer[],
+      loading: false,
+      selectedServerId: 'default',
+      selectedServer: null,
+      selectServer: () => {},
+      refresh: async () => {},
+      syncLolka: async () => ({}),
+    } as ServerContextValue;
   }
   return ctx;
 }

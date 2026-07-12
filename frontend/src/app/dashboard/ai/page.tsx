@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/toggle';
 import { api } from '@/lib/api';
+import { useServer } from '@/context/ServerProvider';
 
 interface AISettings {
   botName: string;
@@ -62,13 +63,14 @@ const TABS = [
 ];
 
 export default function AIPage() {
+  const { selectedServerId } = useServer();
   const [settings, setSettings] = useState<AISettings>(DEFAULT);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
 
   useEffect(() => {
-    api.ai.get().then((data) => {
+    api.ai.get(selectedServerId).then((data) => {
       if (data.settings) {
         const s = data.settings as Record<string, unknown>;
         setSettings(prev => ({
@@ -78,9 +80,11 @@ export default function AIPage() {
           geminiTemperature: (s.temperature as number) ?? prev.geminiTemperature,
           systemPrompt: (s.systemPrompt as string) || prev.systemPrompt,
         }));
+      } else {
+        setSettings(DEFAULT);
       }
     }).catch(() => {});
-  }, []);
+  }, [selectedServerId]);
 
   const update = <K extends keyof AISettings>(key: K, value: AISettings[K]) =>
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -92,7 +96,7 @@ export default function AIPage() {
     setSaving(true);
     try {
       await api.ai.save({
-        server_id: 'default',
+        server_id: selectedServerId,
         botName: settings.botName,
         personality: settings.activeModel,
         temperature: settings.geminiTemperature,

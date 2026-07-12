@@ -1,40 +1,46 @@
 'use client';
-
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
 import { api } from '@/lib/api';
 import { useServer } from '@/context/ServerProvider';
+import { RefreshCw, Plus, Trash2, X } from 'lucide-react';
 
-interface LolkaBotStatus {
-  configured: boolean;
-  connected: boolean;
-  bot: { username?: string; avatar?: string } | null;
-}
-
-const PLATFORM_META: Record<string, { label: string; badge: string; icon: string }> = {
-  vk: { label: 'VK', badge: 'bg-blue-500/15 text-blue-400', icon: '🔵' },
-  lolka: { label: 'Lolka', badge: 'bg-purple-500/15 text-purple-400', icon: '🟣' },
-};
+const PLATFORM_ICON: Record<string, string> = { lolka: '🎮', vk: '🔵' };
+const PLATFORM_LABEL: Record<string, string> = { lolka: 'Lolka', vk: 'VK' };
 
 export default function ServersPage() {
-  const { servers, loading, refresh, syncLolka, syncing } = useServer();
+  const { servers, loading, selectedServerId, selectServer, refresh, syncLolka } = useServer();
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', server_id: '', webhook_url: '' });
+  const [form, setForm] = useState({ name: '', server_id: '', platform: 'vk' as 'vk' | 'lolka', webhook_url: '' });
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [botStatus, setBotStatus] = useState<LolkaBotStatus | null>(null);
+  const [botStatus, setBotStatus] = useState<{ configured: boolean; connected: boolean; bot: { username?: string } | null } | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     api.lolkaBot.getStatus().then(setBotStatus).catch(() => {});
   }, []);
 
-  const vkCount = servers.filter((s) => s.platform === 'vk').length;
-  const lolkaCount = servers.filter((s) => s.platform === 'lolka').length;
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    const res = await syncLolka();
+    if (res.error) {
+      setSyncMsg(`⚠️ ${res.error}`);
+    } else {
+      setSyncMsg(`✅ Синхронизировано серверов: ${res.synced ?? 0}`);
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncMsg(null), 5000);
+  }
 
   async function inviteBot() {
     setInviteLoading(true);
@@ -53,53 +59,62 @@ export default function ServersPage() {
     }
   }
 
-  async function handleSyncLolka() {
-    setSyncMessage(null);
-    const res = await syncLolka();
-    if (res.error) {
-      setSyncMessage(`❌ ${res.error}`);
-    } else {
-      setSyncMessage(`✅ Синхронизировано серверов: ${res.synced ?? 0}`);
-    }
-    setTimeout(() => setSyncMessage(null), 5000);
+  function openModal() {
+    setForm({ name: '', server_id: '', platform: 'vk', webhook_url: '' });
+    setFormError(null);
+    setShowModal(true);
   }
 
-  async function handleAdd() {
-    if (!form.name.trim() || !form.server_id.trim()) return;
+  async function createServer() {
+    if (!form.name.trim() || !form.server_id.trim()) {
+      setFormError('Заполните название и ID сервера');
+      return;
+    }
     setSaving(true);
+    setFormError(null);
     try {
-      await api.servers.create({ ...form, platform: 'vk' });
+      const res = await api.servers.create(form);
+      if (res.error) {
+        setFormError(res.error);
+        return;
+      }
       setShowModal(false);
-      setForm({ name: '', server_id: '', webhook_url: '' });
-      refresh();
+      await refresh();
     } catch {
-      alert('Не удалось добавить сервер');
+      setFormError('Не удалось создать сервер');
     } finally {
       setSaving(false);
     }
   }
 
+  async function removeServer(id: number) {
+    if (!confirm('Удалить сервер из панели Nova? Сам сервер в VK/Lolka не пострадает.')) return;
+    await api.servers.remove(id).catch(() => {});
+    await refresh();
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-start flex-wrap gap-4">
+    <div className="space-y-8 p-8 max-w-5xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">🌐 Мои серверы</h1>
-          <p className="text-[rgb(var(--text-secondary))]">Серверы из VK и Lolka в одном месте</p>
+          <h1 className="text-3xl font-bold text-[rgb(var(--text))]">Серверы</h1>
+          <p className="text-[rgb(var(--text-secondary))] mt-1">Серверы Lolka и сообщества VK, подключённые к Nova</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="secondary" onClick={handleSyncLolka} disabled={syncing}>
-            {syncing ? 'Синхронизация...' : '🔄 Синхронизировать с Lolka'}
+          <Button variant="secondary" onClick={handleSync} disabled={syncing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Синхронизация...' : 'Синхронизировать с Lolka'}
           </Button>
-          <Button onClick={() => setShowModal(true)}>+ Добавить сервер VK</Button>
+          <Button onClick={openModal}>
+            <Plus className="w-4 h-4 mr-2" />
+            Добавить вручную
+          </Button>
         </div>
       </div>
 
-      {syncMessage && (
-        <div className="px-4 py-3 rounded-2xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-sm">
-          {syncMessage}
-        </div>
-      )}
+      {syncMsg && <p className="text-sm text-[rgb(var(--text-secondary))]">{syncMsg}</p>}
 
+      {/* Статус бота Lolka */}
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -113,19 +128,15 @@ export default function ServersPage() {
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     botStatus.connected ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'
                   }`}>
-                    {botStatus.connected ? '🟢 Подключён' : '🟡 Токен задан, ждём соединения'}
+                    {botStatus.connected ? '🟢 Подключён' : '🟡 Ждём соединения'}
                   </span>
                 )}
                 {botStatus && !botStatus.configured && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400">
-                    🔴 Не настроен
-                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400">🔴 Не настроен</span>
                 )}
               </div>
               <p className="text-sm text-[rgb(var(--text-secondary))] mt-0.5">
-                {botStatus?.bot?.username
-                  ? `@${botStatus.bot.username} — добавьте бота на нужные серверы, затем нажмите «Синхронизировать с Lolka»`
-                  : 'Добавьте бота на свой сервер в Lolka, чтобы начать пользоваться модерацией, музыкой и командами'}
+                {botStatus?.bot?.username ? `@${botStatus.bot.username}` : 'Добавьте бота на сервер, чтобы он появился здесь автоматически'}
               </p>
               {inviteError && <p className="text-red-400 text-xs mt-1">{inviteError}</p>}
             </div>
@@ -136,114 +147,91 @@ export default function ServersPage() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Всего серверов', value: loading ? '...' : servers.length, icon: '🌐' },
-          { label: 'VK-сообществ', value: loading ? '...' : vkCount, icon: '🔵' },
-          { label: 'Lolka-серверов', value: loading ? '...' : lolkaCount, icon: '🟣' },
-          { label: 'Время ответа', value: '<0.8s', icon: '⚡' },
-        ].map((s, i) => (
-          <Card key={i} className="flex items-center gap-4 p-6">
-            <span className="text-3xl">{s.icon}</span>
-            <div>
-              <div className="text-2xl font-bold">{s.value}</div>
-              <div className="text-sm text-[rgb(var(--text-secondary))]">{s.label}</div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      <Card>
-        {loading ? (
-          <div className="py-16 text-center text-[rgb(var(--text-secondary))]"><p>Загрузка серверов...</p></div>
-        ) : servers.length === 0 ? (
-          <div className="py-16 text-center">
-            <div className="text-5xl mb-4">🌐</div>
-            <p className="text-[rgb(var(--text-secondary))] mb-4">
-              У вас пока нет подключённых серверов. Добавьте VK-сообщество вручную или синхронизируйте Lolka.
-            </p>
-            <div className="flex justify-center gap-3">
-              <Button variant="secondary" onClick={handleSyncLolka}>🔄 Синхронизировать с Lolka</Button>
-              <Button onClick={() => setShowModal(true)}>Добавить сервер VK</Button>
-            </div>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[rgb(var(--border))] text-left text-xs uppercase text-[rgb(var(--text-secondary))]">
-                <th className="py-4 px-4">Сервер</th>
-                <th className="py-4 px-4">Платформа</th>
-                <th className="py-4 px-4">Участники</th>
-                <th className="py-4 px-4">ID</th>
-                <th className="py-4 px-4">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {servers.map((s) => {
-                const m = PLATFORM_META[s.platform] || PLATFORM_META.vk;
-                return (
-                  <tr key={`${s.platform}-${s.id}`} className="border-b border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-2))] transition-colors">
-                    <td className="py-4 px-4 font-medium">
-                      <div className="flex items-center gap-3">
-                        {s.icon_url ? (
-                          <img src={s.icon_url} alt="" className="w-8 h-8 rounded-full" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white">
-                            {s.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        {s.name}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${m.badge}`}>
-                        {m.icon} {m.label}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-[rgb(var(--text-secondary))]">
-                      {s.member_count > 0 ? s.member_count.toLocaleString('ru-RU') : '—'}
-                    </td>
-                    <td className="py-4 px-4 text-[rgb(var(--text-secondary))] text-xs font-mono">{s.server_id}</td>
-                    <td className="py-4 px-4">
-                      <Button variant="secondary" size="sm" onClick={() => (window.location.href = '/dashboard/commands')}>
-                        Настроить
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </Card>
+      {/* Список серверов */}
+      {loading ? (
+        <p className="text-[rgb(var(--text-secondary))]">Загрузка...</p>
+      ) : servers.length === 0 ? (
+        <div className="text-center py-16 text-[rgb(var(--text-secondary))]">
+          <p>Пока нет ни одного сервера. Добавьте бота в Lolka и нажмите «Синхронизировать» — или добавьте сервер вручную.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {servers.map(s => (
+            <Card
+              key={s.id}
+              className={`p-5 flex items-center gap-4 cursor-pointer transition-colors ${
+                s.server_id === selectedServerId ? 'border-primary' : 'hover:border-primary/40'
+              }`}
+              onClick={() => selectServer(s.server_id)}
+            >
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xl shrink-0">
+                {PLATFORM_ICON[s.platform] || '🔵'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold truncate">{s.name}</h3>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] shrink-0">
+                    {PLATFORM_LABEL[s.platform] || s.platform}
+                  </span>
+                </div>
+                <p className="text-sm text-[rgb(var(--text-secondary))]">
+                  {s.member_count > 0 ? `${s.member_count} участников` : `ID: ${s.server_id}`}
+                </p>
+              </div>
+              {s.server_id === selectedServerId && (
+                <span className="text-xs text-primary font-medium shrink-0">Выбран</span>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
+                className="p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                title="Удалить из панели"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h2 className="text-xl font-semibold">Добавить сервер VK</h2>
-            <p className="text-xs text-[rgb(var(--text-secondary))]">
-              Серверы Lolka добавлять вручную не нужно — используйте кнопку «Синхронизировать с Lolka» выше, она подтянет их автоматически.
-            </p>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Название сообщества</label>
-              <input className="input w-full" placeholder="Моё сообщество"
-                value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">ID сообщества VK</label>
-              <input className="input w-full" placeholder="123456789"
-                value={form.server_id} onChange={(e) => setForm((f) => ({ ...f, server_id: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Webhook URL (необязательно)</label>
-              <input className="input w-full" placeholder="https://..."
-                value={form.webhook_url} onChange={(e) => setForm((f) => ({ ...f, webhook_url: e.target.value }))} />
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="ghost" onClick={() => setShowModal(false)}>Отмена</Button>
-              <Button onClick={handleAdd} disabled={saving || !form.name || !form.server_id}>
-                {saving ? 'Добавление...' : 'Добавить'}
-              </Button>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-8 max-w-md w-full relative shadow-2xl" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold mb-6">Добавить сервер вручную</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Платформа</label>
+                <Select value={form.platform} onValueChange={(v: string) => setForm(f => ({ ...f, platform: v as 'vk' | 'lolka' }))}>
+                  <SelectTrigger>
+                    <span>{PLATFORM_ICON[form.platform]} {PLATFORM_LABEL[form.platform]}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vk">🔵 VK</SelectItem>
+                    <SelectItem value="lolka">🎮 Lolka</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Название</label>
+                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Например, Моё сообщество" className="input w-full" />
+              </div>
+              <div>
+                <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">
+                  ID {form.platform === 'vk' ? 'сообщества VK' : 'сервера Lolka'}
+                </label>
+                <input type="text" value={form.server_id} onChange={e => setForm(f => ({ ...f, server_id: e.target.value }))} placeholder="123456789" className="input w-full font-mono text-sm" />
+              </div>
+              {formError && <p className="text-red-400 text-sm">{formError}</p>}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowModal(false)} className="flex-1 px-5 py-2.5 border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] rounded-xl hover:bg-[rgb(var(--surface-2))] transition-colors">
+                  Отмена
+                </button>
+                <Button onClick={createServer} disabled={saving} className="flex-1">
+                  {saving ? 'Создаём...' : 'Добавить'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

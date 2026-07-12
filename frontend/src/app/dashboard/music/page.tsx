@@ -1,11 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { useServer } from '@/context/ServerProvider';
 
 type Provider = { id: number; type: string; name: string; enabled: boolean; streamUrl: string; channels?: string[] };
 type AvailableType = { value: string; label: string; icon: string; category: string };
 
 export default function MusicPage() {
+  const { selectedServerId } = useServer();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [availableTypes, setAvailableTypes] = useState<AvailableType[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -17,11 +19,11 @@ export default function MusicPage() {
   const [editDraft, setEditDraft] = useState({ name: '', api_key: '', webhook_url: '', channels: '' });
   const [editSaving, setEditSaving] = useState(false);
 
-  useEffect(() => { loadProviders(); }, []);
+  useEffect(() => { loadProviders(); }, [selectedServerId]);
 
   async function loadProviders() {
     try {
-      const data = await api.music.getProviders();
+      const data = await api.music.getProviders(selectedServerId);
       setProviders((data.providers as Provider[]) || []);
       setAvailableTypes((data.available_types as AvailableType[]) || []);
     } catch {}
@@ -35,7 +37,7 @@ export default function MusicPage() {
     setSaving(true);
     try {
       await api.music.addProvider({
-        server_id: 'default',
+        server_id: selectedServerId,
         type: newProvider.type,
         name: newProvider.name || newProvider.type,
         api_key: newProvider.api_key,

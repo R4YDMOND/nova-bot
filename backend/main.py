@@ -97,11 +97,30 @@ def create_server(
 ):
     db = SessionLocal()
     try:
+        existing = db.query(Server).filter(Server.server_id == server_id).first()
+        if existing:
+            return {"error": "Сервер с таким ID уже зарегистрирован"}
         server = Server(name=name, server_id=server_id, webhook_url=webhook_url, platform=platform)
         db.add(server)
         db.commit()
         db.refresh(server)
         return {"status": "created", "server": {"id": server.id, "name": server.name, "platform": server.platform}}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+@app.delete("/api/servers/{db_id}")
+def delete_server(db_id: int):
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.id == db_id).first()
+        if not server:
+            return {"error": "Сервер не найден"}
+        db.delete(server)
+        db.commit()
+        return {"status": "deleted"}
     except Exception as e:
         db.rollback()
         return {"error": str(e)}

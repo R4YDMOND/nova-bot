@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/toggle';
 import { api } from '@/lib/api';
+import { useServer } from '@/context/ServerProvider';
 
 type Stats = { serversCount?: number; totalMessages?: number; activeUsers?: number; commandsUsed?: number };
 type ReportConfig = { webhook_url?: string; daily?: boolean; weekly?: boolean; monthly?: boolean; include_members?: boolean; include_commands?: boolean; include_activity?: boolean };
 
 export default function AnalyticsPage() {
+  const { selectedServerId } = useServer();
   const [stats, setStats] = useState<Stats>({});
   const [reports, setReports] = useState<ReportConfig>({});
   const [saved, setSaved] = useState(false);
@@ -15,21 +17,22 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       api.stats.getDashboard().catch(() => ({})),
-      api.analytics.getReportsConfig().catch(() => ({ config: {} })),
+      api.analytics.getReportsConfig(selectedServerId).catch(() => ({ config: {} })),
     ]).then(([statsData, reportsData]) => {
       setStats(statsData as Stats);
       setReports((reportsData as { config: ReportConfig }).config || {});
       setLoading(false);
     });
-  }, []);
+  }, [selectedServerId]);
 
   const updateReport = (key: keyof ReportConfig, value: ReportConfig[keyof ReportConfig]) =>
     setReports(prev => ({ ...prev, [key]: value }));
 
   const saveReports = async () => {
-    await api.analytics.saveReportsConfig({ server_id: 'default', config: reports }).catch(() => {});
+    await api.analytics.saveReportsConfig({ server_id: selectedServerId, config: reports }).catch(() => {});
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
