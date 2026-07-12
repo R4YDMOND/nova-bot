@@ -6,7 +6,10 @@ import base64
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
 from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook
-from auth_utils import hash_password, verify_password, generate_verification_token, token_expiry
+from auth_utils import (
+    hash_password, verify_password, generate_verification_token, token_expiry,
+    create_access_token, create_refresh_token, verify_token,
+)
 from email_utils import send_verification_email, send_email
 import requests
 import random
@@ -32,6 +35,14 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
 
 app = FastAPI(title="Nova API", version="0.7.0")
 
@@ -618,7 +629,7 @@ def verify_email(token: str):
 
 @app.post("/api/auth/login")
 def login(data: LoginRequest):
-    """Вход по e-mail и паролю"""
+    """Вход по e-mail и паролю — выдаёт настоящую пару JWT (access + refresh)."""
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == data.email).first()
@@ -627,15 +638,84 @@ def login(data: LoginRequest):
         if not user.is_verified:
             raise HTTPException(status_code=403, detail="Подтвердите email перед входом")
 
-        nova_token = secrets.token_hex(32)
+        payload = {"sub": str(user.id), "email": user.email}
+        access_token = create_access_token(payload)
+        refresh_token = create_refresh_token(payload)
+
+        user.refresh_token = refresh_token
+        db.commit()
+
         return {
             "status": "ok",
-            "token": nova_token,
+            "access_token": access_token,
+            "refresh_token": refresh_token,
             "user": {"id": user.id, "email": user.email},
         }
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@app.post("/api/auth/refresh")
+def refresh_access_token(data: RefreshRequest):
+    """Выдаёт новую пару токенов по действующему refresh-токену (с ротацией —
+    старый refresh-токен сразу перестаёт быть валидным)."""
+    db = SessionLocal()
+    try:
+        payload = verify_token(data.refresh_token, expected_type="refresh")
+        if not payload:
+            raise HTTPException(status_code=401, detail="Refresh-токен недействителен или истёк")
+
+        user = db.query(User).filter(User.id == int(payload["sub"])).first()
+        if not user or user.refresh_token != data.refresh_token:
+            # user.refresh_token не совпадает — токен был отозван (logout)
+            # или уже использован раньше (ротация), либо это чужой/поддельный токен
+            raise HTTPException(status_code=401, detail="Refresh-токен отозван")
+
+        new_payload = {"sub": str(user.id), "email": user.email}
+        access_token = create_access_token(new_payload)
+        new_refresh_token = create_refresh_token(new_payload)
+
+        user.refresh_token = new_refresh_token
+        db.commit()
+
+        return {
+            "status": "ok",
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@app.post("/api/auth/logout")
+def logout(data: LogoutRequest):
+    """Отзывает refresh-токен — им больше нельзя будет обновить access-токен,
+    даже если срок действия ещё не истёк."""
+    db = SessionLocal()
+    try:
+        payload = verify_token(data.refresh_token, expected_type="refresh")
+        if not payload:
+            # токен и так уже нерабочий — с точки зрения клиента это тоже успешный logout
+            return {"status": "ok"}
+
+        user = db.query(User).filter(User.id == int(payload["sub"])).first()
+        if user and user.refresh_token == data.refresh_token:
+            user.refresh_token = None
+            db.commit()
+
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
