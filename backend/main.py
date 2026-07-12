@@ -568,14 +568,15 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
 def register(data: RegisterRequest):
     db = SessionLocal()
     try:
-        existing = db.query(User).filter(User.email == data.email).first()
+        email = data.email.strip().lower()
+        existing = db.query(User).filter(User.email == email).first()
         if existing:
             raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
         if len(data.password) < 8:
             raise HTTPException(status_code=400, detail="Пароль должен быть не короче 8 символов")
         token = generate_verification_token()
         user = User(
-            email=data.email,
+            email=email,
             password_hash=hash_password(data.password),
             verification_token=token,
             verification_token_expires=token_expiry(),
@@ -583,9 +584,9 @@ def register(data: RegisterRequest):
         db.add(user)
         db.commit()
         base_url = "https://nova-bot-rpsy.onrender.com"
-        email_sent = send_verification_email(data.email, token, base_url)
+        email_sent = send_verification_email(email, token, base_url)
         if not email_sent:
-            print(f"[register] Пользователь {data.email} создан, но письмо НЕ отправлено")
+            print(f"[register] Пользователь {email} создан, но письмо НЕ отправлено")
         return {
             "status": "ok",
             "message": "Проверьте почту для подтверждения" if email_sent else "Аккаунт создан, но письмо не отправлено — попробуйте позже",
@@ -632,7 +633,8 @@ def login(data: LoginRequest):
     """Вход по e-mail и паролю — выдаёт настоящую пару JWT (access + refresh)."""
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.email == data.email).first()
+        email = data.email.strip().lower()
+        user = db.query(User).filter(User.email == email).first()
         if not user or not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Неверный email или пароль")
         if not user.is_verified:
@@ -727,7 +729,7 @@ def debug_user(email: str = Query(...)):
     Не отдаёт password_hash и другие чувствительные поля. Удалить после отладки."""
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.email == email).first()
+        user = db.query(User).filter(User.email == email.strip().lower()).first()
         if not user:
             return {"exists": False}
         return {
@@ -739,11 +741,34 @@ def debug_user(email: str = Query(...)):
         db.close()
 
 
+@app.post("/api/auth/normalize-emails")
+def normalize_emails():
+    """ВРЕМЕННЫЙ эндпоинт-миграция: привести все email в таблице users к нижнему
+    регистру (нужно один раз после деплоя нормализации email в register/login).
+    Удалить после использования."""
+    db = SessionLocal()
+    try:
+        users = db.query(User).all()
+        changed = 0
+        for u in users:
+            lower = u.email.strip().lower()
+            if lower != u.email:
+                u.email = lower
+                changed += 1
+        db.commit()
+        return {"status": "ok", "changed": changed, "total": len(users)}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 @app.post("/api/auth/resend-verification")
 def resend_verification(data: dict):
     """Повторно отправить письмо с подтверждением уже существующему,
     но ещё не подтверждённому аккаунту (без создания нового пользователя)."""
-    email = data.get("email", "")
+    email = data.get("email", "").strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="email обязателен")
     db = SessionLocal()
