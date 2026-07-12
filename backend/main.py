@@ -721,6 +721,24 @@ def logout(data: LogoutRequest):
         db.close()
 
 
+@app.get("/api/auth/debug-user")
+def debug_user(email: str = Query(...)):
+    """ВРЕМЕННЫЙ эндпоинт для отладки: проверить состояние пользователя по email.
+    Не отдаёт password_hash и другие чувствительные поля. Удалить после отладки."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            return {"exists": False}
+        return {
+            "exists": True,
+            "is_verified": user.is_verified,
+            "has_refresh_token": bool(user.refresh_token),
+        }
+    finally:
+        db.close()
+
+
 # ==================== Отправка сообщений ====================
 
 @app.post("/api/send/lolka")
