@@ -26,7 +26,7 @@ export default function ServersPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.lolkaBot.getStatus().then(setBotStatus).catch(() => {});
+    api.lolkaBot.getStatus().then(setBotStatus).catch(() => { });
   }, []);
 
   async function inviteBot() {
@@ -123,9 +123,8 @@ export default function ServersPage() {
               <div className="font-semibold flex items-center gap-2">
                 Бот Nova в Lolka
                 {botStatus?.configured && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    botStatus.connected ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'
-                  }`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${botStatus.connected ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'
+                    }`}>
                     {botStatus.connected ? '🟢 Подключён' : '🟡 Ждём соединения'}
                   </span>
                 )}
@@ -161,9 +160,8 @@ export default function ServersPage() {
           {servers.map(s => (
             <Card
               key={s.id}
-              className={`p-5 flex items-center gap-4 cursor-pointer transition-colors ${
-                s.server_id === selectedServerId ? 'border-primary' : 'hover:border-primary/40'
-              }`}
+              className={`p-5 flex items-center gap-4 cursor-pointer transition-colors ${s.server_id === selectedServerId ? 'border-primary' : 'hover:border-primary/40'
+                }`}
               onClick={() => selectServer(s.server_id)}
             >
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xl shrink-0">
@@ -197,7 +195,10 @@ export default function ServersPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+        >
           <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-8 max-w-md w-full relative shadow-2xl" onClick={e => e.stopPropagation()}>
             <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
               <X className="w-5 h-5" />
