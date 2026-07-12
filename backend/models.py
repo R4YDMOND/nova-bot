@@ -151,10 +151,10 @@ class NotificationSettings(Base):
 
     max_enabled = Column(Boolean, default=False)
     max_webhook_url = Column(String, default="")
-
     updated_at = Column(DateTime, default=datetime.utcnow)
 
-    class Webhook(Base):
+
+class Webhook(Base):
     """Вебхук интеграции VK/Lolka, привязанный к конкретному серверу и платформе."""
     __tablename__ = "webhooks"
 
