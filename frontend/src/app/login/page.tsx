@@ -69,7 +69,7 @@ function LoginContent() {
             </div>
           )}
 
-          
+          <a
             href="/api/auth/vk"
             className="flex items-center justify-center gap-3 w-full py-3.5 px-6 rounded-2xl font-semibold text-white transition-all active:scale-95"
             style={{ backgroundColor: '#0077FF' }}

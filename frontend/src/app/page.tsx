@@ -222,7 +222,7 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-col gap-3 mb-8 max-w-md mx-auto lg:mx-0">
-              
+              <a
                 href="/api/auth/vk"
                 className="inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-[#0077FF] to-[#2b8fff] hover:opacity-90 transition-opacity"
               >
