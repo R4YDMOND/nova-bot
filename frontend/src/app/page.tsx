@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTheme } from '@/components/ThemeProvider';
@@ -140,7 +141,6 @@ export default function HomePage() {
   const [stats, setStats] = useState(FALLBACK_STATS);
   const [loaded, setLoaded] = useState(false);
   const [showLolkaModal, setShowLolkaModal] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -222,7 +222,7 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-col gap-3 mb-8 max-w-md mx-auto lg:mx-0">
-              <a
+              
                 href="/api/auth/vk"
                 className="inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-[#0077FF] to-[#2b8fff] hover:opacity-90 transition-opacity"
               >
@@ -240,13 +240,13 @@ export default function HomePage() {
                 Войти через Lolka
               </button>
 
-              <button
-                onClick={() => setShowEmailModal(true)}
+              <Link
+                href="/register"
                 className="inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl font-semibold border border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-2))] transition-colors"
               >
                 <Mail className="w-5 h-5" />
                 Регистрация по e-mail
-              </button>
+              </Link>
             </div>
 
             {/* Stats */}
@@ -335,26 +335,6 @@ export default function HomePage() {
               <div className="flex items-center gap-2 text-sm text-[rgb(var(--text-secondary))]"><span className="text-yellow-400">⏳</span> OAuth2-вход пользователей — в разработке у Lolka</div>
             </div>
             <button onClick={() => setShowLolkaModal(false)} className="w-full px-5 py-3 border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] rounded-xl hover:bg-[rgb(var(--surface-2))] transition-colors">
-              Закрыть
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showEmailModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowEmailModal(false)}>
-          <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-8 max-w-md w-full text-center relative shadow-2xl" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowEmailModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-            <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold text-[rgb(var(--text))] mb-2">Вход по e-mail — скоро</h2>
-            <p className="text-[rgb(var(--text-secondary))] text-sm leading-relaxed mb-6">
-              Полноценная регистрация и вход по e-mail и паролю в разработке. Пока используйте VK.
-            </p>
-            <button onClick={() => setShowEmailModal(false)} className="w-full px-5 py-3 border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] rounded-xl hover:bg-[rgb(var(--surface-2))] transition-colors">
               Закрыть
             </button>
           </div>

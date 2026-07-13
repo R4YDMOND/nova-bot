@@ -1,5 +1,4 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://nova-bot-rpsy.onrender.com';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://nova-bot-rpsy.onrender.com';
 
 export type NotificationSettings = {
   email: { enabled: boolean; address: string };
@@ -26,6 +25,8 @@ export type DashboardWebhook = {
   active: boolean;
 };
 
+export type AuthUser = { id: number; email: string };
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -35,7 +36,18 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
       signal: controller.signal,
       headers: { 'Content-Type': 'application/json', ...options.headers },
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    if (!res.ok) {
+      // Раньше тут терялось тело ответа — FastAPI кладёт человекочитаемую
+      // причину ошибки в JSON-поле detail, а мы показывали только "HTTP 401".
+      let detail = '';
+      try {
+        const body = await res.json();
+        detail = body?.detail || body?.error || '';
+      } catch {
+        // тело не JSON — просто нет detail, не страшно
+      }
+      throw new Error(detail || `HTTP ${res.status}: ${res.statusText}`);
+    }
     return (await res.json()) as T;
   } catch (error) {
     if ((error as Error).name === 'AbortError') throw new Error('Превышено время ожидания');
@@ -47,7 +59,8 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
 export const api = {
   servers: {
-    list: (platform?: 'vk' | 'lolka') => apiFetch<{ servers: DashboardServer[]; total: number }>(`/api/servers${platform ? `?platform=${platform}` : ''}`),
+    list: (platform?: 'vk' | 'lolka') =>
+      apiFetch<{ servers: DashboardServer[]; total: number }>(`/api/servers${platform ? `?platform=${platform}` : ''}`),
     create: (data: { name: string; server_id: string; platform?: 'vk' | 'lolka'; webhook_url?: string }) => {
       const params = new URLSearchParams({ name: data.name, server_id: data.server_id, platform: data.platform || 'vk' });
       if (data.webhook_url) params.set('webhook_url', data.webhook_url);
@@ -86,20 +99,12 @@ export const api = {
     getStats: (webhookId = '') => apiFetch<{ total_sent: number; today_sent: number; last_sent: string | null }>(`/api/webhooks/stats?webhook_id=${webhookId}`),
     getAutoForwardConfig: (serverId = 'default') => apiFetch<{ config: object }>(`/api/webhooks/auto-forward/config?server_id=${serverId}`),
     saveAutoForwardConfig: (data: object) => apiFetch<{ status: string }>('/api/webhooks/auto-forward/config', { method: 'POST', body: JSON.stringify(data) }),
-    list: (serverId: string) =>
-      apiFetch<{ webhooks: DashboardWebhook[]; error?: string }>(`/api/webhooks?server_id=${serverId}`),
+    list: (serverId: string) => apiFetch<{ webhooks: DashboardWebhook[]; error?: string }>(`/api/webhooks?server_id=${serverId}`),
     create: (data: { server_id: string; platform: 'vk' | 'lolka'; project: string; url: string; event: string }) =>
-      apiFetch<{ status?: string; error?: string; webhook?: DashboardWebhook }>('/api/webhooks', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+      apiFetch<{ status?: string; error?: string; webhook?: DashboardWebhook }>('/api/webhooks', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: Partial<{ active: boolean; url: string; project: string; event: string }>) =>
-      apiFetch<{ status?: string; error?: string }>(`/api/webhooks/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-    remove: (id: number) =>
-      apiFetch<{ status?: string; error?: string }>(`/api/webhooks/${id}`, { method: 'DELETE' }),
+      apiFetch<{ status?: string; error?: string }>(`/api/webhooks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    remove: (id: number) => apiFetch<{ status?: string; error?: string }>(`/api/webhooks/${id}`, { method: 'DELETE' }),
   },
   analytics: {
     getReportsConfig: (serverId = 'default') => apiFetch<{ config: object }>(`/api/analytics/reports?server_id=${serverId}`),
@@ -117,8 +122,22 @@ export const api = {
     getMembers: () => apiFetch<{ members: object[]; total: number }>('/api/ranking/members'),
   },
   auth: {
-    getLolkaUrl: () => apiFetch<{ url: string; state: string }>('/api/auth/lolka'),
+    getLolkaUrl: () => apiFetch<{ error?: string; message?: string }>('/api/auth/lolka'),
     getVkUrl: () => apiFetch<{ url: string; state: string }>('/api/auth/vk'),
+    register: (data: { email: string; password: string }) =>
+      apiFetch<{ status: string; message: string; email_sent: boolean }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    login: (data: { email: string; password: string }) =>
+      apiFetch<{ status: string; access_token: string; refresh_token: string; user: AuthUser }>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    refresh: (data: { refresh_token: string }) =>
+      apiFetch<{ status: string; access_token: string; refresh_token: string }>('/api/auth/refresh', { method: 'POST', body: JSON.stringify(data) }),
+    logout: (data: { refresh_token: string }) =>
+      apiFetch<{ status: string }>('/api/auth/logout', { method: 'POST', body: JSON.stringify(data) }),
+    forgotPassword: (data: { email: string }) =>
+      apiFetch<{ status: string }>('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify(data) }),
+    resetPassword: (data: { token: string; new_password: string }) =>
+      apiFetch<{ status: string }>('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(data) }),
+    resendVerification: (data: { email: string }) =>
+      apiFetch<{ status: string; email_sent: boolean }>('/api/auth/resend-verification', { method: 'POST', body: JSON.stringify(data) }),
   },
   lolkaBot: {
     getStatus: () => apiFetch<{ configured: boolean; connected: boolean; bot: { username?: string; avatar?: string } | null }>('/api/lolka/bot'),
