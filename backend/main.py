@@ -155,6 +155,29 @@ def _normalize_server_id(raw_id: str, platform: str) -> str:
     return raw_id
 
 
+def _get_server_or_error(db, server_id: str):
+    """
+    Находит сервер по server_id для эндпоинтов сохранения настроек
+    (modules, ai, notifications, auto-forward, reports).
+
+    ВАЖНО: раньше эти эндпоинты при отсутствии сервера тихо создавали
+    новую запись Server(name="Auto-created", ...) — тот же класс бага,
+    что и старый sync_lolka_servers, только с другой стороны: настройки
+    сохранялись для server_id, который ещё не был добавлен администратором
+    на /dashboard/servers (например при гонке состояний на фронте, пока
+    ServerProvider ещё не выбрал реальный сервер, и запрос уходил с
+    server_id="default"). В результате в списке серверов всплывали
+    "призрачные" записи, не добавленные вручную.
+
+    Теперь — никогда не создаём сервер неявно. Если записи нет, вызывающий
+    код должен вернуть понятную ошибку и попросить сначала добавить сервер
+    на странице /dashboard/servers.
+    """
+    if not server_id or server_id == "default":
+        return None
+    return db.query(Server).filter(Server.server_id == server_id).first()
+
+
 @app.get("/api/servers")
 def get_servers(platform: str = Query("")):
     db = SessionLocal()
@@ -171,6 +194,7 @@ def get_servers(platform: str = Query("")):
                 "platform": s.platform or "vk",
                 "icon_url": s.icon_url or "",
                 "member_count": s.member_count or 0,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
             }
             for s in servers
         ]
@@ -212,6 +236,35 @@ def create_server(
         return {"error": str(e)}
     finally:
         db.close()
+
+@app.delete("/api/servers/cleanup-ghosts")
+def cleanup_ghost_servers():
+    """
+    Одноразовая очистка: удаляет серверы, которые могли быть созданы
+    старым багом (либо старым sync_lolka_servers, либо settings-эндпоинтами,
+    которые раньше тихо создавали Server(name="Auto-created", ...)).
+
+    Удаляет только записи с именем ровно "Auto-created" — то есть только
+    то, что могло появиться исключительно через автосоздание, а не
+    что-либо добавленное вручную. Настоящие серверы с реальными именами
+    (даже если появились из-за старого бага sync_lolka_servers) эта ручка
+    не трогает — их нужно удалить вручную через кнопку 🗑 на /dashboard/servers,
+    если они не нужны, ровно так же, как любой другой сервер.
+    """
+    db = SessionLocal()
+    try:
+        ghosts = db.query(Server).filter(Server.name == "Auto-created").all()
+        removed = [{"id": g.id, "server_id": g.server_id, "platform": g.platform} for g in ghosts]
+        for g in ghosts:
+            db.delete(g)
+        db.commit()
+        return {"status": "ok", "removed_count": len(removed), "removed": removed}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "error": str(e)}
+    finally:
+        db.close()
+
 
 @app.delete("/api/servers/{db_id}")
 def delete_server(db_id: int):
@@ -356,14 +409,11 @@ def save_modules(data: dict):
     try:
         server_id = data.get("server_id", "default")
         modules = data.get("modules", [])
-        
-        server = db.query(Server).filter(Server.server_id == server_id).first()
+
+        server = _get_server_or_error(db, server_id)
         if not server:
-            server = Server(name="Auto-created", server_id=server_id)
-            db.add(server)
-            db.commit()
-            db.refresh(server)
-        
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
         for mod in modules:
             existing = db.query(ModuleConfig).filter(
                 ModuleConfig.server_id == server.id,
@@ -424,14 +474,11 @@ def save_ai_settings(data: dict):
     db = SessionLocal()
     try:
         server_id = data.get("server_id", "default")
-        
-        server = db.query(Server).filter(Server.server_id == server_id).first()
+
+        server = _get_server_or_error(db, server_id)
         if not server:
-            server = Server(name="Auto-created", server_id=server_id)
-            db.add(server)
-            db.commit()
-            db.refresh(server)
-        
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
         ai = db.query(AISettings).filter(AISettings.server_id == server.id).first()
         if not ai:
             ai = AISettings(server_id=server.id)
@@ -494,12 +541,9 @@ def save_notification_settings(data: dict):
         vk = data.get("vk", {}) or {}
         max_ = data.get("max", {}) or {}
 
-        server = db.query(Server).filter(Server.server_id == server_id).first()
+        server = _get_server_or_error(db, server_id)
         if not server:
-            server = Server(name="Auto-created", server_id=server_id)
-            db.add(server)
-            db.commit()
-            db.refresh(server)
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
 
         n = db.query(NotificationSettings).filter(NotificationSettings.server_id == server.id).first()
         if not n:
@@ -1716,14 +1760,11 @@ def save_auto_forward_config(data: dict):
     try:
         server_id = data.get("server_id", "default")
         config_data = data.get("config", {})
-        
-        server = db.query(Server).filter(Server.server_id == server_id).first()
+
+        server = _get_server_or_error(db, server_id)
         if not server:
-            server = Server(name="Auto-created", server_id=server_id)
-            db.add(server)
-            db.commit()
-            db.refresh(server)
-        
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
         existing = db.query(ModuleConfig).filter(
             ModuleConfig.server_id == server.id,
             ModuleConfig.module_name == "auto_forward"
@@ -1797,14 +1838,11 @@ def save_reports_config(data: dict):
     try:
         server_id = data.get("server_id", "default")
         config_data = data.get("config", {})
-        
-        server = db.query(Server).filter(Server.server_id == server_id).first()
+
+        server = _get_server_or_error(db, server_id)
         if not server:
-            server = Server(name="Auto-created", server_id=server_id)
-            db.add(server)
-            db.commit()
-            db.refresh(server)
-        
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
         existing = db.query(ModuleConfig).filter(
             ModuleConfig.server_id == server.id,
             ModuleConfig.module_name == "reports"
