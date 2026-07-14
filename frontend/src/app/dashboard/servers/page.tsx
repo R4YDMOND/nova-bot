@@ -336,7 +336,7 @@ export default function ServersPage() {
         ) : (
           <>
             {/* DESKTOP: сетка 4 колонки с вертикальными карточками */}
-            <div className="hidden lg:grid lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {servers.map(s => (
                 <Card
                   key={s.id}
@@ -390,61 +390,6 @@ export default function ServersPage() {
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
-                </Card>
-              ))}
-            </div>
-
-            {/* TABLET & MOBILE: список горизонтальных карточек */}
-            <div className="lg:hidden space-y-3">
-              {servers.map(s => (
-                <Card
-                  key={s.id}
-                  className={`flex items-center gap-4 p-4 cursor-pointer transition-all ${
-                    s.server_id === selectedServerId
-                      ? 'border-2 border-primary bg-primary/5'
-                      : 'border border-[rgb(var(--border))] hover:border-primary/40'
-                  }`}
-                  onClick={() => selectServer(s.server_id)}
-                >
-                  {/* Аватар слева */}
-                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl overflow-hidden shrink-0">
-                    {s.icon_url ? (
-                      <img src={s.icon_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      PLATFORM_ICON[s.platform] || '🔵'
-                    )}
-                  </div>
-
-                  {/* Информация посередине */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{s.name}</h3>
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] shrink-0">
-                        {PLATFORM_ICON[s.platform]} {PLATFORM_LABEL[s.platform]}
-                      </span>
-                    </div>
-                    <div className="text-sm text-[rgb(var(--text))] font-semibold">
-                      👥 {s.member_count > 0 ? s.member_count.toLocaleString('ru-RU') : 'N/A'} участников
-                    </div>
-                    <div className="text-xs text-[rgb(var(--text-secondary))] font-mono">
-                      ID: {s.server_id}
-                    </div>
-                  </div>
-
-                  {/* Статус и кнопка удаления */}
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    {s.server_id === selectedServerId && (
-                      <span className="text-xs text-primary font-bold px-2 py-1 bg-primary/10 rounded-lg">✓ Выбран</span>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
-                      disabled={deletingId === s.id}
-                      className="p-2 rounded-lg text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                      title="Удалить из панели"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
                 </Card>
               ))}
             </div>
