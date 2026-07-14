@@ -1,5 +1,5 @@
 'use client';
-import { Bell, Search } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
@@ -56,18 +56,6 @@ export function Header() {
         </nav>
 
         <ServerSwitcher />
-
-        <div className="relative w-72 ml-auto md:ml-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(var(--text-secondary))] w-4 h-4" />
-          <input
-            type="text"
-            placeholder="Поиск..."
-            className="input w-full pl-9 pr-12 py-2 text-sm"
-          />
-          <kbd className="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[rgb(var(--text-secondary))] border border-[rgb(var(--border))] rounded px-1.5 py-0.5">
-            ⌘K
-          </kbd>
-        </div>
       </div>
 
       <div className="flex items-center gap-3">

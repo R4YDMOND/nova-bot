@@ -53,82 +53,6 @@ function useCountUp(target: number, trigger: boolean, durationMs = 1200) {
   return value;
 }
 
-/**
- * Геометрический логотип N — фирменный знак Nova Bot: левая грань голубая,
- * правая фиолетовая, между ними диагональная перемычка (как в брендбуке,
- * вариация "02. Упрощённый знак"). Сплошная заливка + лёгкий теневой facet
- * для эффекта гранёного кристалла.
- */
-function NovaLogo({ size = 320 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 300 300" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="nCyan" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#22D3EE" />
-          <stop offset="100%" stopColor="#0EA5E9" />
-        </linearGradient>
-        <linearGradient id="nPurple" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#8B5CF6" />
-          <stop offset="100%" stopColor="#7B2FBE" />
-        </linearGradient>
-        <linearGradient id="nDiag" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#22D3EE" />
-          <stop offset="100%" stopColor="#8B5CF6" />
-        </linearGradient>
-        <radialGradient id="nGlow" cx="50%" cy="60%" r="55%">
-          <stop offset="0%" stopColor="#7B2FBE" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#7B2FBE" stopOpacity="0" />
-        </radialGradient>
-        <filter id="nBlur"><feGaussianBlur stdDeviation="10" /></filter>
-      </defs>
-
-      {/* фоновое свечение */}
-      <ellipse cx="150" cy="290" rx="110" ry="16" fill="url(#nGlow)" filter="url(#nBlur)" />
-      <circle cx="150" cy="150" r="150" fill="url(#nGlow)" opacity="0.4" />
-
-      {/* диагональная перемычка N (рисуется первой, снизу) */}
-      <polygon points="20,20 90,20 280,280 210,280" fill="url(#nDiag)" />
-
-      {/* левая нога (голубая) */}
-      <polygon points="20,20 90,20 90,280 20,280" fill="url(#nCyan)" />
-      <polygon points="90,20 90,280 20,280" fill="#0B0F19" opacity="0.18" />
-
-      {/* правая нога (фиолетовая) */}
-      <polygon points="210,20 280,20 280,280 210,280" fill="url(#nPurple)" />
-      <polygon points="280,20 280,280 210,280" fill="#0B0F19" opacity="0.18" />
-
-      {/* блики */}
-      <line x1="35" y1="35" x2="35" y2="140" stroke="white" strokeOpacity="0.45" strokeWidth="4" strokeLinecap="round" />
-      <line x1="225" y1="35" x2="225" y2="140" stroke="white" strokeOpacity="0.3" strokeWidth="4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** Компактная версия того же логотипа для шапки */
-function NovaLogoMark({ size = 22 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 300 300" width={size} height={size} xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="nCyanSm" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#22D3EE" />
-          <stop offset="100%" stopColor="#0EA5E9" />
-        </linearGradient>
-        <linearGradient id="nPurpleSm" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#8B5CF6" />
-          <stop offset="100%" stopColor="#7B2FBE" />
-        </linearGradient>
-        <linearGradient id="nDiagSm" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#22D3EE" />
-          <stop offset="100%" stopColor="#8B5CF6" />
-        </linearGradient>
-      </defs>
-      <polygon points="20,20 90,20 280,280 210,280" fill="url(#nDiagSm)" />
-      <polygon points="20,20 90,20 90,280 20,280" fill="url(#nCyanSm)" />
-      <polygon points="210,20 280,20 280,280 210,280" fill="url(#nPurpleSm)" />
-    </svg>
-  );
-}
-
 function LolkaAvatarIcon() {
   return (
     <span className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
@@ -177,8 +101,8 @@ export default function HomePage() {
         {/* Logo + theme toggle */}
         <div className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-2 font-bold text-xl mx-auto lg:mx-0">
-            <div className="w-9 h-9 rounded-xl bg-[rgb(var(--surface-2))] flex items-center justify-center">
-              <NovaLogoMark size={22} />
+            <div className="w-9 h-9 rounded-full bg-[rgb(var(--surface-2))] flex items-center justify-center overflow-hidden shrink-0">
+              <img src="/logo-lolka.png" alt="Nova Bot" className="w-full h-full object-cover" />
             </div>
             NOVA <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">BOT</span>
           </div>
@@ -265,7 +189,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex-1 w-full flex justify-center">
-            <NovaLogo />
+            <img src="/logo-lolka-512.png" alt="Nova Bot" width={320} height={320} className="w-full max-w-[320px] h-auto" />
           </div>
         </div>
 

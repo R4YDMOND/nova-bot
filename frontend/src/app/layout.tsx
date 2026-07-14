@@ -7,7 +7,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Nova Bot — Панель управления',
   description: 'Умный помощник для серверов Lolka и сообществ VK',
-  icons: { icon: '/icon', shortcut: '/icon', apple: '/icon' },
+  icons: { icon: '/icon.png', shortcut: '/icon.png', apple: '/apple-icon.png' },
 };
 
 export default function RootLayout({

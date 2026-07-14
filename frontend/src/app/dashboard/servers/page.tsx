@@ -86,12 +86,6 @@ export default function ServersPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
-  const [showGuildsModal, setShowGuildsModal] = useState(false);
-  const [guildsLoading, setGuildsLoading] = useState(false);
-  const [guildsError, setGuildsError] = useState<string | null>(null);
-  const [availableGuilds, setAvailableGuilds] = useState<{ id: string; name: string; icon: string | null; member_count: number }[]>([]);
-  const [addingGuildId, setAddingGuildId] = useState<string | null>(null);
-
   useEffect(() => {
     api.lolkaBot.getStatus().then(setBotStatus).catch(() => { });
   }, []);
@@ -149,47 +143,6 @@ export default function ServersPage() {
       setFormError('Не удалось создать сервер');
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function openGuildsModal() {
-    setShowGuildsModal(true);
-    setGuildsLoading(true);
-    setGuildsError(null);
-    try {
-      const res = await api.lolkaBot.getAvailableGuilds();
-      if (res.error) {
-        setGuildsError(res.error);
-      } else {
-        setAvailableGuilds(res.guilds || []);
-      }
-    } catch {
-      setGuildsError('Не удалось получить список серверов бота');
-    } finally {
-      setGuildsLoading(false);
-    }
-  }
-
-  async function addGuild(g: { id: string; name: string; icon: string | null; member_count: number }) {
-    setAddingGuildId(g.id);
-    try {
-      const res = await api.servers.create({
-        name: g.name,
-        server_id: g.id,
-        platform: 'lolka',
-        icon_url: g.icon || '',
-        member_count: g.member_count,
-      });
-      if (res.error) {
-        setGuildsError(res.error);
-        return;
-      }
-      setAvailableGuilds(list => list.filter(x => x.id !== g.id));
-      await refresh();
-    } catch {
-      setGuildsError('Не удалось добавить сервер');
-    } finally {
-      setAddingGuildId(null);
     }
   }
 
@@ -318,9 +271,6 @@ export default function ServersPage() {
             >
               {syncing ? '🔄 Синхронизируем...' : '🔄 Синхронизировать'}
             </Button>
-            <Button onClick={openGuildsModal} variant="secondary">
-              🎮 Серверы бота (Lolka)
-            </Button>
             <Button onClick={openModal} className="ml-auto">
               <Plus className="w-4 h-4 mr-2" />
               Добавить сервер
@@ -379,20 +329,20 @@ export default function ServersPage() {
           </div>
         ) : (
           <>
-            {/* DESKTOP: сетка 4 колонки с вертикальными карточками */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {/* Адаптивная сетка: 1 колонка mobile / 2 tablet / 3 desktop */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredServers.map(s => (
                 <Card
                   key={s.id}
-                  className={`group relative flex flex-col items-center text-center gap-4 p-6 cursor-pointer transition-all hover:shadow-lg ${
+                  className={`group relative flex flex-col items-center text-center gap-4 p-6 min-h-[200px] cursor-pointer transition-all hover:shadow-lg ${
                     s.server_id === selectedServerId
                       ? 'border-2 border-primary bg-primary/5'
                       : 'border border-[rgb(var(--border))] hover:border-primary/40'
                   }`}
                   onClick={() => selectServer(s.server_id)}
                 >
-                  {/* Аватар */}
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-4xl overflow-hidden shrink-0">
+                  {/* Аватар: единый формат 64x64px, круглый */}
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl overflow-hidden shrink-0">
                     {s.icon_url ? (
                       <img src={s.icon_url} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -452,15 +402,6 @@ export default function ServersPage() {
           title="Синхронизировать"
         >
           <span className="text-xl">{syncing ? '⏳' : '🔄'}</span>
-        </Button>
-        <Button
-          onClick={openGuildsModal}
-          variant="secondary"
-          size="sm"
-          className="rounded-full w-14 h-14 flex items-center justify-center p-0 shadow-lg"
-          title="Серверы бота"
-        >
-          🎮
         </Button>
         <Button
           onClick={openModal}
@@ -535,53 +476,6 @@ export default function ServersPage() {
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Модалка серверов бота */}
-      {showGuildsModal && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowGuildsModal(false); }}
-        >
-          <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-8 max-w-lg w-full relative shadow-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowGuildsModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-xl font-bold mb-1 text-[rgb(var(--text))]">Серверы бота в Lolka</h2>
-            <p className="text-sm text-[rgb(var(--text-secondary))] mb-6">
-              Бот состоит в этих серверах, но они ещё не подключены к дашборду. Выберите, какие добавить.
-            </p>
-
-            {guildsLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="w-8 h-8 border-2 border-[rgb(var(--text-secondary))] border-t-primary rounded-full animate-spin"></div>
-              </div>
-            ) : guildsError ? (
-              <p className="text-red-400 text-sm bg-red-500/10 px-4 py-3 rounded-xl">⚠️ {guildsError}</p>
-            ) : availableGuilds.length === 0 ? (
-              <p className="text-[rgb(var(--text-secondary))] text-sm text-center py-8">Новых серверов нет — все уже подключены ✓</p>
-            ) : (
-              <div className="space-y-3 overflow-y-auto pr-1">
-                {availableGuilds.map(g => (
-                  <div key={g.id} className="flex items-center gap-3 p-4 rounded-xl border border-[rgb(var(--border))] hover:border-primary/40 transition-colors">
-                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-lg shrink-0 overflow-hidden">
-                      {g.icon ? <img src={g.icon} alt="" className="w-full h-full object-cover" /> : '🎮'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-[rgb(var(--text))]">{g.name}</p>
-                      <p className="text-xs text-[rgb(var(--text-secondary))]">
-                        {g.member_count > 0 ? `${g.member_count.toLocaleString('ru-RU')} участников` : `ID: ${g.id}`}
-                      </p>
-                    </div>
-                    <Button onClick={() => addGuild(g)} disabled={addingGuildId === g.id} size="sm" className="shrink-0">
-                      {addingGuildId === g.id ? '⏳' : '➕'}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       )}
