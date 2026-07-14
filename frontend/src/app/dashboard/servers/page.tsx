@@ -6,15 +6,13 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/u
 import { api } from '@/lib/api';
 import { useServer } from '@/context/ServerProvider';
 import { Plus, Trash2, X } from 'lucide-react';
-
-const PLATFORM_ICON: Record<string, string> = { lolka: '🎮', vk: '🔵' };
-const PLATFORM_LABEL: Record<string, string> = { lolka: 'Lolka', vk: 'VK' };
+import { PlatformIcon, PLATFORM_LABEL } from '@/components/PlatformIcon';
 
 type PlatformFilter = 'all' | 'vk' | 'lolka';
 const FILTER_TABS: { value: PlatformFilter; label: string }[] = [
   { value: 'all', label: 'Все' },
-  { value: 'vk', label: '🔵 VK' },
-  { value: 'lolka', label: '🎮 Lolka' },
+  { value: 'vk', label: 'VK' },
+  { value: 'lolka', label: 'Lolka' },
 ];
 
 type Detection =
@@ -288,12 +286,13 @@ export default function ServersPage() {
                 <button
                   key={tab.value}
                   onClick={() => setPlatformFilter(tab.value)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                     active
                       ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-md'
                       : 'bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] border border-[rgb(var(--border))] hover:border-primary/40'
                   }`}
                 >
+                  {tab.value !== 'all' && <PlatformIcon platform={tab.value} className="w-4 h-4 rounded" />}
                   {tab.label} <span className={active ? 'text-white/80' : 'text-[rgb(var(--text-secondary))]'}>({count})</span>
                 </button>
               );
@@ -341,21 +340,26 @@ export default function ServersPage() {
                   }`}
                   onClick={() => selectServer(s.server_id)}
                 >
-                  {/* Аватар: единый формат 64x64px, круглый */}
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl overflow-hidden shrink-0">
-                    {s.icon_url ? (
-                      <img src={s.icon_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      PLATFORM_ICON[s.platform] || '🔵'
-                    )}
+                  {/* Аватар: единый формат 64x64px, круглый. Значок платформы — бейдж поверх аватара */}
+                  <div className="relative w-16 h-16 shrink-0">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center overflow-hidden">
+                      {s.icon_url ? (
+                        <img src={s.icon_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <PlatformIcon platform={s.platform} className="w-8 h-8 rounded-lg" />
+                      )}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full ring-2 ring-[rgb(var(--surface))] overflow-hidden bg-[rgb(var(--surface))]">
+                      <PlatformIcon platform={s.platform} className="w-6 h-6" />
+                    </div>
                   </div>
 
                   {/* Название и платформа */}
                   <div className="w-full">
                     <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{s.name}</h3>
                     <div className="flex justify-center mt-2">
-                      <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
-                        {PLATFORM_ICON[s.platform]} {PLATFORM_LABEL[s.platform]}
+                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
+                        <PlatformIcon platform={s.platform} className="w-3.5 h-3.5 rounded" /> {PLATFORM_LABEL[s.platform]}
                       </span>
                     </div>
                   </div>
@@ -429,11 +433,17 @@ export default function ServersPage() {
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Платформа</label>
                 <Select value={form.platform} onValueChange={(v: string) => setForm(f => ({ ...f, platform: v as 'vk' | 'lolka' }))}>
                   <SelectTrigger>
-                    <span>{PLATFORM_ICON[form.platform]} {PLATFORM_LABEL[form.platform]}</span>
+                    <span className="inline-flex items-center gap-2">
+                      <PlatformIcon platform={form.platform} className="w-4 h-4 rounded" /> {PLATFORM_LABEL[form.platform]}
+                    </span>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="vk">🔵 VK</SelectItem>
-                    <SelectItem value="lolka">🎮 Lolka</SelectItem>
+                    <SelectItem value="vk">
+                      <span className="inline-flex items-center gap-2"><PlatformIcon platform="vk" className="w-4 h-4 rounded" /> VK</span>
+                    </SelectItem>
+                    <SelectItem value="lolka">
+                      <span className="inline-flex items-center gap-2"><PlatformIcon platform="lolka" className="w-4 h-4 rounded" /> Lolka</span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -454,7 +464,7 @@ export default function ServersPage() {
                 />
                 {detection?.status === 'ok' && (
                   <p className="text-xs text-green-400 mt-1.5 flex items-center gap-1">
-                    ✅ {PLATFORM_ICON[detection.platform]} {detection.label} · ID {detection.id} — подставлено автоматически
+                    ✅ <PlatformIcon platform={detection.platform} className="w-3.5 h-3.5 rounded" /> {detection.label} · ID {detection.id} — подставлено автоматически
                   </p>
                 )}
                 {detection?.status === 'plain' && (

@@ -2,8 +2,7 @@
 import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
 import { useServer } from '@/context/ServerProvider';
 import { Server as ServerIcon } from 'lucide-react';
-
-const PLATFORM_ICON: Record<string, string> = { lolka: '🎮', vk: '🔵' };
+import { PlatformIcon } from '@/components/PlatformIcon';
 
 export function ServerSwitcher() {
   const { servers, loading, selectedServerId, selectedServer, selectServer } = useServer();
@@ -19,7 +18,7 @@ export function ServerSwitcher() {
           <ServerIcon className="w-4 h-4 text-[rgb(var(--text-secondary))] shrink-0" />
           {selectedServer ? (
             <>
-              <span>{PLATFORM_ICON[selectedServer.platform] || '🔵'}</span>
+              <PlatformIcon platform={selectedServer.platform} className="w-4 h-4 rounded shrink-0" />
               <span className="truncate">{selectedServer.name}</span>
             </>
           ) : (
@@ -31,7 +30,7 @@ export function ServerSwitcher() {
         {servers.map(s => (
           <SelectItem key={s.server_id} value={s.server_id}>
             <span className="flex items-center gap-2">
-              <span>{PLATFORM_ICON[s.platform] || '🔵'}</span>
+              <PlatformIcon platform={s.platform} className="w-4 h-4 rounded shrink-0" />
               {s.name}
             </span>
           </SelectItem>

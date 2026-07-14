@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,10 +21,41 @@ import {
   Bell,
   Moon,
   Sun,
+  ChevronLeft,
 } from 'lucide-react';
 
 const API_BASE = 'https://nova-bot-rpsy.onrender.com';
 const FALLBACK_STATS = { servers: 0, users: 0, responseTime: 0.8 };
+
+// Последние обновления — пока статический список (последние 3-4 записи).
+// TODO: при появлении /api/changelog на бэкенде заменить на реальные
+// динамические данные с версиями (см. правку ТЗ 15.07.2026).
+const UPDATES = [
+  {
+    date: '2 июля 2026',
+    badge: '✦ Улучшения',
+    title: 'Новая система уведомлений',
+    desc: 'Колокольчик в панели теперь показывает реальные уведомления с историей.',
+  },
+  {
+    date: '28 июня 2026',
+    badge: '⚡ Обновление',
+    title: 'Синхронизация VK и Lolka',
+    desc: 'Карточки серверов теперь подтягивают аватар и число участников напрямую из API.',
+  },
+  {
+    date: '21 июня 2026',
+    badge: '🎨 UI/UX',
+    title: 'Единый стиль карточек серверов',
+    desc: 'Карточки VK и Lolka приведены к общему формату — размер, аватар, бейджи.',
+  },
+  {
+    date: '14 июня 2026',
+    badge: '🚀 Миграция',
+    title: 'Переезд на Render',
+    desc: 'Frontend и backend перенесены с Vercel на Render для большей стабильности.',
+  },
+];
 
 const FEATURES = [
   { icon: ShieldCheck, title: 'Модерация', desc: 'Гибкие инструменты модерации и защита от спама.' },
@@ -66,6 +97,15 @@ export default function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [showLolkaModal, setShowLolkaModal] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const updatesRef = useRef<HTMLDivElement>(null);
+
+  function scrollUpdates(direction: 1 | -1) {
+    const el = updatesRef.current;
+    if (!el) return;
+    const card = el.querySelector<HTMLElement>(':scope > *');
+    const step = (card?.offsetWidth ?? 320) + 16; // ширина карточки + gap
+    el.scrollBy({ left: step * direction, behavior: 'smooth' });
+  }
 
   useEffect(() => {
     fetch(`${API_BASE}/api/stats`, { cache: 'no-store' })
@@ -217,25 +257,60 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* What's new */}
+        {/* What's new — карусель с прокруткой вправо/влево, последние 3-4 обновления */}
         <div>
-          <h2 className="text-2xl font-bold mb-5">Что нового</h2>
-          <Card className="p-6 flex items-center justify-between gap-6 flex-wrap">
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <Badge variant="default">✦ Улучшения</Badge>
-                <span className="text-sm text-[rgb(var(--text-secondary))]">2 июля 2026</span>
-              </div>
-              <h3 className="text-lg font-semibold mb-1">Новая система уведомлений</h3>
-              <p className="text-sm text-[rgb(var(--text-secondary))] max-w-md">
-                Колокольчик в панели теперь показывает реальные уведомления с историей.
-              </p>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-2xl font-bold">Что нового</h2>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/docs"
+                className="hidden sm:inline text-sm text-primary hover:underline mr-1"
+              >
+                Все обновления
+              </Link>
+              <button
+                onClick={() => scrollUpdates(-1)}
+                aria-label="Предыдущие обновления"
+                className="w-9 h-9 rounded-xl border border-[rgb(var(--border))] flex items-center justify-center hover:bg-[rgb(var(--surface-2))] transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => scrollUpdates(1)}
+                aria-label="Следующие обновления"
+                className="w-9 h-9 rounded-xl border border-[rgb(var(--border))] flex items-center justify-center hover:bg-[rgb(var(--surface-2))] transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-            <div className="relative shrink-0 w-14 h-14 rounded-2xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] flex items-center justify-center">
-              <Bell className="w-6 h-6 text-primary" />
-              <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-white text-xs font-bold flex items-center justify-center">3</span>
-            </div>
-          </Card>
+          </div>
+
+          <div
+            ref={updatesRef}
+            className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 -mx-6 px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {UPDATES.map((u, i) => (
+              <Card
+                key={i}
+                className="snap-start shrink-0 w-[85%] sm:w-[380px] p-6 flex items-center justify-between gap-6"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-3 mb-3 flex-wrap">
+                    <Badge variant="default">{u.badge}</Badge>
+                    <span className="text-sm text-[rgb(var(--text-secondary))]">{u.date}</span>
+                  </div>
+                  <h3 className="text-lg font-semibold mb-1">{u.title}</h3>
+                  <p className="text-sm text-[rgb(var(--text-secondary))]">{u.desc}</p>
+                </div>
+                {i === 0 && (
+                  <div className="relative shrink-0 w-14 h-14 rounded-2xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] flex items-center justify-center">
+                    <Bell className="w-6 h-6 text-primary" />
+                    <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-white text-xs font-bold flex items-center justify-center">3</span>
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
 
