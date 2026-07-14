@@ -192,7 +192,7 @@ export default function ServersPage() {
       if (res.status === 'error') {
         setSyncMessage({ type: 'error', text: 'Не удалось синхронизировать платформы' });
       } else {
-        setSyncMessage({ type: 'ok', text: `Синхронизировано серверов: ${res.synced}` });
+        setSyncMessage({ type: 'ok', text: `Обновлено данных: ${res.synced} серверов` });
         await refresh();
       }
     } catch {
@@ -223,123 +223,217 @@ export default function ServersPage() {
   }
 
   return (
-    <div className="space-y-8 p-8 max-w-5xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-[rgb(var(--text))]">Серверы</h1>
-          <p className="text-[rgb(var(--text-secondary))] mt-1">Серверы Lolka и сообщества VK, которые вы подключили к Nova</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={openGuildsModal}>
-            🎮 Серверы бота (Lolka)
-          </Button>
-          <Button variant="secondary" onClick={syncAllPlatforms} disabled={syncing}>
-            {syncing ? 'Синхронизируем...' : '🔄 Синхронизировать все платформы'}
-          </Button>
-          <Button onClick={openModal}>
-            <Plus className="w-4 h-4 mr-2" />
-            Добавить сервер
-          </Button>
+    <div className="min-h-screen pb-32 md:pb-8">
+      {/* Главный баннер — Nova Bot Status */}
+      <div className="bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] animate-gradient px-4 sm:px-8 py-12 sm:py-16 rounded-b-3xl shadow-xl">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center text-6xl sm:text-7xl shrink-0">
+              🎮
+            </div>
+            <div className="flex-1">
+              <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Nova Bot в Lolka</h1>
+              <p className="text-white/80 text-sm sm:text-base mb-4">
+                Управляйте подключёнными сообществами VK и серверами Lolka
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                {botStatus && (
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      botStatus.connected
+                        ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                        : botStatus.configured
+                          ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                          : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        botStatus.connected ? 'bg-green-400' : botStatus.configured ? 'bg-yellow-400' : 'bg-red-400'
+                      }`}></span>
+                      {botStatus.connected ? 'Бот подключён' : botStatus.configured ? 'Ждём соединения' : 'Не настроен'}
+                    </span>
+                  </div>
+                )}
+                <Button 
+                  onClick={inviteBot} 
+                  disabled={inviteLoading}
+                  className="bg-white/20 hover:bg-white/30 text-white border border-white/30 w-full sm:w-auto"
+                  variant="outline"
+                >
+                  {inviteLoading ? 'Открываем...' : '➕ Добавить бота на сервер'}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {syncMessage && (
-        <p className={`text-sm rounded-xl px-4 py-2.5 border ${syncMessage.type === 'ok'
-            ? 'text-green-400 bg-green-500/10 border-green-500/20'
-            : 'text-red-400 bg-red-500/10 border-red-500/20'
-          }`}>
-          {syncMessage.type === 'ok' ? '✅' : '⚠️'} {syncMessage.text}
-        </p>
-      )}
-
-      {deleteError && (
-        <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
-          ⚠️ {deleteError}
-        </p>
-      )}
-
-      {/* Статус бота Lolka — только для получения ссылки приглашения, не влияет на список серверов */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl shrink-0">
-              🎮
-            </div>
+      {/* Основной контент */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+        {/* Заголовок и кнопки управления */}
+        <div className="mb-8">
+          <div className="flex flex-col gap-4 mb-6">
             <div>
-              <div className="font-semibold flex items-center gap-2">
-                Бот Nova в Lolka
-                {botStatus?.configured && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${botStatus.connected ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'
-                    }`}>
-                    {botStatus.connected ? '🟢 Подключён' : '🟡 Ждём соединения'}
-                  </span>
-                )}
-                {botStatus && !botStatus.configured && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/15 text-red-400">🔴 Не настроен</span>
-                )}
-              </div>
-              <p className="text-sm text-[rgb(var(--text-secondary))] mt-0.5">
-                Добавьте бота на сервер, затем добавьте сам сервер в список ниже вручную (по ID)
+              <h2 className="text-2xl font-bold text-[rgb(var(--text))]">Мои серверы</h2>
+              <p className="text-[rgb(var(--text-secondary))] mt-1">
+                {servers.length > 0 
+                  ? `Всего подключено: ${servers.length} сервер${servers.length % 10 === 1 && servers.length % 100 !== 11 ? '' : 'ов'}`
+                  : 'Пока нет подключённых серверов'}
               </p>
-              {inviteError && <p className="text-red-400 text-xs mt-1">{inviteError}</p>}
             </div>
+
+            {/* Сообщение синхронизации */}
+            {syncMessage && (
+              <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium ${
+                syncMessage.type === 'ok'
+                  ? 'text-green-400 bg-green-500/10 border-green-500/20'
+                  : 'text-red-400 bg-red-500/10 border-red-500/20'
+              }`}>
+                {syncMessage.type === 'ok' ? '✅' : '⚠️'} {syncMessage.text}
+              </div>
+            )}
+
+            {/* Сообщение об ошибке удаления */}
+            {deleteError && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium text-red-400 bg-red-500/10 border-red-500/20">
+                ⚠️ {deleteError}
+              </div>
+            )}
           </div>
-          <Button variant="secondary" onClick={inviteBot} disabled={inviteLoading} className="shrink-0">
-            {inviteLoading ? 'Открываем...' : '🔗 Добавить бота на сервер'}
-          </Button>
-        </div>
-      </Card>
 
-      {/* Список серверов — только те, что пользователь добавил сам */}
-      {loading ? (
-        <p className="text-[rgb(var(--text-secondary))]">Загрузка...</p>
-      ) : servers.length === 0 ? (
-        <div className="text-center py-16 text-[rgb(var(--text-secondary))]">
-          <p className="mb-4">Пока нет ни одного сервера. Добавьте его вручную по ID.</p>
-          <Button onClick={openModal} className="inline-flex">
-            <Plus className="w-4 h-4 mr-2" />
-            Добавить сервер
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {servers.map(s => (
-            <Card
-              key={s.id}
-              className={`p-5 flex items-center gap-4 cursor-pointer transition-colors ${s.server_id === selectedServerId ? 'border-primary' : 'hover:border-primary/40'
-                }`}
-              onClick={() => selectServer(s.server_id)}
+          {/* Кнопки управления — сверху на Desktop, FAB на Mobile */}
+          <div className="hidden md:flex gap-3">
+            <Button 
+              onClick={syncAllPlatforms} 
+              disabled={syncing}
+              variant="secondary"
             >
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-xl shrink-0">
-                {PLATFORM_ICON[s.platform] || '🔵'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold truncate">{s.name}</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] shrink-0">
-                    {PLATFORM_LABEL[s.platform] || s.platform}
-                  </span>
-                </div>
-                <p className="text-sm text-[rgb(var(--text-secondary))]">
-                  {s.member_count > 0 ? `${s.member_count} участников` : `ID: ${s.server_id}`}
-                </p>
-              </div>
-              {s.server_id === selectedServerId && (
-                <span className="text-xs text-primary font-medium shrink-0">Выбран</span>
-              )}
-              <button
-                onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
-                disabled={deletingId === s.id}
-                className="p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 disabled:opacity-40"
-                title="Удалить из панели"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </Card>
-          ))}
+              {syncing ? '🔄 Синхронизируем...' : '🔄 Синхронизировать'}
+            </Button>
+            <Button onClick={openGuildsModal} variant="secondary">
+              🎮 Серверы бота (Lolka)
+            </Button>
+            <Button onClick={openModal} className="ml-auto">
+              <Plus className="w-4 h-4 mr-2" />
+              Добавить сервер
+            </Button>
+          </div>
         </div>
-      )}
 
+        {/* Сетка серверов */}
+        {loading ? (
+          <div className="text-center py-16">
+            <div className="inline-block">
+              <div className="w-8 h-8 border-2 border-[rgb(var(--text-secondary))] border-t-primary rounded-full animate-spin"></div>
+            </div>
+            <p className="text-[rgb(var(--text-secondary))] mt-4">Загрузка серверов...</p>
+          </div>
+        ) : servers.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-6xl mb-4">🔗</div>
+            <h3 className="text-xl font-semibold text-[rgb(var(--text))] mb-2">Нет подключённых серверов</h3>
+            <p className="text-[rgb(var(--text-secondary))] mb-6">
+              Добавьте сервер вручную по ID, чтобы начать управление
+            </p>
+            <Button onClick={openModal} className="inline-flex">
+              <Plus className="w-4 h-4 mr-2" />
+              Добавить сервер
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {servers.map(s => (
+              <Card
+                key={s.id}
+                className={`p-5 flex flex-col gap-4 cursor-pointer transition-all hover:shadow-lg ${
+                  s.server_id === selectedServerId
+                    ? 'border-2 border-primary bg-primary/5'
+                    : 'hover:border-primary/40'
+                }`}
+                onClick={() => selectServer(s.server_id)}
+              >
+                {/* Аватар и информация */}
+                <div className="flex items-start gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-3xl shrink-0 overflow-hidden">
+                    {s.icon_url ? (
+                      <img src={s.icon_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      PLATFORM_ICON[s.platform] || '🔵'
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{s.name}</h3>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] shrink-0">
+                            {PLATFORM_ICON[s.platform]} {PLATFORM_LABEL[s.platform]}
+                          </span>
+                          {s.server_id === selectedServerId && (
+                            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary font-medium shrink-0">
+                              ✓ Выбран
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
+                        disabled={deletingId === s.id}
+                        className="p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 disabled:opacity-50"
+                        title="Удалить из панели"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Статистика */}
+                <div className="pt-3 border-t border-[rgb(var(--border))] space-y-1">
+                  <p className="text-sm text-[rgb(var(--text-secondary))]">
+                    👥 {s.member_count > 0 ? `${s.member_count.toLocaleString('ru-RU')} участников` : 'Кол-во участников неизвестно'}
+                  </p>
+                  <p className="text-xs text-[rgb(var(--text-secondary))] font-mono">
+                    ID: {s.server_id}
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Плавающая кнопка на мобайле */}
+      <div className="md:hidden fixed bottom-6 right-6 z-40 flex flex-col gap-3">
+        <Button
+          onClick={syncAllPlatforms}
+          disabled={syncing}
+          variant="secondary"
+          size="sm"
+          className="rounded-full w-14 h-14 flex items-center justify-center p-0 shadow-lg"
+          title="Синхронизировать"
+        >
+          <span className="text-xl">{syncing ? '⏳' : '🔄'}</span>
+        </Button>
+        <Button
+          onClick={openGuildsModal}
+          variant="secondary"
+          size="sm"
+          className="rounded-full w-14 h-14 flex items-center justify-center p-0 shadow-lg"
+          title="Серверы бота"
+        >
+          🎮
+        </Button>
+        <Button
+          onClick={openModal}
+          size="sm"
+          className="rounded-full w-14 h-14 flex items-center justify-center p-0 shadow-lg"
+          title="Добавить сервер"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
+      </div>
+
+      {/* Модалка добавления сервера */}
       {showModal && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -349,7 +443,7 @@ export default function ServersPage() {
             <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
               <X className="w-5 h-5" />
             </button>
-            <h2 className="text-xl font-bold mb-6">Добавить сервер</h2>
+            <h2 className="text-xl font-bold mb-6 text-[rgb(var(--text))]">Добавить сервер</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Платформа</label>
@@ -365,7 +459,7 @@ export default function ServersPage() {
               </div>
               <div>
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Название</label>
-                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Например, Моё сообщество" className="input w-full" />
+                <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Например, Моё сообщество" className="input w-full px-4 py-2.5 rounded-xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text))] placeholder:text-[rgb(var(--text-secondary))] outline-none focus:border-primary transition-colors" />
               </div>
               <div>
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">
@@ -376,11 +470,11 @@ export default function ServersPage() {
                   value={form.server_id}
                   onChange={e => handleServerIdChange(e.target.value)}
                   placeholder="123456789 или ссылка vk.com/club123456"
-                  className="input w-full font-mono text-sm"
+                  className="input w-full font-mono text-sm px-4 py-2.5 rounded-xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text))] placeholder:text-[rgb(var(--text-secondary))] outline-none focus:border-primary transition-colors"
                 />
                 {detection?.status === 'ok' && (
                   <p className="text-xs text-green-400 mt-1.5 flex items-center gap-1">
-                    ✅ {PLATFORM_ICON[detection.platform]} {detection.label} · ID {detection.id} — платформа подставлена автоматически
+                    ✅ {PLATFORM_ICON[detection.platform]} {detection.label} · ID {detection.id} — подставлено автоматически
                   </p>
                 )}
                 {detection?.status === 'plain' && (
@@ -392,9 +486,9 @@ export default function ServersPage() {
                   <p className="text-xs text-amber-400 mt-1.5">⚠️ {detection.message}</p>
                 )}
               </div>
-              {formError && <p className="text-red-400 text-sm">{formError}</p>}
+              {formError && <p className="text-red-400 text-sm bg-red-500/10 px-3 py-2 rounded-lg">{formError}</p>}
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowModal(false)} className="flex-1 px-5 py-2.5 border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] rounded-xl hover:bg-[rgb(var(--surface-2))] transition-colors">
+                <button onClick={() => setShowModal(false)} className="flex-1 px-5 py-2.5 border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] rounded-xl hover:bg-[rgb(var(--surface-2))] transition-colors font-medium">
                   Отмена
                 </button>
                 <Button onClick={createServer} disabled={saving} className="flex-1">
@@ -406,6 +500,7 @@ export default function ServersPage() {
         </div>
       )}
 
+      {/* Модалка серверов бота */}
       {showGuildsModal && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -415,32 +510,34 @@ export default function ServersPage() {
             <button onClick={() => setShowGuildsModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
               <X className="w-5 h-5" />
             </button>
-            <h2 className="text-xl font-bold mb-1">Серверы бота в Lolka</h2>
+            <h2 className="text-xl font-bold mb-1 text-[rgb(var(--text))]">Серверы бота в Lolka</h2>
             <p className="text-sm text-[rgb(var(--text-secondary))] mb-6">
-              Бот состоит в этих серверах, но они ещё не подключены к дашборду. Ничего не добавляется автоматически — выберите нужные.
+              Бот состоит в этих серверах, но они ещё не подключены к дашборду. Выберите, какие добавить.
             </p>
 
             {guildsLoading ? (
-              <p className="text-[rgb(var(--text-secondary))]">Загрузка...</p>
+              <div className="flex justify-center py-8">
+                <div className="w-8 h-8 border-2 border-[rgb(var(--text-secondary))] border-t-primary rounded-full animate-spin"></div>
+              </div>
             ) : guildsError ? (
-              <p className="text-red-400 text-sm">⚠️ {guildsError}</p>
+              <p className="text-red-400 text-sm bg-red-500/10 px-4 py-3 rounded-xl">⚠️ {guildsError}</p>
             ) : availableGuilds.length === 0 ? (
-              <p className="text-[rgb(var(--text-secondary))] text-sm">Новых серверов нет — все, где состоит бот, уже подключены.</p>
+              <p className="text-[rgb(var(--text-secondary))] text-sm text-center py-8">Новых серверов нет — все уже подключены ✓</p>
             ) : (
               <div className="space-y-3 overflow-y-auto pr-1">
                 {availableGuilds.map(g => (
-                  <div key={g.id} className="flex items-center gap-3 p-3 rounded-xl border border-[rgb(var(--border))]">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-lg shrink-0 overflow-hidden">
+                  <div key={g.id} className="flex items-center gap-3 p-4 rounded-xl border border-[rgb(var(--border))] hover:border-primary/40 transition-colors">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-lg shrink-0 overflow-hidden">
                       {g.icon ? <img src={g.icon} alt="" className="w-full h-full object-cover" /> : '🎮'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{g.name}</p>
+                      <p className="font-medium truncate text-[rgb(var(--text))]">{g.name}</p>
                       <p className="text-xs text-[rgb(var(--text-secondary))]">
-                        {g.member_count > 0 ? `${g.member_count} участников` : `ID: ${g.id}`}
+                        {g.member_count > 0 ? `${g.member_count.toLocaleString('ru-RU')} участников` : `ID: ${g.id}`}
                       </p>
                     </div>
-                    <Button onClick={() => addGuild(g)} disabled={addingGuildId === g.id} className="shrink-0">
-                      {addingGuildId === g.id ? 'Добавляем...' : 'Добавить'}
+                    <Button onClick={() => addGuild(g)} disabled={addingGuildId === g.id} size="sm" className="shrink-0">
+                      {addingGuildId === g.id ? '⏳' : '➕'}
                     </Button>
                   </div>
                 ))}
