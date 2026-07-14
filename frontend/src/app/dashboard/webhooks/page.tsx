@@ -8,11 +8,9 @@ import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/u
 import { Zap, Copy, Trash2, Plus, X } from 'lucide-react';
 import { useServer } from '@/context/ServerProvider';
 import { api, DashboardWebhook } from '@/lib/api';
+import { PlatformIcon, PLATFORM_LABEL } from '@/components/PlatformIcon';
 
 type Platform = 'vk' | 'lolka';
-
-const PLATFORM_LABEL: Record<Platform, string> = { vk: 'VK', lolka: 'Lolka' };
-const PLATFORM_ICON: Record<Platform, string> = { vk: '🔵', lolka: '🎮' };
 
 const EVENT_OPTIONS = [
   'Новое сообщение',
@@ -197,8 +195,8 @@ export default function WebhooksPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center text-xl">
-                      {PLATFORM_ICON[hook.platform]}
+                    <div className="w-11 h-11 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center overflow-hidden p-2">
+                      <PlatformIcon platform={hook.platform} className="w-full h-full rounded-md" />
                     </div>
                     <div>
                       <CardTitle className="text-lg">{PLATFORM_LABEL[hook.platform]}</CardTitle>
@@ -260,12 +258,16 @@ export default function WebhooksPage() {
                 <Select value={form.platform} onValueChange={(v: string) => setForm(f => ({ ...f, platform: v as Platform }))}>
                   <SelectTrigger>
                     <span className="flex items-center gap-2">
-                      {PLATFORM_ICON[form.platform]} {PLATFORM_LABEL[form.platform]}
+                      <PlatformIcon platform={form.platform} className="w-4 h-4 rounded" /> {PLATFORM_LABEL[form.platform]}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="vk">🔵 VK</SelectItem>
-                    <SelectItem value="lolka">🎮 Lolka</SelectItem>
+                    <SelectItem value="vk">
+                      <span className="inline-flex items-center gap-2"><PlatformIcon platform="vk" className="w-4 h-4 rounded" /> VK</span>
+                    </SelectItem>
+                    <SelectItem value="lolka">
+                      <span className="inline-flex items-center gap-2"><PlatformIcon platform="lolka" className="w-4 h-4 rounded" /> Lolka</span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
