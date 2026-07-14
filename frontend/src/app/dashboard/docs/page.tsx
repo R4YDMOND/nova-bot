@@ -1,5 +1,9 @@
 'use client';
 
+import { useState } from 'react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Book, Terminal } from 'lucide-react';
+
 const COMMANDS = [
   { cmd: '/ping', desc: 'Проверка работы бота' },
   { cmd: '/help', desc: 'Список всех команд' },
@@ -53,6 +57,8 @@ const SUPPORT_LINKS = [
 ];
 
 export default function DocsPage() {
+  const [activeTab, setActiveTab] = useState<'guide' | 'api'>('guide');
+
   return (
     <div className="p-8 max-w-4xl space-y-6">
       <div>
@@ -60,6 +66,55 @@ export default function DocsPage() {
         <p className="text-[rgb(var(--text-secondary))] mt-1">Всё что нужно для подключения и настройки Nova</p>
       </div>
 
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'guide' | 'api')}>
+        <TabsList>
+          <TabsTrigger value="guide" className="flex items-center gap-2">
+            <Book className="w-4 h-4" />
+            Руководство
+          </TabsTrigger>
+          <TabsTrigger value="api" className="flex items-center gap-2">
+            <Terminal className="w-4 h-4" />
+            Для разработчиков (API)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="guide" className="space-y-6">
+          <GuideContent />
+        </TabsContent>
+
+        <TabsContent value="api">
+          <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl p-6">
+            <h2 className="text-xl font-semibold text-[rgb(var(--text))] mb-2 flex items-center gap-2">
+              <Terminal className="w-5 h-5 text-primary" />
+              API Документация
+            </h2>
+            <p className="text-[rgb(var(--text-secondary))] text-sm mb-4">
+              Интерактивная документация по REST API Nova Bot (Swagger UI). Можно пробовать запросы прямо здесь — кнопка &quot;Try it out&quot;.
+            </p>
+            <div className="rounded-xl overflow-hidden border border-[rgb(var(--border))] bg-white">
+              <iframe
+                src="https://nova-bot-rpsy.onrender.com/docs"
+                className="w-full h-[75vh] min-h-[500px]"
+                title="Nova Bot API Documentation"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              />
+            </div>
+            <p className="text-[rgb(var(--text-secondary))] text-xs mt-3">
+              Если документация не загрузилась, откройте её напрямую:{' '}
+              <a href="https://nova-bot-rpsy.onrender.com/docs" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline">
+                nova-bot-rpsy.onrender.com/docs
+              </a>
+            </p>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function GuideContent() {
+  return (
+    <>
       {/* Quick start */}
       <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-2xl p-6">
         <h2 className="text-xl font-semibold text-[rgb(var(--text))] mb-4">🚀 Быстрый старт</h2>
@@ -166,6 +221,6 @@ export default function DocsPage() {
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }

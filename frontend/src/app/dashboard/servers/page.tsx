@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
@@ -9,6 +9,13 @@ import { Plus, Trash2, X } from 'lucide-react';
 
 const PLATFORM_ICON: Record<string, string> = { lolka: '🎮', vk: '🔵' };
 const PLATFORM_LABEL: Record<string, string> = { lolka: 'Lolka', vk: 'VK' };
+
+type PlatformFilter = 'all' | 'vk' | 'lolka';
+const FILTER_TABS: { value: PlatformFilter; label: string }[] = [
+  { value: 'all', label: 'Все' },
+  { value: 'vk', label: '🔵 VK' },
+  { value: 'lolka', label: '🎮 Lolka' },
+];
 
 type Detection =
   | { status: 'ok'; platform: 'vk' | 'lolka'; id: string; label: string }
@@ -54,6 +61,14 @@ function detectServerLink(raw: string): Detection | null {
 
 export default function ServersPage() {
   const { servers, loading, selectedServerId, selectServer, refresh } = useServer();
+
+  // Фильтр платформ: серверы уже загружены один раз в ServerProvider (кэш в React state),
+  // поэтому переключение вкладок — это чистая фильтрация на клиенте, без запросов к API.
+  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>('all');
+  const filteredServers = useMemo(() => {
+    if (platformFilter === 'all') return servers;
+    return servers.filter(s => s.platform === platformFilter);
+  }, [servers, platformFilter]);
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', server_id: '', platform: 'vk' as 'vk' | 'lolka', webhook_url: '' });
@@ -313,6 +328,29 @@ export default function ServersPage() {
           </div>
         </div>
 
+        {/* Фильтр платформ — данные уже в кэше (ServerProvider), переключение мгновенное */}
+        {!loading && servers.length > 0 && (
+          <div className="flex gap-2 mb-6 flex-wrap">
+            {FILTER_TABS.map(tab => {
+              const count = tab.value === 'all' ? servers.length : servers.filter(s => s.platform === tab.value).length;
+              const active = platformFilter === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setPlatformFilter(tab.value)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    active
+                      ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-md'
+                      : 'bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] border border-[rgb(var(--border))] hover:border-primary/40'
+                  }`}
+                >
+                  {tab.label} <span className={active ? 'text-white/80' : 'text-[rgb(var(--text-secondary))]'}>({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Сетка/список серверов — адаптивная */}
         {loading ? (
           <div className="text-center py-16">
@@ -333,14 +371,20 @@ export default function ServersPage() {
               Добавить сервер
             </Button>
           </div>
+        ) : filteredServers.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-6xl mb-4">🔍</div>
+            <h3 className="text-xl font-semibold text-[rgb(var(--text))] mb-2">Нет серверов на этой платформе</h3>
+            <p className="text-[rgb(var(--text-secondary))]">Попробуйте выбрать другую вкладку фильтра</p>
+          </div>
         ) : (
           <>
             {/* DESKTOP: сетка 4 колонки с вертикальными карточками */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {servers.map(s => (
+              {filteredServers.map(s => (
                 <Card
                   key={s.id}
-                  className={`flex flex-col items-center text-center gap-4 p-6 cursor-pointer transition-all hover:shadow-lg ${
+                  className={`group relative flex flex-col items-center text-center gap-4 p-6 cursor-pointer transition-all hover:shadow-lg ${
                     s.server_id === selectedServerId
                       ? 'border-2 border-primary bg-primary/5'
                       : 'border border-[rgb(var(--border))] hover:border-primary/40'
@@ -385,7 +429,7 @@ export default function ServersPage() {
                   <button
                     onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
                     disabled={deletingId === s.id}
-                    className="p-2 rounded-lg text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                    className="p-2 rounded-lg text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 md:opacity-0 md:group-hover:opacity-100"
                     title="Удалить из панели"
                   >
                     <Trash2 className="w-5 h-5" />
