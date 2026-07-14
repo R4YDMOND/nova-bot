@@ -15,16 +15,10 @@ type Detection =
   | { status: 'plain'; id: string }
   | { status: 'unresolved'; message: string };
 
-/**
- * Распознаёт вставленную ссылку на сообщество/сервер/канал и достаёт из неё
- * чистый числовой ID, а заодно определяет платформу.
- * Если это просто голый ID или произвольный текст без признаков ссылки — не мешаем вводу.
- */
 function detectServerLink(raw: string): Detection | null {
   const value = raw.trim();
   if (!value) return null;
 
-  // Голый числовой ID — подтверждаем, но не раньше 4 цифр (иначе моргает на каждый символ)
   if (/^\d+$/.test(value)) {
     if (value.length < 4) return null;
     return { status: 'plain', id: value };
@@ -226,7 +220,7 @@ export default function ServersPage() {
     <div className="min-h-screen pb-32 md:pb-8">
       {/* Главный баннер — Nova Bot Status */}
       <div className="bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] animate-gradient px-4 sm:px-8 py-12 sm:py-16 rounded-b-3xl shadow-xl">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center gap-6">
             <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center text-6xl sm:text-7xl shrink-0">
               🎮
@@ -268,7 +262,7 @@ export default function ServersPage() {
       </div>
 
       {/* Основной контент */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
         {/* Заголовок и кнопки управления */}
         <div className="mb-8">
           <div className="flex flex-col gap-4 mb-6">
@@ -301,7 +295,7 @@ export default function ServersPage() {
           </div>
 
           {/* Кнопки управления — сверху на Desktop, FAB на Mobile */}
-          <div className="hidden md:flex gap-3">
+          <div className="hidden md:flex gap-3 flex-wrap">
             <Button 
               onClick={syncAllPlatforms} 
               disabled={syncing}
@@ -319,7 +313,7 @@ export default function ServersPage() {
           </div>
         </div>
 
-        {/* Сетка серверов */}
+        {/* Сетка/список серверов — адаптивная */}
         {loading ? (
           <div className="text-center py-16">
             <div className="inline-block">
@@ -340,69 +334,125 @@ export default function ServersPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {servers.map(s => (
-              <Card
-                key={s.id}
-                className={`p-5 flex flex-col gap-4 cursor-pointer transition-all hover:shadow-lg ${
-                  s.server_id === selectedServerId
-                    ? 'border-2 border-primary bg-primary/5'
-                    : 'hover:border-primary/40'
-                }`}
-                onClick={() => selectServer(s.server_id)}
-              >
-                {/* Аватар и информация */}
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-3xl shrink-0 overflow-hidden">
+          <>
+            {/* DESKTOP: сетка 4 колонки с вертикальными карточками */}
+            <div className="hidden lg:grid lg:grid-cols-4 gap-4">
+              {servers.map(s => (
+                <Card
+                  key={s.id}
+                  className={`flex flex-col items-center text-center gap-4 p-6 cursor-pointer transition-all hover:shadow-lg ${
+                    s.server_id === selectedServerId
+                      ? 'border-2 border-primary bg-primary/5'
+                      : 'border border-[rgb(var(--border))] hover:border-primary/40'
+                  }`}
+                  onClick={() => selectServer(s.server_id)}
+                >
+                  {/* Аватар */}
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-4xl overflow-hidden shrink-0">
                     {s.icon_url ? (
                       <img src={s.icon_url} alt="" className="w-full h-full object-cover" />
                     ) : (
                       PLATFORM_ICON[s.platform] || '🔵'
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{s.name}</h3>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] shrink-0">
-                            {PLATFORM_ICON[s.platform]} {PLATFORM_LABEL[s.platform]}
-                          </span>
-                          {s.server_id === selectedServerId && (
-                            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary font-medium shrink-0">
-                              ✓ Выбран
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
-                        disabled={deletingId === s.id}
-                        className="p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 disabled:opacity-50"
-                        title="Удалить из панели"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+
+                  {/* Название и платформа */}
+                  <div className="w-full">
+                    <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{s.name}</h3>
+                    <div className="flex justify-center mt-2">
+                      <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
+                        {PLATFORM_ICON[s.platform]} {PLATFORM_LABEL[s.platform]}
+                      </span>
                     </div>
                   </div>
-                </div>
 
-                {/* Статистика */}
-                <div className="pt-3 border-t border-[rgb(var(--border))] space-y-1">
-                  <p className="text-sm text-[rgb(var(--text-secondary))]">
-                    👥 {s.member_count > 0 ? `${s.member_count.toLocaleString('ru-RU')} участников` : 'Кол-во участников неизвестно'}
-                  </p>
-                  <p className="text-xs text-[rgb(var(--text-secondary))] font-mono">
+                  {/* Участники */}
+                  <div className="text-sm text-[rgb(var(--text))] font-semibold">
+                    👥 {s.member_count > 0 ? s.member_count.toLocaleString('ru-RU') : 'N/A'}
+                  </div>
+
+                  {/* ID */}
+                  <div className="text-xs text-[rgb(var(--text-secondary))] font-mono">
                     ID: {s.server_id}
-                  </p>
-                </div>
-              </Card>
-            ))}
-          </div>
+                  </div>
+
+                  {/* Статус */}
+                  {s.server_id === selectedServerId && (
+                    <div className="text-xs text-primary font-bold">✓ Выбран</div>
+                  )}
+
+                  {/* Кнопка удаления */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
+                    disabled={deletingId === s.id}
+                    className="p-2 rounded-lg text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                    title="Удалить из панели"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </Card>
+              ))}
+            </div>
+
+            {/* TABLET & MOBILE: список горизонтальных карточек */}
+            <div className="lg:hidden space-y-3">
+              {servers.map(s => (
+                <Card
+                  key={s.id}
+                  className={`flex items-center gap-4 p-4 cursor-pointer transition-all ${
+                    s.server_id === selectedServerId
+                      ? 'border-2 border-primary bg-primary/5'
+                      : 'border border-[rgb(var(--border))] hover:border-primary/40'
+                  }`}
+                  onClick={() => selectServer(s.server_id)}
+                >
+                  {/* Аватар слева */}
+                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-2xl overflow-hidden shrink-0">
+                    {s.icon_url ? (
+                      <img src={s.icon_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      PLATFORM_ICON[s.platform] || '🔵'
+                    )}
+                  </div>
+
+                  {/* Информация посередине */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{s.name}</h3>
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] shrink-0">
+                        {PLATFORM_ICON[s.platform]} {PLATFORM_LABEL[s.platform]}
+                      </span>
+                    </div>
+                    <div className="text-sm text-[rgb(var(--text))] font-semibold">
+                      👥 {s.member_count > 0 ? s.member_count.toLocaleString('ru-RU') : 'N/A'} участников
+                    </div>
+                    <div className="text-xs text-[rgb(var(--text-secondary))] font-mono">
+                      ID: {s.server_id}
+                    </div>
+                  </div>
+
+                  {/* Статус и кнопка удаления */}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    {s.server_id === selectedServerId && (
+                      <span className="text-xs text-primary font-bold px-2 py-1 bg-primary/10 rounded-lg">✓ Выбран</span>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
+                      disabled={deletingId === s.id}
+                      className="p-2 rounded-lg text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                      title="Удалить из панели"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Плавающая кнопка на мобайле */}
+      {/* Плавающие кнопки на мобайле */}
       <div className="md:hidden fixed bottom-6 right-6 z-40 flex flex-col gap-3">
         <Button
           onClick={syncAllPlatforms}
