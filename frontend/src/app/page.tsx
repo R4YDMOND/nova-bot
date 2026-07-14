@@ -142,7 +142,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-2 font-bold text-xl mx-auto lg:mx-0">
             <div className="w-9 h-9 rounded-full bg-[rgb(var(--surface-2))] flex items-center justify-center overflow-hidden shrink-0">
-              <img src="/logo-lolka.png" alt="Nova Bot" className="w-full h-full object-cover" />
+              <img src="/logo-nova.png" alt="Nova Bot" className="w-full h-full object-cover" />
             </div>
             NOVA <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">BOT</span>
           </div>
@@ -229,7 +229,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex-1 w-full flex justify-center">
-            <img src="/logo-lolka-512.png" alt="Nova Bot" width={320} height={320} className="w-full max-w-[320px] h-auto" />
+            <img src="/logo-nova-512.png" alt="Nova Bot" width={320} height={320} className="w-full max-w-[320px] h-auto" />
           </div>
         </div>
 

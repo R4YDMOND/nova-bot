@@ -48,7 +48,7 @@ export function Sidebar() {
         <div className="p-6 border-b border-[rgb(var(--border))]">
           <Link href="/" className="flex items-center gap-3" onClick={() => setIsOpen(false)}>
             <div className="w-10 h-10 rounded-full bg-[rgb(var(--surface-2))] flex items-center justify-center shadow-lg overflow-hidden shrink-0">
-              <img src="/logo-lolka.png" alt="Nova Bot" className="w-full h-full object-cover" />
+              <img src="/logo-nova.png" alt="Nova Bot" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-[rgb(var(--text))]">Nova</h1>

@@ -188,8 +188,8 @@ export default function ServersPage() {
       <div className="bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] animate-gradient px-4 sm:px-8 py-12 sm:py-16 rounded-b-3xl shadow-xl">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center text-6xl sm:text-7xl shrink-0">
-              🎮
+            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center shrink-0 overflow-hidden p-4 sm:p-5">
+              <PlatformIcon platform="lolka" className="w-full h-full rounded-xl" />
             </div>
             <div className="flex-1">
               <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Nova Bot в Lolka</h1>
