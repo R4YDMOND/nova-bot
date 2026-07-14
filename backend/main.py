@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, EmailStr
 import hashlib
@@ -67,6 +67,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """
+    Без этого хендлера необработанное исключение вылетает выше CORSMiddleware,
+    и браузер видит голый 500 без Access-Control-Allow-Origin — из-за чего
+    в консоли это выглядит как ошибка CORS, хотя реальная причина другая.
+    Хендлер сам является частью ExceptionMiddleware, который CORSMiddleware
+    оборачивает — поэтому заголовки добавляются как обычно.
+    """
+    print(f"❌ Необработанная ошибка на {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"error": "internal_error", "detail": str(exc)},
+    )
+
+
 @app.on_event("startup")
 async def startup():
     init_db()
@@ -88,6 +105,42 @@ def root():
     HEAD используется UptimeRobot для мониторинга.
     """
     return {"status": "ok", "version": "0.7.0"}
+
+def _normalize_server_id(raw_id: str, platform: str) -> str:
+    """
+    Приводит server_id к чистому виду, который безопасно ложится в БД
+    и сравнивается с Integer-колонками в других таблицах (ModuleConfig и т.д.).
+
+    Принимает как готовый ID, так и вставленную ссылку:
+      - "240082352"                          -> "240082352"
+      - "https://vk.com/club240082352"       -> "240082352"
+      - "https://vk.com/public240082352"     -> "240082352"
+      - "vk.com/club240082352"               -> "240082352"
+
+    Для VK-сообществ с текстовым screen_name (без цифр, например vk.com/durov)
+    однозначно вытащить числовой ID без обращения к VK API нельзя —
+    в этом случае просим ввести ID вручную.
+    """
+    raw_id = (raw_id or "").strip()
+    if not raw_id:
+        raise ValueError("server_id не может быть пустым")
+
+    if platform == "vk":
+        match = re.search(r"(?:club|public)(\d+)", raw_id)
+        if match:
+            return match.group(1)
+        if raw_id.isdigit():
+            return raw_id
+        raise ValueError(
+            "Не удалось распознать числовой ID VK-сообщества. "
+            "Укажите ID напрямую (например 240082352) или ссылку вида "
+            "vk.com/club240082352 — ссылки с текстовым именем (vk.com/durov) "
+            "пока не поддерживаются, нужен числовой ID."
+        )
+
+    # Lolka и остальные платформы — ID уже числовой, просто чистим пробелы
+    return raw_id
+
 
 @app.get("/api/servers")
 def get_servers(platform: str = Query("")):
@@ -121,6 +174,11 @@ def create_server(
     webhook_url: str = Query(""),
     platform: str = Query("vk"),
 ):
+    try:
+        server_id = _normalize_server_id(server_id, platform)
+    except ValueError as e:
+        return {"error": str(e)}
+
     db = SessionLocal()
     try:
         existing = db.query(Server).filter(Server.server_id == server_id).first()
