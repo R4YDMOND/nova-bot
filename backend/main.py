@@ -138,7 +138,19 @@ def _normalize_server_id(raw_id: str, platform: str) -> str:
             "пока не поддерживаются, нужен числовой ID."
         )
 
-    # Lolka и остальные платформы — ID уже числовой, просто чистим пробелы
+    if platform == "lolka":
+        # Вставленная ссылка вида https://lolka.app/servers/<id> или .../channels/<id>/...
+        match = re.search(r"lolka\.app/(?:servers|channels)/(\d+)", raw_id)
+        if match:
+            return match.group(1)
+        if raw_id.isdigit():
+            return raw_id
+        raise ValueError(
+            "Не удалось распознать числовой ID Lolka-сервера. "
+            "Укажите ID напрямую или ссылку вида lolka.app/servers/780713670838272."
+        )
+
+    # Остальные платформы — просто чистим пробелы
     return raw_id
 
 
@@ -1425,18 +1437,19 @@ def get_auto_forward_config(server_id: str = Query("default")):
     """Получить настройки авто-форварда"""
     db = SessionLocal()
     try:
-        config = db.query(ModuleConfig).filter(
-            ModuleConfig.server_id == server_id,
-            ModuleConfig.module_name == "auto_forward"
-        ).first()
-        
-        if config:
-            import json
-            try:
-                return {"config": json.loads(config.config)}
-            except:
-                pass
-        
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if server:
+            config = db.query(ModuleConfig).filter(
+                ModuleConfig.server_id == server.id,
+                ModuleConfig.module_name == "auto_forward"
+            ).first()
+            if config:
+                import json
+                try:
+                    return {"config": json.loads(config.config)}
+                except Exception:
+                    pass
+
         return {"config": {
             "enabled": False,
             "from_lolka_to_vk": True,
@@ -1498,18 +1511,19 @@ def get_reports_config(server_id: str = Query("default")):
     """Получить настройки отчётов"""
     db = SessionLocal()
     try:
-        config = db.query(ModuleConfig).filter(
-            ModuleConfig.server_id == server_id,
-            ModuleConfig.module_name == "reports"
-        ).first()
-        
-        if config:
-            import json
-            try:
-                return {"config": json.loads(config.config)}
-            except:
-                pass
-        
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if server:
+            config = db.query(ModuleConfig).filter(
+                ModuleConfig.server_id == server.id,
+                ModuleConfig.module_name == "reports"
+            ).first()
+            if config:
+                import json
+                try:
+                    return {"config": json.loads(config.config)}
+                except Exception:
+                    pass
+
         return {"config": {
             "enabled": False,
             "channel": "",

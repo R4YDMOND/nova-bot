@@ -10,6 +10,54 @@ import { Plus, Trash2, X } from 'lucide-react';
 const PLATFORM_ICON: Record<string, string> = { lolka: '🎮', vk: '🔵' };
 const PLATFORM_LABEL: Record<string, string> = { lolka: 'Lolka', vk: 'VK' };
 
+type Detection =
+  | { status: 'ok'; platform: 'vk' | 'lolka'; id: string; label: string }
+  | { status: 'plain'; id: string }
+  | { status: 'unresolved'; message: string };
+
+/**
+ * Распознаёт вставленную ссылку на сообщество/сервер/канал и достаёт из неё
+ * чистый числовой ID, а заодно определяет платформу.
+ * Если это просто голый ID или произвольный текст без признаков ссылки — не мешаем вводу.
+ */
+function detectServerLink(raw: string): Detection | null {
+  const value = raw.trim();
+  if (!value) return null;
+
+  // Голый числовой ID — подтверждаем, но не раньше 4 цифр (иначе моргает на каждый символ)
+  if (/^\d+$/.test(value)) {
+    if (value.length < 4) return null;
+    return { status: 'plain', id: value };
+  }
+
+  const looksLikeLink = /https?:\/\/|vk\.com|lolka\.app/i.test(value);
+
+  const vkMatch = value.match(/vk\.com\/(club|public)(\d+)/i);
+  if (vkMatch) {
+    const kind = vkMatch[1].toLowerCase() === 'club' ? 'Сообщество' : 'Паблик';
+    return { status: 'ok', platform: 'vk', id: vkMatch[2], label: `${kind} VK` };
+  }
+
+  const lolkaServerMatch = value.match(/lolka\.app\/servers\/(\d+)/i);
+  if (lolkaServerMatch) {
+    return { status: 'ok', platform: 'lolka', id: lolkaServerMatch[1], label: 'Сервер Lolka' };
+  }
+
+  const lolkaChannelMatch = value.match(/lolka\.app\/channels\/(\d+)/i);
+  if (lolkaChannelMatch) {
+    return { status: 'ok', platform: 'lolka', id: lolkaChannelMatch[1], label: 'Канал Lolka' };
+  }
+
+  if (looksLikeLink) {
+    return {
+      status: 'unresolved',
+      message: 'Не нашли числовой ID в ссылке — введите его вручную (например club123456 → 123456).',
+    };
+  }
+
+  return null;
+}
+
 export default function ServersPage() {
   const { servers, loading, selectedServerId, selectServer, refresh } = useServer();
 
@@ -17,6 +65,7 @@ export default function ServersPage() {
   const [form, setForm] = useState({ name: '', server_id: '', platform: 'vk' as 'vk' | 'lolka', webhook_url: '' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [detection, setDetection] = useState<Detection | null>(null);
 
   const [botStatus, setBotStatus] = useState<{ configured: boolean; connected: boolean; bot: { username?: string } | null } | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -49,7 +98,18 @@ export default function ServersPage() {
   function openModal() {
     setForm({ name: '', server_id: '', platform: 'vk', webhook_url: '' });
     setFormError(null);
+    setDetection(null);
     setShowModal(true);
+  }
+
+  function handleServerIdChange(raw: string) {
+    const result = detectServerLink(raw);
+    if (result?.status === 'ok') {
+      setForm(f => ({ ...f, server_id: result.id, platform: result.platform }));
+    } else {
+      setForm(f => ({ ...f, server_id: raw }));
+    }
+    setDetection(result);
   }
 
   async function createServer() {
@@ -225,7 +285,26 @@ export default function ServersPage() {
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">
                   ID {form.platform === 'vk' ? 'сообщества VK' : 'сервера Lolka'}
                 </label>
-                <input type="text" value={form.server_id} onChange={e => setForm(f => ({ ...f, server_id: e.target.value }))} placeholder="123456789" className="input w-full font-mono text-sm" />
+                <input
+                  type="text"
+                  value={form.server_id}
+                  onChange={e => handleServerIdChange(e.target.value)}
+                  placeholder="123456789 или ссылка vk.com/club123456"
+                  className="input w-full font-mono text-sm"
+                />
+                {detection?.status === 'ok' && (
+                  <p className="text-xs text-green-400 mt-1.5 flex items-center gap-1">
+                    ✅ {PLATFORM_ICON[detection.platform]} {detection.label} · ID {detection.id} — платформа подставлена автоматически
+                  </p>
+                )}
+                {detection?.status === 'plain' && (
+                  <p className="text-xs text-[rgb(var(--text-secondary))] mt-1.5">
+                    🔢 Похоже на корректный числовой ID
+                  </p>
+                )}
+                {detection?.status === 'unresolved' && (
+                  <p className="text-xs text-amber-400 mt-1.5">⚠️ {detection.message}</p>
+                )}
               </div>
               {formError && <p className="text-red-400 text-sm">{formError}</p>}
               <div className="flex gap-3 pt-2">
