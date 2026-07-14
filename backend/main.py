@@ -58,8 +58,9 @@ app = FastAPI(title="Nova API", version="0.7.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://nova-bot-4vmp.vercel.app",
-        "http://localhost:3000",
+        "https://nova-bot-1-1hsz.onrender.com",  # реальный frontend на Render
+        "https://nova-bot-4vmp.vercel.app",       # старый Vercel — оставлен временно
+        "http://localhost:3000",                   # локальная разработка
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -79,8 +80,13 @@ async def startup():
     else:
         print("INFO: LOLKA_BOT_TOKEN не задан — Gateway не подключается")
 
+@app.head("/")
 @app.get("/")
 def root():
+    """
+    Корневой роут для health check.
+    HEAD используется UptimeRobot для мониторинга.
+    """
     return {"status": "ok", "version": "0.7.0"}
 
 @app.get("/api/servers")
@@ -626,7 +632,7 @@ def verify_email(token: str):
         user.verification_token_expires = None
         db.commit()
 
-        frontend_url = "https://nova-bot-4vmp.vercel.app"
+        frontend_url = "https://nova-bot-1-1hsz.onrender.com"
         return RedirectResponse(url=f"{frontend_url}/login?verified=1")
     except HTTPException:
         raise
@@ -732,47 +738,6 @@ def logout(data: LogoutRequest):
         db.close()
 
 
-@app.get("/api/auth/debug-user")
-def debug_user(email: str = Query(...)):
-    """ВРЕМЕННЫЙ эндпоинт для отладки: проверить состояние пользователя по email.
-    Не отдаёт password_hash и другие чувствительные поля. Удалить после отладки."""
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.email == email.strip().lower()).first()
-        if not user:
-            return {"exists": False}
-        return {
-            "exists": True,
-            "is_verified": user.is_verified,
-            "has_refresh_token": bool(user.refresh_token),
-        }
-    finally:
-        db.close()
-
-
-@app.post("/api/auth/normalize-emails")
-def normalize_emails():
-    """ВРЕМЕННЫЙ эндпоинт-миграция: привести все email в таблице users к нижнему
-    регистру (нужно один раз после деплоя нормализации email в register/login).
-    Удалить после использования."""
-    db = SessionLocal()
-    try:
-        users = db.query(User).all()
-        changed = 0
-        for u in users:
-            lower = u.email.strip().lower()
-            if lower != u.email:
-                u.email = lower
-                changed += 1
-        db.commit()
-        return {"status": "ok", "changed": changed, "total": len(users)}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
-
-
 @app.post("/api/auth/resend-verification")
 def resend_verification(data: dict):
     """Повторно отправить письмо с подтверждением уже существующему,
@@ -822,7 +787,7 @@ def forgot_password(data: ForgotPasswordRequest):
             user.password_reset_expires = token_expiry(hours=1)
             db.commit()
 
-            frontend_url = "https://nova-bot-4vmp.vercel.app"
+            frontend_url = "https://nova-bot-1-1hsz.onrender.com"
             reset_link = f"{frontend_url}/reset-password?token={token}"
             sent = send_email(
                 user.email,
