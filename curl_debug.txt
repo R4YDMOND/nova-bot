@@ -1,0 +1,39 @@
+﻿curl.exe :   % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+строка:1 знак:1
++ curl.exe -v https://github.com 2>&1 | Out-File -Encoding utf8 curl_de ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (  % Total    % ... Time   Current:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+                                 Dload  Upload  Total   Spent   Left   Speed
+
+  0      0   0      0   0      0      0      0                              0* Host github.com:443 was resolved.
+* IPv6: (none)
+* IPv4: 140.82.121.4
+*   Trying 140.82.121.4:443...
+* schannel: disabled automatic use of client certificate
+* ALPN: curl offers http/1.1
+
+  0      0   0      0   0      0      0      0           00:01              0
+  0      0   0      0   0      0      0      0           00:02              0
+  0      0   0      0   0      0      0      0           00:03              0
+  0      0   0      0   0      0      0      0           00:04              0
+  0      0   0      0   0      0      0      0           00:05              0
+  0      0   0      0   0      0      0      0           00:06              0
+  0      0   0      0   0      0      0      0           00:07              0
+  0      0   0      0   0      0      0      0           00:08              0
+  0      0   0      0   0      0      0      0           00:09              0
+  0      0   0      0   0      0      0      0           00:10              0
+  0      0   0      0   0      0      0      0           00:11              0
+  0      0   0      0   0      0      0      0           00:12              0
+  0      0   0      0   0      0      0      0           00:13              0
+  0      0   0      0   0      0      0      0           00:14              0
+  0      0   0      0   0      0      0      0           00:15              0
+  0      0   0      0   0      0      0      0           00:16              0
+  0      0   0      0   0      0      0      0           00:17              0
+  0      0   0      0   0      0      0      0           00:18              0
+  0      0   0      0   0      0      0      0           00:19              0* Recv failure: Connection was reset
+* schannel: failed to receive handshake, SSL/TLS connection failed
+
+* closing connection #0
+curl: (35) Recv failure: Connection was reset
