@@ -2,8 +2,12 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/toggle';
+import { api } from '@/lib/api';
+import { useServer } from '@/context/ServerProvider';
+import { NoServerSelected } from '@/components/NoServerSelected';
 
 const API_URL = 'https://nova-bot-rpsy.onrender.com';
+const MODULE_NAME = 'moderation';
 
 const TABS = [
   { id: 'protection', label: '🛡️ Защита' },
@@ -40,30 +44,35 @@ type Settings = {
 
 type LogEntry = { user: string; action: string; reason: string; moderator: string; time: string };
 
+const DEFAULT_SETTINGS: Settings = {
+  antiSpam: true, antiRaid: true, badWordsFilter: true,
+  captchaForNew: true, autoDeleteLinks: false,
+  autoModMentions: true, maxMentions: 5,
+  autoModEmoji: false, maxEmoji: 10,
+  autoModCaps: true, capsThreshold: 70,
+  autoModRepeats: true, repeatThreshold: 3,
+  maxWarnings: 3, muteDuration: 10, banDuration: 1440,
+  logChannel: '#логи-модерации', appealChannel: '',
+  warnMessage: '{user}, вы нарушили правило {rule}. Предупреждение {count}/{max}.',
+  muteMessage: '{user}, вы замьючены на {duration} минут. Причина: {reason}',
+  banMessage: '{user}, вы забанены. Причина: {reason}. Апелляция: {appeal}',
+  rulesChannel: '#правила', rulesUrl: '', rulesText: '1. Без спама\n2. Без оскорблений\n3. Без рекламы\n4. Уважать участников',
+  modBotName: 'Nova Модератор 🤖', modAvatarStyle: 'shield', modAvatarUrl: '',
+  useAIResponses: true, aiModel: 'auto',
+};
+
 export default function ModerationPage() {
+  const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState('protection');
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [logFilter, setLogFilter] = useState('all');
   const [logSearch, setLogSearch] = useState('');
   const [auditLog, setAuditLog] = useState<LogEntry[]>([]);
   const [logLoading, setLogLoading] = useState(true);
 
-  const [settings, setSettings] = useState<Settings>({
-    antiSpam: true, antiRaid: true, badWordsFilter: true,
-    captchaForNew: true, autoDeleteLinks: false,
-    autoModMentions: true, maxMentions: 5,
-    autoModEmoji: false, maxEmoji: 10,
-    autoModCaps: true, capsThreshold: 70,
-    autoModRepeats: true, repeatThreshold: 3,
-    maxWarnings: 3, muteDuration: 10, banDuration: 1440,
-    logChannel: '#логи-модерации', appealChannel: '',
-    warnMessage: '{user}, вы нарушили правило {rule}. Предупреждение {count}/{max}.',
-    muteMessage: '{user}, вы замьючены на {duration} минут. Причина: {reason}',
-    banMessage: '{user}, вы забанены. Причина: {reason}. Апелляция: {appeal}',
-    rulesChannel: '#правила', rulesUrl: '', rulesText: '1. Без спама\n2. Без оскорблений\n3. Без рекламы\n4. Уважать участников',
-    modBotName: 'Nova Модератор 🤖', modAvatarStyle: 'shield', modAvatarUrl: '',
-    useAIResponses: true, aiModel: 'auto',
-  });
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     fetch(`${API_URL}/api/moderation/log`)
@@ -72,9 +81,32 @@ export default function ModerationPage() {
       .catch(() => setLogLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!selectedServer) { setSettingsLoading(false); return; }
+    setSettingsLoading(true);
+    api.modules.getConfig<Settings>(selectedServerId, MODULE_NAME)
+      .then(saved => setSettings(saved ? { ...DEFAULT_SETTINGS, ...saved } : DEFAULT_SETTINGS))
+      .catch(() => setSettings(DEFAULT_SETTINGS))
+      .finally(() => setSettingsLoading(false));
+  }, [selectedServer, selectedServerId]);
+
   const update = (key: keyof Settings, value: any) => setSettings(s => ({ ...s, [key]: value }));
   const toggle = (key: keyof Settings) => setSettings(s => ({ ...s, [key]: !s[key] }));
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2500); };
+
+  const save = async () => {
+    if (!selectedServer) return;
+    setSaving(true);
+    try {
+      const res = await api.modules.saveConfig(selectedServerId, selectedServer.platform, MODULE_NAME, settings);
+      if (res.error) throw new Error(res.error);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {
+      alert('Не удалось сохранить настройки модерации');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filteredLog = auditLog.filter(e => {
     const matchType = logFilter === 'all'
@@ -84,6 +116,14 @@ export default function ModerationPage() {
     const q = logSearch.toLowerCase();
     return matchType && (e.user?.toLowerCase().includes(q) || e.reason?.toLowerCase().includes(q));
   });
+
+  if (serverLoading || settingsLoading) {
+    return <div className="p-8 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
+  }
+
+  if (!selectedServer) {
+    return <NoServerSelected title="🛡️ Модерация" />;
+  }
 
   return (
     <div className="p-8 max-w-4xl">
@@ -319,10 +359,10 @@ export default function ModerationPage() {
       )}
 
       <div className="mt-8">
-        <button onClick={save} className={`px-7 py-3 rounded-xl font-semibold text-black transition-all ${
+        <button onClick={save} disabled={saving} className={`px-7 py-3 rounded-xl font-semibold text-black transition-all disabled:opacity-60 ${
           saved ? 'bg-green-400' : 'bg-cyan-400 hover:bg-cyan-300'
         }`}>
-          {saved ? '✅ Сохранено!' : '💾 Сохранить настройки'}
+          {saving ? 'Сохранение...' : saved ? '✅ Сохранено!' : '💾 Сохранить настройки'}
         </button>
       </div>
       {saved && (

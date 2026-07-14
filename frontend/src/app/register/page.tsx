@@ -74,13 +74,15 @@ export default function RegisterPage() {
         <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-8 shadow-2xl">
           <h2 className="text-xl font-semibold text-white text-center mb-6">Регистрация по e-mail</h2>
 
-          <form onSubmit={handleSubmit} className="space-y-3">
+          {/* autoComplete="off" на форме — дополнительная подсказка Chrome/Firefox не путать это с формой входа */}
+          <form onSubmit={handleSubmit} className="space-y-3" autoComplete="off">
             <input
               type="email"
               required
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
               className="w-full px-4 py-3 rounded-2xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-white placeholder:text-[rgb(var(--text-secondary))] outline-none focus:border-primary transition-colors"
             />
             <input
@@ -89,6 +91,7 @@ export default function RegisterPage() {
               placeholder="Пароль (минимум 8 символов)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
               className="w-full px-4 py-3 rounded-2xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-white placeholder:text-[rgb(var(--text-secondary))] outline-none focus:border-primary transition-colors"
             />
             <input
@@ -97,6 +100,7 @@ export default function RegisterPage() {
               placeholder="Повторите пароль"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
+              autoComplete="new-password"
               className="w-full px-4 py-3 rounded-2xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-white placeholder:text-[rgb(var(--text-secondary))] outline-none focus:border-primary transition-colors"
             />
 

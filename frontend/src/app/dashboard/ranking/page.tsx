@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/toggle';
 import { api } from '@/lib/api';
+import { useServer } from '@/context/ServerProvider';
+import { NoServerSelected } from '@/components/NoServerSelected';
 
 const TABS = [
   { id: 'settings', label: '⚙️ Настройки' },
@@ -26,10 +28,21 @@ type Reward = { level: number; role: string; color: string; message?: string };
 type VoiceReward = { minutes: number; role: string; color: string };
 type Member = { rank?: number; name?: string; avatar?: string; level?: number; xp?: number; messages?: number; voiceHours?: number; reactions?: number };
 
-const STORAGE_KEY = 'nova-ranking-settings';
+type RankingConfig = {
+  xpSources: XpSource[]; multiplier: number; boostChannels: string; boostRoles: string;
+  notifyChannel: string; notifyMessage: string; pingUser: boolean; blacklistChannels: string;
+  decayEnabled: boolean; decayDays: number; decayPercent: number;
+  rewards: Reward[]; voiceRewards: VoiceReward[];
+  cardBgColor: string; cardAccentColor: string; cardNickname: string; cardStyle: string;
+};
+
+const MODULE_NAME = 'ranking';
 
 export default function RankingPage() {
+  const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState('settings');
+  const [configLoading, setConfigLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const [xpSources, setXpSources] = useState<XpSource[]>([
@@ -85,22 +98,62 @@ export default function RankingPage() {
   const [searchMember, setSearchMember] = useState('');
 
   useEffect(() => {
+    // Список участников рейтинга — общий эндпоинт бэкенда, пока не принимает
+    // server_id (известное ограничение, см. арх.-документ проекта). Не в
+    // рамках текущей задачи по привязке настроек к платформе.
     api.ranking.getMembers()
       .then(d => { setMembers((d.members as Member[]) || []); setMembersLoading(false); })
       .catch(() => setMembersLoading(false));
   }, []);
 
-  const save = () => {
+  useEffect(() => {
+    if (!selectedServer) { setConfigLoading(false); return; }
+    setConfigLoading(true);
+    api.modules.getConfig<RankingConfig>(selectedServerId, MODULE_NAME)
+      .then(cfg => {
+        if (!cfg) return;
+        setXpSources(cfg.xpSources ?? xpSources);
+        setMultiplier(cfg.multiplier ?? multiplier);
+        setBoostChannels(cfg.boostChannels ?? boostChannels);
+        setBoostRoles(cfg.boostRoles ?? boostRoles);
+        setNotifyChannel(cfg.notifyChannel ?? notifyChannel);
+        setNotifyMessage(cfg.notifyMessage ?? notifyMessage);
+        setPingUser(cfg.pingUser ?? pingUser);
+        setBlacklistChannels(cfg.blacklistChannels ?? blacklistChannels);
+        setDecayEnabled(cfg.decayEnabled ?? decayEnabled);
+        setDecayDays(cfg.decayDays ?? decayDays);
+        setDecayPercent(cfg.decayPercent ?? decayPercent);
+        setRewards(cfg.rewards ?? rewards);
+        setVoiceRewards(cfg.voiceRewards ?? voiceRewards);
+        setCardBgColor(cfg.cardBgColor ?? cardBgColor);
+        setCardAccentColor(cfg.cardAccentColor ?? cardAccentColor);
+        setCardNickname(cfg.cardNickname ?? cardNickname);
+        setCardStyle(cfg.cardStyle ?? cardStyle);
+      })
+      .catch(() => {})
+      .finally(() => setConfigLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedServer, selectedServerId]);
+
+  const save = async () => {
+    if (!selectedServer) return;
+    setSaving(true);
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      const config: RankingConfig = {
         xpSources, multiplier, boostChannels, boostRoles,
         notifyChannel, notifyMessage, pingUser, blacklistChannels,
         decayEnabled, decayDays, decayPercent, rewards, voiceRewards,
         cardBgColor, cardAccentColor, cardNickname, cardStyle,
-      }));
-    } catch {}
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2200);
+      };
+      const res = await api.modules.saveConfig(selectedServerId, selectedServer.platform, MODULE_NAME, config);
+      if (res.error) throw new Error(res.error);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2200);
+    } catch {
+      alert('Не удалось сохранить настройки уровней');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleSource = (i: number) =>
@@ -130,6 +183,14 @@ export default function RankingPage() {
     (m.name || '').toLowerCase().includes(searchMember.toLowerCase())
   );
 
+  if (serverLoading || configLoading) {
+    return <div className="p-8 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
+  }
+
+  if (!selectedServer) {
+    return <NoServerSelected title="🪪 Система уровней" />;
+  }
+
   return (
     <div className="p-8 max-w-5xl">
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
@@ -137,8 +198,8 @@ export default function RankingPage() {
           <h1 className="text-3xl font-bold">🪪 Система уровней</h1>
           <p className="text-[rgb(var(--text-secondary))] mt-1">Настройки опыта, наград и рейтинга</p>
         </div>
-        <button onClick={save} className={`px-5 py-2.5 rounded-xl font-semibold text-black transition-all ${saved ? 'bg-green-400' : 'bg-cyan-400 hover:bg-cyan-300'}`}>
-          {saved ? '✅ Сохранено!' : '💾 Сохранить'}
+        <button onClick={save} disabled={saving} className={`px-5 py-2.5 rounded-xl font-semibold text-black transition-all disabled:opacity-60 ${saved ? 'bg-green-400' : 'bg-cyan-400 hover:bg-cyan-300'}`}>
+          {saving ? 'Сохранение...' : saved ? '✅ Сохранено!' : '💾 Сохранить'}
         </button>
       </div>
 
@@ -435,8 +496,8 @@ export default function RankingPage() {
       )}
 
       <div className="flex justify-end mt-8">
-        <button onClick={save} className={`px-6 py-2.5 rounded-xl font-semibold text-black transition-all ${saved ? 'bg-green-400' : 'bg-cyan-400 hover:bg-cyan-300'}`}>
-          {saved ? '✅ Сохранено!' : '💾 Сохранить всё'}
+        <button onClick={save} disabled={saving} className={`px-6 py-2.5 rounded-xl font-semibold text-black transition-all disabled:opacity-60 ${saved ? 'bg-green-400' : 'bg-cyan-400 hover:bg-cyan-300'}`}>
+          {saving ? 'Сохранение...' : saved ? '✅ Сохранено!' : '💾 Сохранить всё'}
         </button>
       </div>
 

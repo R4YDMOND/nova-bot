@@ -83,6 +83,26 @@ export const api = {
   modules: {
     get: (serverId = 'default') => apiFetch<{ modules: { name: string; enabled: boolean; config: string }[] }>(`/api/settings/modules?server_id=${serverId}`),
     save: (data: object) => apiFetch<{ status: string }>('/api/settings/modules', { method: 'POST', body: JSON.stringify(data) }),
+    // Хелперы поверх generic /api/settings/modules — хранят JSON-конфиг конкретного
+    // раздела дашборда (commands/moderation/ranking) под своим module_name,
+    // чтобы не заводить под каждую страницу отдельный бэкенд-эндпоинт.
+    getConfig: async <T,>(serverId: string, moduleName: string): Promise<T | null> => {
+      const data = await apiFetch<{ modules: { name: string; enabled: boolean; config: string }[] }>(
+        `/api/settings/modules?server_id=${serverId}`
+      );
+      const found = data.modules?.find(m => m.name === moduleName);
+      if (!found?.config) return null;
+      try { return JSON.parse(found.config) as T; } catch { return null; }
+    },
+    saveConfig: (serverId: string, platform: string, moduleName: string, config: unknown) =>
+      apiFetch<{ status?: string; error?: string; modules_count?: number }>('/api/settings/modules', {
+        method: 'POST',
+        body: JSON.stringify({
+          server_id: serverId,
+          platform,
+          modules: [{ name: moduleName, enabled: true, config: JSON.stringify(config) }],
+        }),
+      }),
   },
   ai: {
     get: (serverId = 'default') => apiFetch<{ settings: object | null }>(`/api/settings/ai?server_id=${serverId}`),

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/toggle';
 import { api } from '@/lib/api';
 import { useServer } from '@/context/ServerProvider';
+import { NoServerSelected } from '@/components/NoServerSelected';
 
 interface AISettings {
   botName: string;
@@ -63,13 +64,16 @@ const TABS = [
 ];
 
 export default function AIPage() {
-  const { selectedServerId } = useServer();
+  const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
   const [settings, setSettings] = useState<AISettings>(DEFAULT);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
 
   useEffect(() => {
+    if (!selectedServer) { setSettingsLoading(false); return; }
+    setSettingsLoading(true);
     api.ai.get(selectedServerId).then((data) => {
       if (data.settings) {
         const s = data.settings as Record<string, unknown>;
@@ -83,8 +87,8 @@ export default function AIPage() {
       } else {
         setSettings(DEFAULT);
       }
-    }).catch(() => {});
-  }, [selectedServerId]);
+    }).catch(() => {}).finally(() => setSettingsLoading(false));
+  }, [selectedServer, selectedServerId]);
 
   const update = <K extends keyof AISettings>(key: K, value: AISettings[K]) =>
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -93,10 +97,12 @@ export default function AIPage() {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
 
   const save = async () => {
+    if (!selectedServer) return;
     setSaving(true);
     try {
       await api.ai.save({
         server_id: selectedServerId,
+        platform: selectedServer.platform,
         botName: settings.botName,
         personality: settings.activeModel,
         temperature: settings.geminiTemperature,
@@ -107,6 +113,14 @@ export default function AIPage() {
     } catch { alert('Не удалось сохранить настройки'); }
     finally { setSaving(false); }
   };
+
+  if (serverLoading || settingsLoading) {
+    return <div className="p-8 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
+  }
+
+  if (!selectedServer) {
+    return <NoServerSelected title="✨ AI-Настройки" />;
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">

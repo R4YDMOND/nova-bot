@@ -1,8 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/toggle';
+import { api } from '@/lib/api';
+import { useServer } from '@/context/ServerProvider';
+import { NoServerSelected } from '@/components/NoServerSelected';
 
 interface Command {
   name: string;
@@ -13,6 +16,9 @@ interface Command {
   allowedRoles: string;
 }
 
+// Полный каталог команд бота — статическая часть (имя/описание/категория)
+// не хранится на бэкенде. На сервере (per-server) сохраняются только
+// изменяемые поля: enabled/cooldown/allowedRoles, см. type SavedOverride.
 const INITIAL_COMMANDS: Command[] = [
   { name: '🏓 /ping',  desc: 'Проверка бота',        category: 'Основные',  enabled: true,  cooldown: 3,  allowedRoles: '' },
   { name: '❓ /help',  desc: 'Список команд',         category: 'Основные',  enabled: true,  cooldown: 5,  allowedRoles: '' },
@@ -28,12 +34,33 @@ const INITIAL_COMMANDS: Command[] = [
 ];
 
 const CATEGORIES = ['Все', 'Основные', 'Модерация', 'Уровни', 'Музыка', 'AI'];
+const MODULE_NAME = 'commands';
+
+type SavedOverride = { name: string; enabled: boolean; cooldown: number; allowedRoles: string };
 
 export default function CommandsPage() {
+  const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
   const [commands, setCommands] = useState<Command[]>(INITIAL_COMMANDS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeCategory, setActiveCategory] = useState('Все');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!selectedServer) { setLoading(false); return; }
+    setLoading(true);
+    api.modules.getConfig<SavedOverride[]>(selectedServerId, MODULE_NAME)
+      .then(overrides => {
+        if (!overrides) { setCommands(INITIAL_COMMANDS); return; }
+        setCommands(INITIAL_COMMANDS.map(base => {
+          const o = overrides.find(x => x.name === base.name);
+          return o ? { ...base, enabled: o.enabled, cooldown: o.cooldown, allowedRoles: o.allowedRoles } : base;
+        }));
+      })
+      .catch(() => setCommands(INITIAL_COMMANDS))
+      .finally(() => setLoading(false));
+  }, [selectedServer, selectedServerId]);
 
   const filtered = commands.filter(c => {
     const matchCat = activeCategory === 'Все' || c.category === activeCategory;
@@ -46,9 +73,33 @@ export default function CommandsPage() {
   const toggle = (name: string) =>
     setCommands(prev => prev.map(c => c.name === name ? { ...c, enabled: !c.enabled } : c));
 
-  const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const save = async () => {
+    if (!selectedServer) return;
+    setSaving(true);
+    try {
+      const overrides: SavedOverride[] = commands.map(c => ({
+        name: c.name, enabled: c.enabled, cooldown: c.cooldown, allowedRoles: c.allowedRoles,
+      }));
+      const res = await api.modules.saveConfig(selectedServerId, selectedServer.platform, MODULE_NAME, overrides);
+      if (res.error) throw new Error(res.error);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      alert('Не удалось сохранить изменения');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const enabledCount = commands.filter(c => c.enabled).length;
+
+  if (serverLoading || loading) {
+    return <div className="p-8 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
+  }
+
+  if (!selectedServer) {
+    return <NoServerSelected title="⚡ Команды" />;
+  }
 
   return (
     <div className="space-y-6 p-8 max-w-5xl">
@@ -61,8 +112,8 @@ export default function CommandsPage() {
           <span className="text-sm text-[rgb(var(--text-secondary))]">
             Активных: <strong className="text-[rgb(var(--text))]">{enabledCount}</strong> / {commands.length}
           </span>
-          <Button onClick={save}>
-            {saved ? '✅ Сохранено' : '💾 Сохранить изменения'}
+          <Button onClick={save} disabled={saving}>
+            {saving ? 'Сохранение...' : saved ? '✅ Сохранено' : '💾 Сохранить изменения'}
           </Button>
         </div>
       </div>
