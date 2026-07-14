@@ -17,6 +17,7 @@ import re
 import os
 import secrets
 import asyncio
+import time
 from datetime import datetime
 
 # Временное хранилище PKCE code_verifier (ключ = state)
@@ -185,6 +186,8 @@ def create_server(
     server_id: str = Query(...),
     webhook_url: str = Query(""),
     platform: str = Query("vk"),
+    icon_url: str = Query(""),
+    member_count: int = Query(0),
 ):
     try:
         server_id = _normalize_server_id(server_id, platform)
@@ -196,7 +199,10 @@ def create_server(
         existing = db.query(Server).filter(Server.server_id == server_id).first()
         if existing:
             return {"error": "Сервер с таким ID уже зарегистрирован"}
-        server = Server(name=name, server_id=server_id, webhook_url=webhook_url, platform=platform)
+        server = Server(
+            name=name, server_id=server_id, webhook_url=webhook_url, platform=platform,
+            icon_url=icon_url, member_count=member_count,
+        )
         db.add(server)
         db.commit()
         db.refresh(server)
@@ -980,6 +986,46 @@ def _lolka_bot_headers():
     return {"Authorization": f"Bot {token}"} if token else {}
 
 
+def _lolka_bot_request(method: str, url: str, max_retries: int = 3, **kwargs):
+    """
+    Обёртка над запросами к Lolka Bot API с ретраем при 429 — по паттерну
+    Discord (Lolka Bot API прямо позиционируется как Discord-совместимый,
+    см. документацию, раздел «Готовые библиотеки»). Рабочая гипотеза,
+    т.к. точный формат 429 в доках Lolka не расписан отдельно:
+      - ждём время из заголовка Retry-After (или поля retry_after в JSON-теле,
+        как это делает Discord), плюс небольшой запас;
+      - если ни заголовка, ни поля нет — фиксированный backoff 0.5s * попытка.
+    Если это предположение не подтвердится документацией/поведением API —
+    достаточно поправить только эту функцию, все вызовы уже центростремительны.
+    """
+    kwargs.setdefault("headers", _lolka_bot_headers())
+    kwargs.setdefault("timeout", 10)
+    last_resp = None
+    for attempt in range(max_retries):
+        resp = requests.request(method, url, **kwargs)
+        if resp.status_code != 429:
+            return resp
+        last_resp = resp
+        wait = None
+        retry_after_header = resp.headers.get("Retry-After")
+        if retry_after_header is not None:
+            try:
+                wait = float(retry_after_header)
+            except ValueError:
+                wait = None
+        if wait is None:
+            try:
+                body = resp.json()
+                if isinstance(body, dict) and "retry_after" in body:
+                    wait = float(body["retry_after"])
+            except Exception:
+                wait = None
+        if wait is None:
+            wait = 0.5 * (attempt + 1)
+        time.sleep(wait + 0.1)  # небольшой запас, чтобы не постучаться на грани окна
+    return last_resp
+
+
 @app.get("/api/lolka/bot/gateway")
 def get_lolka_gateway():
     """URL и лимиты для подключения к Gateway (как discord /gateway/bot)"""
@@ -1000,8 +1046,8 @@ def get_lolka_bot_info():
     connected = lolka_gateway_instance is not None and getattr(lolka_gateway_instance, "connected", False)
     bot_info = None
     try:
-        resp = requests.get(f"{LOLKA_BOT_BASE_URL}/users/@me", headers=_lolka_bot_headers(), timeout=10)
-        if resp.ok:
+        resp = _lolka_bot_request("GET", f"{LOLKA_BOT_BASE_URL}/users/@me")
+        if resp is not None and resp.ok:
             bot_info = resp.json()
     except Exception:
         pass
@@ -1011,24 +1057,31 @@ def get_lolka_bot_info():
 
 @app.get("/api/lolka/bot/guilds")
 def get_lolka_bot_guilds():
-    """Список серверов (гильдий), где реально состоит бот Nova в Lolka."""
+    """
+    Список серверов (гильдий), где реально состоит бот Nova в Lolka.
+    ВАЖНО: approximate_member_count в ответе появляется только если передать
+    with_counts=true — раньше этот параметр не передавался, из-за чего
+    member_count всегда приходил нулевым (см. документацию: GET /users/@me/guilds).
+    """
     if not os.getenv("LOLKA_BOT_TOKEN", ""):
         return {"error": "LOLKA_BOT_TOKEN не настроен", "guilds": []}
     try:
-        resp = requests.get(
-            f"{LOLKA_BOT_BASE_URL}/users/@me/guilds",
-            headers=_lolka_bot_headers(), timeout=10,
+        resp = _lolka_bot_request(
+            "GET", f"{LOLKA_BOT_BASE_URL}/users/@me/guilds",
+            params={"limit": 200, "with_counts": "true"},
         )
+        if resp is None:
+            return {"error": "Lolka API: превышен лимит запросов", "guilds": []}
         if not resp.ok:
             return {"error": f"Lolka API вернул {resp.status_code}", "guilds": []}
         guilds = resp.json()
         return {
             "guilds": [
                 {
-                    "id": g.get("id"),
+                    "id": str(g.get("id")),
                     "name": g.get("name", "Без названия"),
                     "icon": g.get("icon"),
-                    "member_count": g.get("member_count") or g.get("approximate_member_count") or 0,
+                    "member_count": g.get("approximate_member_count", 0),
                 }
                 for g in guilds
             ]
@@ -1037,9 +1090,39 @@ def get_lolka_bot_guilds():
         return {"error": str(e), "guilds": []}
 
 
+@app.get("/api/lolka/bot/guilds/available")
+def get_lolka_available_guilds():
+    """
+    Гильдии, где бот состоит, но которые ЕЩЁ НЕ подключены к дашборду Nova
+    (нет строки в servers). Это "кандидаты на добавление" для preview-флоу:
+    админ сам решает, какие из них добавить — в отличие от старого
+    автосинка, который добавлял их все без спроса.
+    """
+    guilds_resp = get_lolka_bot_guilds()
+    if guilds_resp.get("error"):
+        return guilds_resp
+
+    db = SessionLocal()
+    try:
+        existing_ids = {s.server_id for s in db.query(Server.server_id).all()}
+    finally:
+        db.close()
+
+    available = [g for g in guilds_resp.get("guilds", []) if g["id"] not in existing_ids]
+    return {"guilds": available, "total": len(available)}
+
+
 @app.post("/api/servers/sync-lolka")
 def sync_lolka_servers():
-    """Подтягивает реальные Lolka-гильдии бота и добавляет/обновляет их в таблице servers."""
+    """
+    Подтягивает свежие name/icon/member_count для Lolka-серверов, УЖЕ
+    добавленных вручную в servers (platform='lolka'). Не создаёт новые
+    записи — раньше это делало (auto-add по факту членства бота в гильдии),
+    и в проде это привело к тому, что в дашборде сами всплывали серверы,
+    которые администратор не добавлял (бот мог состоять в них по любой
+    причине — тестовый сервер, кто-то пригласил и т.п.). Разделение прав
+    "бот состоит в сервере" и "сервер подключён к дашборду Nova" — сознательное.
+    """
     guilds_resp = get_lolka_bot_guilds()
     if guilds_resp.get("error"):
         return {"status": "error", "error": guilds_resp["error"]}
@@ -1048,41 +1131,23 @@ def sync_lolka_servers():
     synced = 0
     errors = []
     try:
-        for g in guilds_resp.get("guilds", []):
-            gid = str(g.get("id", ""))
-            if not gid:
-                continue
+        guilds_by_id = {str(g.get("id", "")): g for g in guilds_resp.get("guilds", []) if g.get("id")}
+        existing_servers = db.query(Server).filter(Server.platform == "lolka").all()
+
+        for server in existing_servers:
+            g = guilds_by_id.get(server.server_id)
+            if not g:
+                continue  # бот не(больше) не в этом сервере — оставляем запись как есть, не трогаем
             try:
-                # server_id уникален глобально (across VK и Lolka), поэтому ищем ТОЛЬКО по нему —
-                # без доп. фильтра по platform. Раньше фильтр "AND platform='lolka'" не находил
-                # существующую строку, если она почему-то была с другим platform, и код пытался
-                # сделать повторный INSERT, что падало с UniqueViolation на server_id.
-                server = db.query(Server).filter(Server.server_id == gid).first()
-
-                # Поле icon у гильдии Lolka — уже готовый полный URL (в отличие от Discord,
-                # где это просто хэш). Раньше сюда ещё раз оборачивали в шаблон
-                # cdn.lolka.app/icons/{id}/{icon}.png, из-за чего получался битый двойной URL.
                 icon_url = g.get("icon") or ""
-
-                if server:
-                    server.name = g.get("name", server.name)
-                    server.icon_url = icon_url or server.icon_url
-                    server.member_count = g.get("member_count", server.member_count)
-                    server.platform = "lolka"
-                else:
-                    server = Server(
-                        name=g.get("name", "Без названия"),
-                        server_id=gid,
-                        platform="lolka",
-                        icon_url=icon_url,
-                        member_count=g.get("member_count", 0),
-                    )
-                    db.add(server)
+                server.name = g.get("name", server.name)
+                server.icon_url = icon_url or server.icon_url
+                server.member_count = g.get("member_count", server.member_count)
                 db.flush()
                 synced += 1
             except Exception as item_err:
                 db.rollback()
-                errors.append(f"{gid}: {item_err}")
+                errors.append(f"{server.server_id}: {item_err}")
         db.commit()
         result = {"status": "ok", "synced": synced}
         if errors:
@@ -1093,6 +1158,188 @@ def sync_lolka_servers():
         return {"status": "error", "error": str(e)}
     finally:
         db.close()
+
+
+# ==================== VK: сообщества (groups) ====================
+#
+# ВАЖНО (см. документацию VK + разбор ТЗ): groups.get отдаёт группы
+# ПОЛЬЗОВАТЕЛЯ, а не сообщества, где установлен бот. Единого метода
+# "дай мне все паблики с ботом" в VK нет (в отличие от Lolka/Discord-like
+# API, где есть /users/@me/guilds). Поэтому источник правды — таблица
+# servers (platform='vk'): администратор добавляет ID сообщества вручную
+# (форма на /dashboard/servers уже это умеет), а этот блок лишь
+# ДОПОЛНЯЕТ уже сохранённые записи реальными name/icon/member_count
+# через groups.getById.
+
+VK_API_VERSION = "5.199"
+VK_API_BASE = "https://api.vk.com/method"
+
+_vk_groups_cache: dict = {}  # {cache_key: (expires_at, payload)}
+_VK_CACHE_TTL = 300  # 5 минут, как рекомендовано в ТЗ
+
+
+class VKAPIError(Exception):
+    def __init__(self, code: int, message: str):
+        self.code = code
+        self.message = message
+        super().__init__(f"VK API error {code}: {message}")
+
+
+def _get_vk_access_token() -> str:
+    token = os.getenv("VK_ACCESS_TOKEN", "")
+    if not token:
+        raise HTTPException(status_code=500, detail="VK_ACCESS_TOKEN не настроен на сервере")
+    return token
+
+
+def _call_vk_api(method: str, params: dict, max_retries: int = 3) -> dict:
+    """
+    Обёртка над VK API с обработкой rate limit (код ошибки 6) и таймаутов.
+    Версия API (v) передаётся в каждом запросе, а не в OAuth-ссылке.
+    """
+    token = _get_vk_access_token()
+    last_exc: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(
+                f"{VK_API_BASE}/{method}",
+                params={**params, "access_token": token, "v": VK_API_VERSION},
+                timeout=10,
+            )
+            data = resp.json()
+            if "error" in data:
+                error_code = data["error"].get("error_code")
+                error_msg = data["error"].get("error_msg", "VK API error")
+                if error_code == 6:  # Too many requests per second
+                    time.sleep(0.5 * (attempt + 1))  # экспоненциальный backoff
+                    continue
+                raise VKAPIError(error_code, error_msg)
+            return data.get("response", {})
+        except requests.Timeout as e:
+            last_exc = e
+            if attempt == max_retries - 1:
+                raise HTTPException(status_code=504, detail="VK API: превышено время ожидания")
+            time.sleep(1)
+    raise HTTPException(status_code=429, detail=f"VK API: превышен лимит запросов ({last_exc})")
+
+
+def _vk_groups_by_ids(group_ids: list) -> list:
+    """groups.getById принимает до 500 ID за один запрос — так что даже
+    для большого списка серверов это один вызов, а не N запросов."""
+    if not group_ids:
+        return []
+    response = _call_vk_api("groups.getById", {
+        "group_ids": ",".join(str(g) for g in group_ids),
+        "fields": "photo_200,members_count",
+    })
+    items = response if isinstance(response, list) else response.get("groups", [])
+    return items
+
+
+@app.get("/api/vk/groups")
+def get_vk_groups(server_id: str = Query("")):
+    """
+    Информация о сообществах VK.
+    - server_id указан -> данные по одному сообществу (не обязательно из БД).
+    - server_id не указан -> данные по всем VK-сообществам, уже добавленным в servers.
+    Результат кэшируется на 5 минут, чтобы не упираться в rate limit VK
+    при частых обновлениях дашборда.
+    """
+    cache_key = server_id or "__all__"
+    cached = _vk_groups_cache.get(cache_key)
+    if cached and cached[0] > datetime.utcnow().timestamp():
+        return cached[1]
+
+    try:
+        if server_id:
+            group_ids = [server_id]
+        else:
+            db = SessionLocal()
+            try:
+                group_ids = [s.server_id for s in db.query(Server).filter(Server.platform == "vk").all()]
+            finally:
+                db.close()
+
+        items = _vk_groups_by_ids(group_ids)
+        result = {
+            "groups": [
+                {
+                    "id": str(g.get("id")),
+                    "name": g.get("name", "Без названия"),
+                    "icon": g.get("photo_200"),
+                    "member_count": g.get("members_count", 0),
+                }
+                for g in items
+            ],
+            "total": len(items),
+        }
+        _vk_groups_cache[cache_key] = (datetime.utcnow().timestamp() + _VK_CACHE_TTL, result)
+        return result
+    except VKAPIError as e:
+        raise HTTPException(status_code=400, detail=f"VK API: {e.message}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка: {str(e)}")
+
+
+def sync_vk_groups() -> dict:
+    """Подтягивает name/icon/member_count из VK для уже сохранённых сообществ
+    (platform='vk') и обновляет строки в servers. Новые сообщества сюда не
+    добавляет — они появляются через ручное добавление на /dashboard/servers,
+    поскольку VK не отдаёт единый список 'где установлен бот'."""
+    db = SessionLocal()
+    try:
+        vk_servers = db.query(Server).filter(Server.platform == "vk").all()
+        if not vk_servers:
+            return {"status": "ok", "synced": 0}
+
+        by_id = {s.server_id: s for s in vk_servers}
+        try:
+            items = _vk_groups_by_ids(list(by_id.keys()))
+        except VKAPIError as e:
+            return {"status": "error", "error": f"VK API: {e.message}"}
+
+        synced = 0
+        for g in items:
+            server = by_id.get(str(g.get("id")))
+            if not server:
+                continue
+            server.name = g.get("name", server.name)
+            server.icon_url = g.get("photo_200") or server.icon_url
+            server.member_count = g.get("members_count", server.member_count)
+            synced += 1
+        db.commit()
+        _vk_groups_cache.clear()  # инвалидируем кэш после обновления
+        return {"status": "ok", "synced": synced}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/servers/sync-vk")
+def sync_vk_servers():
+    """Ручной триггер обновления данных VK-сообществ (см. sync_vk_groups)."""
+    return sync_vk_groups()
+
+
+@app.post("/api/servers/sync-all")
+def sync_all_platforms():
+    """Синхронизировать серверы из ВСЕХ платформ (Lolka + VK) одним вызовом —
+    именно так, как описано в ПРАВКЕ #1 ТЗ."""
+    lolka_result = sync_lolka_servers()
+    vk_result = sync_vk_groups()
+    total = lolka_result.get("synced", 0) + vk_result.get("synced", 0)
+    errors = [e for e in (lolka_result.get("error"), vk_result.get("error")) if e]
+    return {
+        "status": "ok" if not errors else "partial",
+        "synced": total,
+        "lolka": lolka_result,
+        "vk": vk_result,
+        "errors": errors,
+    }
 
 
 @app.get("/api/lolka/bot/invite")
@@ -1124,12 +1371,13 @@ def lolka_send_message(data: dict):
     if not os.getenv("LOLKA_BOT_TOKEN", ""):
         return {"error": "LOLKA_BOT_TOKEN не настроен"}
     try:
-        resp = requests.post(
-            f"{LOLKA_BOT_BASE_URL}/channels/{channel_id}/messages",
+        resp = _lolka_bot_request(
+            "POST", f"{LOLKA_BOT_BASE_URL}/channels/{channel_id}/messages",
             headers={**_lolka_bot_headers(), "Content-Type": "application/json"},
             json={"content": content},
-            timeout=10,
         )
+        if resp is None:
+            return {"error": "Lolka API: превышен лимит запросов"}
         return {"status": "ok" if resp.ok else "error", "response": resp.json() if resp.content else {}}
     except Exception as e:
         return {"error": str(e)}
@@ -1140,10 +1388,9 @@ def lolka_get_server_members(server_id: str):
     if not os.getenv("LOLKA_BOT_TOKEN", ""):
         return {"error": "LOLKA_BOT_TOKEN не настроен"}
     try:
-        resp = requests.get(
-            f"{LOLKA_BOT_BASE_URL}/guilds/{server_id}/members",
-            headers=_lolka_bot_headers(), timeout=10,
-        )
+        resp = _lolka_bot_request("GET", f"{LOLKA_BOT_BASE_URL}/guilds/{server_id}/members")
+        if resp is None:
+            return {"error": "Lolka API: превышен лимит запросов"}
         return {"status": "ok" if resp.ok else "error", "members": resp.json() if resp.ok else []}
     except Exception as e:
         return {"error": str(e)}
@@ -1158,10 +1405,11 @@ def lolka_add_member_role(user_id: str, data: dict):
     if not server_id or not role_id:
         return {"error": "server_id и role_id обязательны"}
     try:
-        resp = requests.put(
-            f"{LOLKA_BOT_BASE_URL}/guilds/{server_id}/members/{user_id}/roles/{role_id}",
-            headers=_lolka_bot_headers(), timeout=10,
+        resp = _lolka_bot_request(
+            "PUT", f"{LOLKA_BOT_BASE_URL}/guilds/{server_id}/members/{user_id}/roles/{role_id}",
         )
+        if resp is None:
+            return {"error": "Lolka API: превышен лимит запросов"}
         return {"status": "ok" if resp.ok else "error"}
     except Exception as e:
         return {"error": str(e)}

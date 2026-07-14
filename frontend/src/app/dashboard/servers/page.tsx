@@ -74,6 +74,15 @@ export default function ServersPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+
+  const [showGuildsModal, setShowGuildsModal] = useState(false);
+  const [guildsLoading, setGuildsLoading] = useState(false);
+  const [guildsError, setGuildsError] = useState<string | null>(null);
+  const [availableGuilds, setAvailableGuilds] = useState<{ id: string; name: string; icon: string | null; member_count: number }[]>([]);
+  const [addingGuildId, setAddingGuildId] = useState<string | null>(null);
+
   useEffect(() => {
     api.lolkaBot.getStatus().then(setBotStatus).catch(() => { });
   }, []);
@@ -134,6 +143,66 @@ export default function ServersPage() {
     }
   }
 
+  async function openGuildsModal() {
+    setShowGuildsModal(true);
+    setGuildsLoading(true);
+    setGuildsError(null);
+    try {
+      const res = await api.lolkaBot.getAvailableGuilds();
+      if (res.error) {
+        setGuildsError(res.error);
+      } else {
+        setAvailableGuilds(res.guilds || []);
+      }
+    } catch {
+      setGuildsError('Не удалось получить список серверов бота');
+    } finally {
+      setGuildsLoading(false);
+    }
+  }
+
+  async function addGuild(g: { id: string; name: string; icon: string | null; member_count: number }) {
+    setAddingGuildId(g.id);
+    try {
+      const res = await api.servers.create({
+        name: g.name,
+        server_id: g.id,
+        platform: 'lolka',
+        icon_url: g.icon || '',
+        member_count: g.member_count,
+      });
+      if (res.error) {
+        setGuildsError(res.error);
+        return;
+      }
+      setAvailableGuilds(list => list.filter(x => x.id !== g.id));
+      await refresh();
+    } catch {
+      setGuildsError('Не удалось добавить сервер');
+    } finally {
+      setAddingGuildId(null);
+    }
+  }
+
+  async function syncAllPlatforms() {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await api.servers.syncAll();
+      if (res.status === 'error') {
+        setSyncMessage({ type: 'error', text: 'Не удалось синхронизировать платформы' });
+      } else {
+        setSyncMessage({ type: 'ok', text: `Синхронизировано серверов: ${res.synced}` });
+        await refresh();
+      }
+    } catch {
+      setSyncMessage({ type: 'error', text: 'Не удалось синхронизировать платформы' });
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMessage(null), 6000);
+    }
+  }
+
   async function removeServer(id: number) {
     if (!confirm('Удалить сервер из панели Nova? Сам сервер в VK/Lolka не пострадает.')) return;
     setDeletingId(id);
@@ -160,11 +229,28 @@ export default function ServersPage() {
           <h1 className="text-3xl font-bold text-[rgb(var(--text))]">Серверы</h1>
           <p className="text-[rgb(var(--text-secondary))] mt-1">Серверы Lolka и сообщества VK, которые вы подключили к Nova</p>
         </div>
-        <Button onClick={openModal}>
-          <Plus className="w-4 h-4 mr-2" />
-          Добавить сервер
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={openGuildsModal}>
+            🎮 Серверы бота (Lolka)
+          </Button>
+          <Button variant="secondary" onClick={syncAllPlatforms} disabled={syncing}>
+            {syncing ? 'Синхронизируем...' : '🔄 Синхронизировать все платформы'}
+          </Button>
+          <Button onClick={openModal}>
+            <Plus className="w-4 h-4 mr-2" />
+            Добавить сервер
+          </Button>
+        </div>
       </div>
+
+      {syncMessage && (
+        <p className={`text-sm rounded-xl px-4 py-2.5 border ${syncMessage.type === 'ok'
+            ? 'text-green-400 bg-green-500/10 border-green-500/20'
+            : 'text-red-400 bg-red-500/10 border-red-500/20'
+          }`}>
+          {syncMessage.type === 'ok' ? '✅' : '⚠️'} {syncMessage.text}
+        </p>
+      )}
 
       {deleteError && (
         <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5">
@@ -316,6 +402,50 @@ export default function ServersPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showGuildsModal && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowGuildsModal(false); }}
+        >
+          <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-8 max-w-lg w-full relative shadow-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowGuildsModal(false)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold mb-1">Серверы бота в Lolka</h2>
+            <p className="text-sm text-[rgb(var(--text-secondary))] mb-6">
+              Бот состоит в этих серверах, но они ещё не подключены к дашборду. Ничего не добавляется автоматически — выберите нужные.
+            </p>
+
+            {guildsLoading ? (
+              <p className="text-[rgb(var(--text-secondary))]">Загрузка...</p>
+            ) : guildsError ? (
+              <p className="text-red-400 text-sm">⚠️ {guildsError}</p>
+            ) : availableGuilds.length === 0 ? (
+              <p className="text-[rgb(var(--text-secondary))] text-sm">Новых серверов нет — все, где состоит бот, уже подключены.</p>
+            ) : (
+              <div className="space-y-3 overflow-y-auto pr-1">
+                {availableGuilds.map(g => (
+                  <div key={g.id} className="flex items-center gap-3 p-3 rounded-xl border border-[rgb(var(--border))]">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-lg shrink-0 overflow-hidden">
+                      {g.icon ? <img src={g.icon} alt="" className="w-full h-full object-cover" /> : '🎮'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{g.name}</p>
+                      <p className="text-xs text-[rgb(var(--text-secondary))]">
+                        {g.member_count > 0 ? `${g.member_count} участников` : `ID: ${g.id}`}
+                      </p>
+                    </div>
+                    <Button onClick={() => addGuild(g)} disabled={addingGuildId === g.id} className="shrink-0">
+                      {addingGuildId === g.id ? 'Добавляем...' : 'Добавить'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

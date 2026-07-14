@@ -61,13 +61,24 @@ export const api = {
   servers: {
     list: (platform?: 'vk' | 'lolka') =>
       apiFetch<{ servers: DashboardServer[]; total: number }>(`/api/servers${platform ? `?platform=${platform}` : ''}`),
-    create: (data: { name: string; server_id: string; platform?: 'vk' | 'lolka'; webhook_url?: string }) => {
+    create: (data: { name: string; server_id: string; platform?: 'vk' | 'lolka'; webhook_url?: string; icon_url?: string; member_count?: number }) => {
       const params = new URLSearchParams({ name: data.name, server_id: data.server_id, platform: data.platform || 'vk' });
       if (data.webhook_url) params.set('webhook_url', data.webhook_url);
+      if (data.icon_url) params.set('icon_url', data.icon_url);
+      if (data.member_count) params.set('member_count', String(data.member_count));
       return apiFetch<{ status: string; error?: string; server?: object }>(`/api/servers?${params}`, { method: 'POST' });
     },
     remove: (id: number) => apiFetch<{ status: string; error?: string }>(`/api/servers/${id}`, { method: 'DELETE' }),
     syncLolka: () => apiFetch<{ status: string; synced?: number; error?: string }>('/api/servers/sync-lolka', { method: 'POST' }),
+    syncVk: () => apiFetch<{ status: string; synced?: number; error?: string }>('/api/servers/sync-vk', { method: 'POST' }),
+    syncAll: () =>
+      apiFetch<{ status: string; synced: number; lolka: object; vk: object; errors: string[] }>('/api/servers/sync-all', { method: 'POST' }),
+  },
+  vk: {
+    groups: (serverId?: string) =>
+      apiFetch<{ groups: { id: string; name: string; icon: string | null; member_count: number }[]; total: number }>(
+        `/api/vk/groups${serverId ? `?server_id=${serverId}` : ''}`
+      ),
   },
   modules: {
     get: (serverId = 'default') => apiFetch<{ modules: { name: string; enabled: boolean; config: string }[] }>(`/api/settings/modules?server_id=${serverId}`),
@@ -143,5 +154,9 @@ export const api = {
     getStatus: () => apiFetch<{ configured: boolean; connected: boolean; bot: { username?: string; avatar?: string } | null }>('/api/lolka/bot'),
     getInviteUrl: (serverId = '') => apiFetch<{ url?: string; error?: string }>(`/api/lolka/bot/invite?server_id=${serverId}`),
     getGuilds: () => apiFetch<{ guilds: { id: string; name: string; icon: string | null; member_count: number }[]; error?: string }>('/api/lolka/bot/guilds'),
+    getAvailableGuilds: () =>
+      apiFetch<{ guilds: { id: string; name: string; icon: string | null; member_count: number }[]; total?: number; error?: string }>(
+        '/api/lolka/bot/guilds/available'
+      ),
   },
 };
