@@ -20,6 +20,11 @@ import asyncio
 import time
 from datetime import datetime
 
+# Новые импорты для JSONB endpoints
+import json
+from typing import Any, Dict
+from sqlalchemy import text
+
 # Временное хранилище PKCE code_verifier (ключ = state)
 vk_pkce_store: dict = {}
 LOLKA_BOT_BASE_URL = "https://lolka.app/api/bot/v10"
@@ -311,21 +316,21 @@ def lolka_webhook(data: dict):
         response = f"🏓 Понг, {user}!"
     
     elif message.startswith("/help") or message.startswith("/помощь"):
-        response = f"""**🤖 Команды Нова:**
+        response = f\"\"\"**🤖 Команды Нова:**
 📊 `/stats` — статистика сервера
 🎵 `/play` — включить музыку
 🛡️ `/mod` — модерация
 ❓ `/help` — список команд
 💡 `/hello` — приветствие
-↗ `/forward ссылка` — переслать контент в каналы"""
+↗ `/forward ссылка` — переслать контент в каналы\"\"\"
     
     elif message.startswith("/stats"):
-        response = f"""**📊 Статистика:**
+        response = f\"\"\"**📊 Статистика:**
 👤 Пользователь: {user}
 💬 Канал: {channel}
 🤖 Бот: Нова v0.7.0
 ⚡ Статус: Работает
-🌐 Сервер: {server_id or 'Неизвестный'}"""
+🌐 Сервер: {server_id or 'Неизвестный'}\"\"\"
     
     elif message.startswith("/hello") or message.startswith("/привет"):
         greetings = [
