@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, UniqueConstraint
 from datetime import datetime
 from database import Base
 
@@ -123,6 +123,7 @@ class EventNotification(Base):
     is_sent = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
 class User(Base):
     """Пользователь, зарегистрированный по e-mail и паролю."""
     __tablename__ = "users"
@@ -171,3 +172,34 @@ class Webhook(Base):
     event = Column(String(255), default="")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ----------------- Новая модель для модерации -----------------
+
+class ModerationConfig(Base):
+    __tablename__ = "moderation_config"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    platform = Column(String(20), nullable=False)  # 'vk' | 'lolka'
+
+    # Базовая защита
+    antispam_enabled = Column(Boolean, default=False)
+    antiraid_enabled = Column(Boolean, default=False)
+    profanity_enabled = Column(Boolean, default=False)
+    captcha_enabled = Column(Boolean, default=False)
+    link_removal_enabled = Column(Boolean, default=False)
+
+    # Дополнительные фильтры
+    scam_links_enabled = Column(Boolean, default=False)
+    invites_enabled = Column(Boolean, default=False)
+    zalgo_enabled = Column(Boolean, default=False)
+    caps_enabled = Column(Boolean, default=False)
+    duplicate_enabled = Column(Boolean, default=False)
+    mentions_enabled = Column(Boolean, default=False)
+    banned_words_enabled = Column(Boolean, default=False)
+    emoji_spam_enabled = Column(Boolean, default=False)
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint('server_id', 'platform', name='uq_server_platform'),)
