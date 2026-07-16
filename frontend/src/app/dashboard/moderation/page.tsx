@@ -59,7 +59,15 @@ type Settings = {
   useAIResponses: boolean; aiModel: string;
 };
 
-type LogEntry = { user: string; action: string; reason: string; moderator: string; time: string };
+type LogEntry = {
+  id: number;
+  type: string;
+  title: string;
+  description: string;
+  target_user_id?: string;
+  target_message_id?: string;
+  created_at: string;
+};
 
 
 // ── VK Connection (ТЗ №5) ──
@@ -211,11 +219,13 @@ export default function ModerationPage() {
   }, [effectiveServer, platformFilter]);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/moderation/log`)
+    if (!effectiveServer) { setAuditLog([]); setLogLoading(false); return; }
+    setLogLoading(true);
+    fetch(`${API_URL}/api/moderation/log?server_id=${effectiveServer.server_id}&limit=50`)
       .then((r: Response) => r.json())
       .then((d: { entries?: LogEntry[] }) => { setAuditLog(d.entries || []); setLogLoading(false); })
       .catch(() => setLogLoading(false));
-  }, []);
+  }, [effectiveServer]);
 
   const update = (key: keyof Settings, value: unknown) => setSettings(s => ({ ...s, [key]: value }));
   const toggle = (key: keyof Settings) => setSettings(s => ({ ...s, [key]: !s[key] }));
@@ -235,13 +245,46 @@ export default function ModerationPage() {
     }
   };
 
+  const moderateVK = async (messageId: string, userId: string | undefined, action: 'delete' | 'ban' | 'warn') => {
+    if (!effectiveServer || !vkConnections.length) {
+      alert('VK-сообщество не подключено');
+      return;
+    }
+    const conn = vkConnections[0];
+    try {
+      const res = await fetch(`${API_URL}/api/vk/moderate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          group_id: conn.group_id,
+          message_id: parseInt(messageId),
+          action,
+          user_id: userId ? parseInt(userId) : undefined,
+          reason: 'Ручная модерация из журнала',
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert(`Ошибка: ${data.error}`);
+        return;
+      }
+      alert('Действие выполнено успешно');
+      // Перезагружаем лог
+      fetch(`${API_URL}/api/moderation/log?server_id=${effectiveServer.server_id}&limit=50`)
+        .then(r => r.json())
+        .then((d: { entries?: LogEntry[] }) => setAuditLog(d.entries || []));
+    } catch {
+      alert('Ошибка при выполнении действия');
+    }
+  };
+
   const filteredLog = auditLog.filter(e => {
     const matchType = logFilter === 'all'
-      || (logFilter === 'warn' && e.action?.includes('Предупреждение'))
-      || (logFilter === 'mute' && e.action?.includes('Мут'))
-      || (logFilter === 'ban' && e.action?.includes('Бан'));
+      || (logFilter === 'warn' && e.type?.includes('warn'))
+      || (logFilter === 'mute' && e.type?.includes('mute'))
+      || (logFilter === 'ban' && e.type?.includes('ban'));
     const q = logSearch.toLowerCase();
-    return matchType && (e.user?.toLowerCase().includes(q) || e.reason?.toLowerCase().includes(q));
+    return matchType && (e.title?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q));
   });
 
   if (serverLoading || settingsLoading) {
@@ -285,7 +328,7 @@ export default function ModerationPage() {
                 key={p.id}
                 onClick={() => setPlatformFilter(p.id)}
                 className={cn(
-                  'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all ease-out duration-300',
+                  'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all',
                   platformFilter === p.id
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
                     : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
@@ -308,7 +351,7 @@ export default function ModerationPage() {
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ease-out duration-200',
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
                 activeTab === tab.id
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md'
                   : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))]'
@@ -323,76 +366,70 @@ export default function ModerationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
         <div className="lg:col-span-7 space-y-5">
-          {/* Анимированная VK-карточка: grid-rows для плавного сворачивания */}
-          <div className={cn(
-            "grid transition-all ease-out duration-500",
-            platformFilter === 'vk' ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-          )}>
-            <div className="overflow-hidden">
-              <Card className="p-5">
-                <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
-                  <Plug className="w-5 h-5 text-blue-400" />
-                  Подключение VK
-                </h3>
-                {vkLoading ? (
-                  <p className="text-[rgb(var(--text-secondary))] text-sm">Загрузка...</p>
-                ) : vkConnections.length > 0 ? (
-                  <div className="space-y-3">
-                    {vkConnections.map(conn => (
-                      <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-2))]">
-                        <div>
-                          <div className="text-[rgb(var(--text))] font-medium text-sm">{conn.group_name || `Сообщество ${conn.group_id}`}</div>
-                          <div className="text-[rgb(var(--text-secondary))] text-xs">ID: {conn.group_id}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => testVK(conn.id)} disabled={vkTesting === conn.id}
-                            className="p-2 rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface))] transition-colors disabled:opacity-50">
-                            <TestTube className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => disconnectVK(conn.id)}
-                            className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+          {platformFilter === 'vk' && (
+          <Card className="p-5">
+            <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
+              <Plug className="w-5 h-5 text-blue-400" />
+              Подключение VK
+            </h3>
+            {vkLoading ? (
+              <p className="text-[rgb(var(--text-secondary))] text-sm">Загрузка...</p>
+            ) : vkConnections.length > 0 ? (
+              <div className="space-y-3">
+                {vkConnections.map(conn => (
+                  <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-2))]">
+                    <div>
+                      <div className="text-[rgb(var(--text))] font-medium text-sm">{conn.group_name || `Сообщество ${conn.group_id}`}</div>
+                      <div className="text-[rgb(var(--text-secondary))] text-xs">ID: {conn.group_id}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => testVK(conn.id)} disabled={vkTesting === conn.id}
+                        className="p-2 rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface))] transition-colors disabled:opacity-50">
+                        <TestTube className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => disconnectVK(conn.id)}
+                        className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">ID сообщества</label>
-                      <input type="text" value={vkForm.group_id} onChange={e => setVkForm(f => ({ ...f, group_id: e.target.value }))}
-                        placeholder="240082352" className="w-full input text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Токен доступа</label>
-                      <input type="password" value={vkForm.access_token} onChange={e => setVkForm(f => ({ ...f, access_token: e.target.value }))}
-                        placeholder="vk1.a.xxx..." className="w-full input text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Код подтверждения Callback</label>
-                      <input type="text" value={vkForm.confirmation_code} onChange={e => setVkForm(f => ({ ...f, confirmation_code: e.target.value }))}
-                        placeholder="a1b2c3d4" className="w-full input text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Секретный ключ (опционально)</label>
-                      <input type="password" value={vkForm.webhook_secret} onChange={e => setVkForm(f => ({ ...f, webhook_secret: e.target.value }))}
-                        placeholder="secret_key" className="w-full input text-sm" />
-                    </div>
-                    <Button onClick={connectVK} disabled={vkLoading || !vkForm.group_id || !vkForm.access_token} variant="gradient" className="w-full text-sm">
-                      <Plug className="w-4 h-4 mr-1.5" />
-                      {vkLoading ? 'Подключение...' : 'Подключить сообщество'}
-                    </Button>
-                    <p className="text-[rgb(var(--text-secondary))] text-xs">
-                      Токен берётся в настройках сообщества: Управление → Настройки → Работа с API → Ключи доступа
-                    </p>
-                  </div>
-                )}
-              </Card>
-            </div>
-          </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">ID сообщества</label>
+                  <input type="text" value={vkForm.group_id} onChange={e => setVkForm(f => ({ ...f, group_id: e.target.value }))}
+                    placeholder="240082352" className="w-full input text-sm" />
+                </div>
+                <div>
+                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Токен доступа</label>
+                  <input type="password" value={vkForm.access_token} onChange={e => setVkForm(f => ({ ...f, access_token: e.target.value }))}
+                    placeholder="vk1.a.xxx..." className="w-full input text-sm" />
+                </div>
+                <div>
+                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Код подтверждения Callback</label>
+                  <input type="text" value={vkForm.confirmation_code} onChange={e => setVkForm(f => ({ ...f, confirmation_code: e.target.value }))}
+                    placeholder="a1b2c3d4" className="w-full input text-sm" />
+                </div>
+                <div>
+                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Секретный ключ (опционально)</label>
+                  <input type="password" value={vkForm.webhook_secret} onChange={e => setVkForm(f => ({ ...f, webhook_secret: e.target.value }))}
+                    placeholder="secret_key" className="w-full input text-sm" />
+                </div>
+                <Button onClick={connectVK} disabled={vkLoading || !vkForm.group_id || !vkForm.access_token} variant="gradient" className="w-full text-sm">
+                  <Plug className="w-4 h-4 mr-1.5" />
+                  {vkLoading ? 'Подключение...' : 'Подключить сообщество'}
+                </Button>
+                <p className="text-[rgb(var(--text-secondary))] text-xs">
+                  Токен берётся в настройках сообщества: Управление → Настройки → Работа с API → Ключи доступа
+                </p>
+              </div>
+            )}
+          </Card>
+        )}
 
-          {activeTab === 'protection' && (
+        {activeTab === 'protection' && (
             <Card className="p-5">
               <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-cyan-400" />
@@ -630,32 +667,53 @@ export default function ModerationPage() {
               </div>
               {logLoading ? (
                 <p className="text-[rgb(var(--text-secondary))] text-center py-10">Загрузка...</p>
-              ) : filteredLog.length === 0 ? (
+              ) : auditLog.length === 0 ? (
                 <p className="text-[rgb(var(--text-secondary))] text-center py-10">Записи не найдены</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[rgb(var(--border))]">
-                        {['Пользователь', 'Действие', 'Причина', 'Модератор', 'Время'].map(h => (
+                        {['Событие', 'Тип', 'Описание', 'Время', 'Действия'].map(h => (
                           <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-[rgb(var(--text-secondary))] uppercase">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredLog.map((entry: LogEntry, i: number) => (
-                        <tr key={i} className="border-b border-[rgb(var(--border))]">
-                          <td className="px-3 py-2 font-medium text-[rgb(var(--text))]">{entry.user}</td>
+                      {auditLog.map((entry: LogEntry) => (
+                        <tr key={entry.id} className="border-b border-[rgb(var(--border))]">
+                          <td className="px-3 py-2 font-medium text-[rgb(var(--text))]">{entry.title}</td>
                           <td className="px-3 py-2">
                             <span className={cn('px-2 py-0.5 rounded-full text-xs',
-                              entry.action?.includes('Бан') ? 'bg-red-500/20 text-red-400' :
-                              entry.action?.includes('Мут') ? 'bg-yellow-500/20 text-yellow-400' :
-                              'bg-blue-500/20 text-blue-400'
-                            )}>{entry.action}</span>
+                              entry.type?.includes('ban') ? 'bg-red-500/20 text-red-400' :
+                              entry.type?.includes('mute') ? 'bg-yellow-500/20 text-yellow-400' :
+                              entry.type?.includes('delete') ? 'bg-orange-500/20 text-orange-400' :
+                              entry.type?.includes('received') ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-green-500/20 text-green-400'
+                            )}>{entry.type}</span>
                           </td>
-                          <td className="px-3 py-2 text-[rgb(var(--text-secondary))]">{entry.reason}</td>
-                          <td className="px-3 py-2 text-[rgb(var(--text-secondary))]">{entry.moderator}</td>
-                          <td className="px-3 py-2 text-[rgb(var(--text-secondary))] text-xs">{entry.time}</td>
+                          <td className="px-3 py-2 text-[rgb(var(--text-secondary))] max-w-xs truncate">{entry.description}</td>
+                          <td className="px-3 py-2 text-[rgb(var(--text-secondary))] text-xs whitespace-nowrap">{entry.created_at ? new Date(entry.created_at).toLocaleString('ru-RU') : ''}</td>
+                          <td className="px-3 py-2">
+                            {platformFilter === 'vk' && entry.target_message_id && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => moderateVK(entry.target_message_id!, entry.target_user_id, 'delete')}
+                                  title="Удалить сообщение"
+                                  className="p-1.5 rounded-md border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => moderateVK(entry.target_message_id!, entry.target_user_id, 'ban')}
+                                  title="Забанить пользователя"
+                                  className="p-1.5 rounded-md border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                >
+                                  <Ban className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -666,7 +724,7 @@ export default function ModerationPage() {
           )}
         </div>
 
-        <div className="lg:col-span-5 space-y-5 transition-opacity duration-300 ease-out">
+        <div className="lg:col-span-5 space-y-5">
           <StatsPanel
             server={effectiveServer}
             stats={stats}

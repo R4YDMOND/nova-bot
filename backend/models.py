@@ -210,18 +210,18 @@ class ModerationConfig(Base):
 class ModerationEvent(Base):
     """
     События модерации.
-    Пока в проекте нет движка, который реально разбирает сообщения VK/Lolka,
-    единственный источник событий — сохранение настроек (type="settings_updated").
-    Остальные типы заведены заранее для будущего модуля автомодерации.
+    Теперь включают target_user_id и target_message_id для ручной модерации из журнала.
     """
     __tablename__ = "moderation_events"
 
     id = Column(Integer, primary_key=True)
     server_id = Column(Integer, nullable=False, index=True)  # ссылка на Server.id
     platform = Column(String, default="vk")  # "vk" или "lolka"
-    type = Column(String, nullable=False)    # "settings_updated", "blocked_message", "warning", "captcha_passed"
+    type = Column(String, nullable=False)    # "settings_updated", "blocked_message", "warning", "captcha_passed", "message_received", "delete_message", "ban_message" ...
     title = Column(String, default="")
     description = Column(String, default="")
+    target_user_id = Column(String(50), default="", nullable=True)      # ID пользователя VK/Lolka
+    target_message_id = Column(String(50), default="", nullable=True)    # ID сообщения VK/Lolka
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
