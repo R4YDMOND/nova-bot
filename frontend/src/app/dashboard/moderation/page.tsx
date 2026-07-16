@@ -285,7 +285,7 @@ export default function ModerationPage() {
                 key={p.id}
                 onClick={() => setPlatformFilter(p.id)}
                 className={cn(
-                  'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all',
+                  'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all ease-out duration-300',
                   platformFilter === p.id
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
                     : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
@@ -308,7 +308,7 @@ export default function ModerationPage() {
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ease-out duration-200',
                 activeTab === tab.id
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md'
                   : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))]'
@@ -323,70 +323,76 @@ export default function ModerationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
         <div className="lg:col-span-7 space-y-5">
-          {platformFilter === 'vk' && (
-          <Card className="p-5">
-            <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
-              <Plug className="w-5 h-5 text-blue-400" />
-              Подключение VK
-            </h3>
-            {vkLoading ? (
-              <p className="text-[rgb(var(--text-secondary))] text-sm">Загрузка...</p>
-            ) : vkConnections.length > 0 ? (
-              <div className="space-y-3">
-                {vkConnections.map(conn => (
-                  <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-2))]">
-                    <div>
-                      <div className="text-[rgb(var(--text))] font-medium text-sm">{conn.group_name || `Сообщество ${conn.group_id}`}</div>
-                      <div className="text-[rgb(var(--text-secondary))] text-xs">ID: {conn.group_id}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => testVK(conn.id)} disabled={vkTesting === conn.id}
-                        className="p-2 rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface))] transition-colors disabled:opacity-50">
-                        <TestTube className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => disconnectVK(conn.id)}
-                        className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+          {/* Анимированная VK-карточка: grid-rows для плавного сворачивания */}
+          <div className={cn(
+            "grid transition-all ease-out duration-500",
+            platformFilter === 'vk' ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          )}>
+            <div className="overflow-hidden">
+              <Card className="p-5">
+                <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
+                  <Plug className="w-5 h-5 text-blue-400" />
+                  Подключение VK
+                </h3>
+                {vkLoading ? (
+                  <p className="text-[rgb(var(--text-secondary))] text-sm">Загрузка...</p>
+                ) : vkConnections.length > 0 ? (
+                  <div className="space-y-3">
+                    {vkConnections.map(conn => (
+                      <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-2))]">
+                        <div>
+                          <div className="text-[rgb(var(--text))] font-medium text-sm">{conn.group_name || `Сообщество ${conn.group_id}`}</div>
+                          <div className="text-[rgb(var(--text-secondary))] text-xs">ID: {conn.group_id}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => testVK(conn.id)} disabled={vkTesting === conn.id}
+                            className="p-2 rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface))] transition-colors disabled:opacity-50">
+                            <TestTube className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => disconnectVK(conn.id)}
+                            className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <div>
-                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">ID сообщества</label>
-                  <input type="text" value={vkForm.group_id} onChange={e => setVkForm(f => ({ ...f, group_id: e.target.value }))}
-                    placeholder="240082352" className="w-full input text-sm" />
-                </div>
-                <div>
-                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Токен доступа</label>
-                  <input type="password" value={vkForm.access_token} onChange={e => setVkForm(f => ({ ...f, access_token: e.target.value }))}
-                    placeholder="vk1.a.xxx..." className="w-full input text-sm" />
-                </div>
-                <div>
-                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Код подтверждения Callback</label>
-                  <input type="text" value={vkForm.confirmation_code} onChange={e => setVkForm(f => ({ ...f, confirmation_code: e.target.value }))}
-                    placeholder="a1b2c3d4" className="w-full input text-sm" />
-                </div>
-                <div>
-                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Секретный ключ (опционально)</label>
-                  <input type="password" value={vkForm.webhook_secret} onChange={e => setVkForm(f => ({ ...f, webhook_secret: e.target.value }))}
-                    placeholder="secret_key" className="w-full input text-sm" />
-                </div>
-                <Button onClick={connectVK} disabled={vkLoading || !vkForm.group_id || !vkForm.access_token} variant="gradient" className="w-full text-sm">
-                  <Plug className="w-4 h-4 mr-1.5" />
-                  {vkLoading ? 'Подключение...' : 'Подключить сообщество'}
-                </Button>
-                <p className="text-[rgb(var(--text-secondary))] text-xs">
-                  Токен берётся в настройках сообщества: Управление → Настройки → Работа с API → Ключи доступа
-                </p>
-              </div>
-            )}
-          </Card>
-        )}
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">ID сообщества</label>
+                      <input type="text" value={vkForm.group_id} onChange={e => setVkForm(f => ({ ...f, group_id: e.target.value }))}
+                        placeholder="240082352" className="w-full input text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Токен доступа</label>
+                      <input type="password" value={vkForm.access_token} onChange={e => setVkForm(f => ({ ...f, access_token: e.target.value }))}
+                        placeholder="vk1.a.xxx..." className="w-full input text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Код подтверждения Callback</label>
+                      <input type="text" value={vkForm.confirmation_code} onChange={e => setVkForm(f => ({ ...f, confirmation_code: e.target.value }))}
+                        placeholder="a1b2c3d4" className="w-full input text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Секретный ключ (опционально)</label>
+                      <input type="password" value={vkForm.webhook_secret} onChange={e => setVkForm(f => ({ ...f, webhook_secret: e.target.value }))}
+                        placeholder="secret_key" className="w-full input text-sm" />
+                    </div>
+                    <Button onClick={connectVK} disabled={vkLoading || !vkForm.group_id || !vkForm.access_token} variant="gradient" className="w-full text-sm">
+                      <Plug className="w-4 h-4 mr-1.5" />
+                      {vkLoading ? 'Подключение...' : 'Подключить сообщество'}
+                    </Button>
+                    <p className="text-[rgb(var(--text-secondary))] text-xs">
+                      Токен берётся в настройках сообщества: Управление → Настройки → Работа с API → Ключи доступа
+                    </p>
+                  </div>
+                )}
+              </Card>
+            </div>
+          </div>
 
-        {activeTab === 'protection' && (
+          {activeTab === 'protection' && (
             <Card className="p-5">
               <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-cyan-400" />
@@ -660,7 +666,7 @@ export default function ModerationPage() {
           )}
         </div>
 
-        <div className="lg:col-span-5 space-y-5">
+        <div className="lg:col-span-5 space-y-5 transition-opacity duration-300 ease-out">
           <StatsPanel
             server={effectiveServer}
             stats={stats}
