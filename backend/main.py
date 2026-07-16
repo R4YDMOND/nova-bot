@@ -85,6 +85,15 @@ class VKSendMessageRequest(BaseModel):
     peer_id: int
     message: str
 
+
+class CreateServerRequest(BaseModel):
+    name: str
+    server_id: str
+    platform: str = "vk"
+    webhook_url: str = ""
+    icon_url: str = ""
+    member_count: int = 0
+
 app = FastAPI(title="Nova API", version="0.7.0")
 
 app.add_middleware(
@@ -97,11 +106,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
 
 # ── Moderation engine (ТЗ №5) ───────────────────────────────────────────────
 _moderation_engine = ModerationEngine()
-
-)
 
 
 @app.exception_handler(Exception)
@@ -240,16 +248,9 @@ def get_servers(platform: str = Query("")):
         db.close()
 
 @app.post("/api/servers")
-def create_server(
-    name: str = Query(...),
-    server_id: str = Query(...),
-    webhook_url: str = Query(""),
-    platform: str = Query("vk"),
-    icon_url: str = Query(""),
-    member_count: int = Query(0),
-):
+def create_server(data: CreateServerRequest):
     try:
-        server_id = _normalize_server_id(server_id, platform)
+        server_id = _normalize_server_id(data.server_id, data.platform)
     except ValueError as e:
         return {"error": str(e)}
 
@@ -259,8 +260,12 @@ def create_server(
         if existing:
             return {"error": "Сервер с таким ID уже зарегистрирован"}
         server = Server(
-            name=name, server_id=server_id, webhook_url=webhook_url, platform=platform,
-            icon_url=icon_url, member_count=member_count,
+            name=data.name,
+            server_id=server_id,
+            webhook_url=data.webhook_url,
+            platform=data.platform,
+            icon_url=data.icon_url,
+            member_count=data.member_count,
         )
         db.add(server)
         db.commit()
@@ -2282,9 +2287,7 @@ def get_dashboard_stats():
     return {"totalMessages": 0, "activeUsers": 0, "commandsUsed": 0, "voiceHours": 0, "onlineNow": 0, "newUsers": 0, "messagesChart": [0,0,0,0,0,0,0], "recentActivity": [], "topCommands": [], "serversCount": 0}
 
 
-@app.get("/api/moderation/log")
-def get_moderation_log():
-    return {"entries": [], "total": 0, "warns": 0, "mutes": 0, "bans": 0}
+
 
 
 # ==================== Вебхуки (CRUD) ====================

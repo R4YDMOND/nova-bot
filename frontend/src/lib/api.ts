@@ -79,13 +79,18 @@ export const api = {
   servers: {
     list: (platform?: 'vk' | 'lolka') =>
       apiFetch<{ servers: DashboardServer[]; total: number }>(`/api/servers${platform ? `?platform=${platform}` : ''}`),
-    create: (data: { name: string; server_id: string; platform?: 'vk' | 'lolka'; webhook_url?: string; icon_url?: string; member_count?: number }) => {
-      const params = new URLSearchParams({ name: data.name, server_id: data.server_id, platform: data.platform || 'vk' });
-      if (data.webhook_url) params.set('webhook_url', data.webhook_url);
-      if (data.icon_url) params.set('icon_url', data.icon_url);
-      if (data.member_count) params.set('member_count', String(data.member_count));
-      return apiFetch<{ status: string; error?: string; server?: object }>(`/api/servers?${params}`, { method: 'POST' });
-    },
+    create: (data: { name: string; server_id: string; platform?: 'vk' | 'lolka'; webhook_url?: string; icon_url?: string; member_count?: number }) =>
+      apiFetch<{ status: string; error?: string; server?: object }>('/api/servers', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: data.name,
+          server_id: data.server_id,
+          platform: data.platform || 'vk',
+          webhook_url: data.webhook_url || '',
+          icon_url: data.icon_url || '',
+          member_count: data.member_count || 0,
+        }),
+      }),
     remove: (id: number) => apiFetch<{ status: string; error?: string }>(`/api/servers/${id}`, { method: 'DELETE' }),
     syncLolka: () => apiFetch<{ status: string; synced?: number; error?: string }>('/api/servers/sync-lolka', { method: 'POST' }),
     syncVk: () => apiFetch<{ status: string; synced?: number; error?: string }>('/api/servers/sync-vk', { method: 'POST' }),
@@ -97,6 +102,32 @@ export const api = {
       apiFetch<{ groups: { id: string; name: string; icon: string | null; member_count: number }[]; total: number }>(
         `/api/vk/groups${serverId ? `?server_id=${serverId}` : ''}`
       ),
+    // ── ТЗ №5: VK Connections ────────────────────────────────────────
+    getConnections: (serverId: string) =>
+      apiFetch<{ connections: { id: number; group_id: string; group_name: string; is_active: boolean; created_at: string }[]; error?: string }>(
+        `/api/vk/connections?server_id=${serverId}`
+      ),
+    createConnection: (data: { server_id: string; group_id: string; access_token: string; webhook_secret?: string; confirmation_code?: string }) =>
+      apiFetch<{ status: string; connection_id?: number; group_name?: string; error?: string }>('/api/vk/connections', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deleteConnection: (id: number) =>
+      apiFetch<{ status: string; error?: string }>(`/api/vk/connections/${id}`, { method: 'DELETE' }),
+    testConnection: (id: number) =>
+      apiFetch<{ status: string; group_name?: string; members_count?: number; error?: string; code?: number }>(`/api/vk/connections/${id}/test`, { method: 'POST' }),
+    moderate: (data: { group_id: string; message_id: number; action: string; user_id?: number; reason?: string }) =>
+      apiFetch<{ success?: boolean; error?: string; code?: number }>('/api/vk/moderate', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    sendMessage: (data: { group_id: string; peer_id: number; message: string }) =>
+      apiFetch<{ status: string; message_id?: number; error?: string; code?: number }>('/api/vk/send', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    getMembers: (groupId: string, count?: number) =>
+      apiFetch<{ members: object[]; total: number; error?: string; code?: number }>(`/api/vk/members?group_id=${groupId}${count ? `&count=${count}` : ''}`),
   },
   modules: {
     get: (serverId = 'default') => apiFetch<{ modules: { name: string; enabled: boolean; config: string }[] }>(`/api/settings/modules?server_id=${serverId}`),
@@ -162,7 +193,8 @@ export const api = {
     getDashboard: () => apiFetch<{ totalMessages: number; activeUsers: number; commandsUsed: number; serversCount: number }>('/api/stats/dashboard'),
   },
   moderation: {
-    getLog: () => apiFetch<{ entries: object[]; total: number; warns: number; mutes: number; bans: number }>('/api/moderation/log'),
+    getLog: (serverId: string, limit?: number) =>
+      apiFetch<{ entries: object[]; total: number }>(`/api/moderation/log?server_id=${serverId}${limit ? `&limit=${limit}` : ''}`),
     // ── ТЗ №4: статистика модерации ─────────────────────────────────
     getStats: (serverId: number, platform: 'vk' | 'lolka') =>
       apiFetch<ModerationStatsResponse>(`/api/moderation/stats?server_id=${serverId}&platform=${platform}`),
