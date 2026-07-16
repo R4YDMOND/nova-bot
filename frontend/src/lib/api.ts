@@ -45,6 +45,7 @@ export type ModerationStatsResponse = {
   };
   recent_events: ModerationEventItem[];
   platform: string;
+  period?: string;
 };
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -196,8 +197,8 @@ export const api = {
     getLog: (serverId: string, limit?: number) =>
       apiFetch<{ entries: object[]; total: number }>(`/api/moderation/log?server_id=${serverId}${limit ? `&limit=${limit}` : ''}`),
     // ── ТЗ №4: статистика модерации ─────────────────────────────────
-    getStats: (serverId: number, platform: 'vk' | 'lolka') =>
-      apiFetch<ModerationStatsResponse>(`/api/moderation/stats?server_id=${serverId}&platform=${platform}`),
+    getStats: (serverId: number, platform: 'vk' | 'lolka', period: '24h' | '7d' | '30d' = '7d') =>
+      apiFetch<ModerationStatsResponse>(`/api/moderation/stats?server_id=${serverId}&platform=${platform}&period=${period}`),
   },
   ranking: {
     getMembers: () => apiFetch<{ members: object[]; total: number }>('/api/ranking/members'),

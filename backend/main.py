@@ -22,7 +22,7 @@ import os
 import secrets
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Новые импорты для JSONB endpoints
 import json
@@ -2409,20 +2409,32 @@ def get_ranking_members():
 
 # ==================== Модерация (ТЗ №4) ====================
 
+PERIOD_DELTAS = {
+    "24h": timedelta(hours=24),
+    "7d": timedelta(days=7),
+    "30d": timedelta(days=30),
+}
+
+
 @app.get("/api/moderation/stats")
 async def get_moderation_stats(
     server_id: int = Query(...),
-    platform: str = Query("vk")
+    platform: str = Query("vk"),
+    period: str = Query("7d")
 ):
     """
-    Получить статистику модерации для сервера.
+    Получить статистику модерации для сервера за период (24h/7d/30d, по умолчанию 7d).
     ЧЕСТНОЕ ПУСТОЕ СОСТОЯНИЕ: если событий нет — вернуть нули/пустые массивы.
     """
     db = SessionLocal()
     try:
+        delta = PERIOD_DELTAS.get(period, PERIOD_DELTAS["7d"])
+        since = datetime.utcnow() - delta
+
         events = db.query(ModerationEvent).filter(
             ModerationEvent.server_id == server_id,
-            ModerationEvent.platform == platform
+            ModerationEvent.platform == platform,
+            ModerationEvent.created_at >= since
         ).all()
 
         blocked = sum(1 for e in events if e.type == "blocked_message")
@@ -2447,7 +2459,8 @@ async def get_moderation_stats(
                 }
                 for e in recent_events
             ],
-            "platform": platform
+           "platform": platform,
+            "period": period
         }
     finally:
         db.close()

@@ -105,6 +105,7 @@ export default function ModerationPage() {
   const [saved, setSaved] = useState(false);
 
   const [stats, setStats] = useState({ blocked: 0, warnings: 0, captcha_solved: 0, total_events: 0 });
+  const [statsPeriod, setStatsPeriod] = useState<'24h' | '7d' | '30d'>('7d');
   const [events, setEvents] = useState<Array<{ type: string; title: string; description: string; created_at: string }>>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -209,7 +210,7 @@ export default function ModerationPage() {
   useEffect(() => {
     if (!effectiveServer) return;
     setStatsLoading(true);
-    api.moderation.getStats(effectiveServer.id, platformFilter)
+    api.moderation.getStats(effectiveServer.id, platformFilter, statsPeriod)
       .then(res => {
         setStats(res.stats);
         setEvents(res.recent_events);
@@ -219,7 +220,7 @@ export default function ModerationPage() {
         setEvents([]);
       })
       .finally(() => setStatsLoading(false));
-  }, [effectiveServer, platformFilter]);
+  }, [effectiveServer, platformFilter, statsPeriod]);
 
   useEffect(() => {
     if (!effectiveServer) { setAuditLog([]); setLogLoading(false); return; }
@@ -732,6 +733,8 @@ export default function ModerationPage() {
             events={events}
             isLoading={statsLoading}
             platform={platformFilter}
+            period={statsPeriod}
+            onPeriodChange={setStatsPeriod}
           />
         </div>
       </div>

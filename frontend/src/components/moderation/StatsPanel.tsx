@@ -24,12 +24,16 @@ type Server = {
   member_count: number;
 };
 
+type StatsPeriod = '24h' | '7d' | '30d';
+
 interface StatsPanelProps {
   server: Server | null;
   stats: ModerationStats;
   events: ModerationEvent[];
   isLoading: boolean;
   platform: Platform;
+  period: StatsPeriod;
+  onPeriodChange: (period: StatsPeriod) => void;
 }
 
 export function StatsPanel({
@@ -38,6 +42,8 @@ export function StatsPanel({
   events,
   isLoading,
   platform,
+  period,
+  onPeriodChange,
 }: StatsPanelProps) {
   return (
     <div className="space-y-6">
@@ -105,10 +111,14 @@ export function StatsPanel({
           <h4 className="text-xs font-bold uppercase tracking-wider text-[rgb(var(--text))]">
             Статистика
           </h4>
-          <select className="px-3 py-1.5 border text-[10px] font-bold rounded-lg bg-[rgb(var(--surface-2))] border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
-            <option>24ч</option>
-            <option>7 дней</option>
-            <option>30 дней</option>
+          <select
+            value={period}
+            onChange={(e) => onPeriodChange(e.target.value as StatsPeriod)}
+            className="px-3 py-1.5 border text-[10px] font-bold rounded-lg bg-[rgb(var(--surface-2))] border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]"
+          >
+            <option value="24h">24ч</option>
+            <option value="7d">7 дней</option>
+            <option value="30d">30 дней</option>
           </select>
         </div>
         {isLoading ? (
