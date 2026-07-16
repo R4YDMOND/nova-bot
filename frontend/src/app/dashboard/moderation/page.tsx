@@ -107,6 +107,17 @@ export default function ModerationPage() {
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
+
+
+  const filteredServers = useMemo(() => servers.filter((s: Server) => s.platform === platformFilter), [servers, platformFilter]);
+
+  const effectiveServer = useMemo(() => {
+    if (selectedServer && selectedServer.platform === platformFilter) return selectedServer;
+    return filteredServers[0] || null;
+  }, [selectedServer, platformFilter, filteredServers]);
+
+  const effectiveServerId = effectiveServer?.id ?? selectedServerId;
+
   // ── VK Connection state (ТЗ №5) ──
   const [vkConnections, setVkConnections] = useState<VKConnectionData[]>([]);
   const [vkLoading, setVkLoading] = useState(false);
@@ -174,15 +185,6 @@ export default function ModerationPage() {
       setVkTesting(null);
     }
   };
-
-  const filteredServers = useMemo(() => servers.filter((s: Server) => s.platform === platformFilter), [servers, platformFilter]);
-
-  const effectiveServer = useMemo(() => {
-    if (selectedServer && selectedServer.platform === platformFilter) return selectedServer;
-    return filteredServers[0] || null;
-  }, [selectedServer, platformFilter, filteredServers]);
-
-  const effectiveServerId = effectiveServer?.id ?? selectedServerId;
 
   useEffect(() => {
     if (!effectiveServer) { setSettingsLoading(false); return; }
