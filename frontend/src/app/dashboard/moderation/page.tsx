@@ -14,7 +14,8 @@ import {
   Type, Repeat, AlertTriangle, VolumeX, Gavel, Mail, FileText,
   MessageSquare, Sparkles, Search, Check, Save, BarChart3,
   Circle, Bell, Moon, Sun, TrendingUp, Lock, Eye, Swords,
-  Hammer, CheckCircle, MessageSquareOff, ShieldCheck, ShieldOff
+  Hammer, CheckCircle, MessageSquareOff, ShieldCheck, ShieldOff,
+  Plug, Unplug, Trash2, TestTube
 } from 'lucide-react';
 
 const API_URL = 'https://nova-bot-rpsy.onrender.com';
@@ -60,6 +61,16 @@ type Settings = {
 
 type LogEntry = { user: string; action: string; reason: string; moderator: string; time: string };
 
+
+// ── VK Connection (ТЗ №5) ──
+type VKConnectionData = {
+  id: number;
+  group_id: string;
+  group_name: string;
+  is_active: boolean;
+  created_at: string;
+};
+
 const DEFAULT_SETTINGS: Settings = {
   antiSpam: true, antiRaid: true, badWordsFilter: true,
   captchaForNew: true, autoDeleteLinks: false,
@@ -95,6 +106,74 @@ export default function ModerationPage() {
   const [logLoading, setLogLoading] = useState(true);
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
+  // ── VK Connection state (ТЗ №5) ──
+  const [vkConnections, setVkConnections] = useState<VKConnectionData[]>([]);
+  const [vkLoading, setVkLoading] = useState(false);
+  const [vkForm, setVkForm] = useState({ group_id: '', access_token: '', confirmation_code: '', webhook_secret: '' });
+  const [vkTesting, setVkTesting] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!effectiveServer || platformFilter !== 'vk') { setVkConnections([]); return; }
+    setVkLoading(true);
+    fetch(`https://nova-bot-rpsy.onrender.com/api/vk/connections?server_id=${effectiveServer.server_id}`)
+      .then(r => r.json())
+      .then((d: { connections?: VKConnectionData[] }) => setVkConnections(d.connections || []))
+      .catch(() => setVkConnections([]))
+      .finally(() => setVkLoading(false));
+  }, [effectiveServer, platformFilter]);
+
+  const connectVK = async () => {
+    if (!effectiveServer) return;
+    setVkLoading(true);
+    try {
+      const res = await fetch('https://nova-bot-rpsy.onrender.com/api/vk/connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          server_id: String(effectiveServer.server_id),
+          group_id: vkForm.group_id,
+          access_token: vkForm.access_token,
+          confirmation_code: vkForm.confirmation_code,
+          webhook_secret: vkForm.webhook_secret,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      setVkConnections(prev => [...prev, { id: data.connection_id, group_id: vkForm.group_id, group_name: data.group_name || vkForm.group_id, is_active: true, created_at: new Date().toISOString() }]);
+      setVkForm({ group_id: '', access_token: '', confirmation_code: '', webhook_secret: '' });
+    } catch (e) {
+      alert('Ошибка подключения VK');
+    } finally {
+      setVkLoading(false);
+    }
+  };
+
+  const disconnectVK = async (id: number) => {
+    if (!confirm('Отключить VK-сообщество?')) return;
+    setVkLoading(true);
+    try {
+      await fetch(`https://nova-bot-rpsy.onrender.com/api/vk/connections/${id}`, { method: 'DELETE' });
+      setVkConnections(prev => prev.filter(c => c.id !== id));
+    } catch {
+      alert('Ошибка отключения');
+    } finally {
+      setVkLoading(false);
+    }
+  };
+
+  const testVK = async (id: number) => {
+    setVkTesting(id);
+    try {
+      const res = await fetch(`https://nova-bot-rpsy.onrender.com/api/vk/connections/${id}/test`, { method: 'POST' });
+      const data = await res.json();
+      alert(data.status === 'ok' ? `Подключение активно: ${data.group_name}` : `Ошибка: ${data.error}`);
+    } catch {
+      alert('Ошибка тестирования');
+    } finally {
+      setVkTesting(null);
+    }
+  };
 
   const filteredServers = useMemo(() => servers.filter((s: Server) => s.platform === platformFilter), [servers, platformFilter]);
 
@@ -242,7 +321,70 @@ export default function ModerationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
         <div className="lg:col-span-7 space-y-5">
-          {activeTab === 'protection' && (
+          {platformFilter === 'vk' && (
+          <Card className="p-5">
+            <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
+              <Plug className="w-5 h-5 text-blue-400" />
+              Подключение VK
+            </h3>
+            {vkLoading ? (
+              <p className="text-[rgb(var(--text-secondary))] text-sm">Загрузка...</p>
+            ) : vkConnections.length > 0 ? (
+              <div className="space-y-3">
+                {vkConnections.map(conn => (
+                  <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-2))]">
+                    <div>
+                      <div className="text-[rgb(var(--text))] font-medium text-sm">{conn.group_name || `Сообщество ${conn.group_id}`}</div>
+                      <div className="text-[rgb(var(--text-secondary))] text-xs">ID: {conn.group_id}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => testVK(conn.id)} disabled={vkTesting === conn.id}
+                        className="p-2 rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface))] transition-colors disabled:opacity-50">
+                        <TestTube className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => disconnectVK(conn.id)}
+                        className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">ID сообщества</label>
+                  <input type="text" value={vkForm.group_id} onChange={e => setVkForm(f => ({ ...f, group_id: e.target.value }))}
+                    placeholder="240082352" className="w-full input text-sm" />
+                </div>
+                <div>
+                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Токен доступа</label>
+                  <input type="password" value={vkForm.access_token} onChange={e => setVkForm(f => ({ ...f, access_token: e.target.value }))}
+                    placeholder="vk1.a.xxx..." className="w-full input text-sm" />
+                </div>
+                <div>
+                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Код подтверждения Callback</label>
+                  <input type="text" value={vkForm.confirmation_code} onChange={e => setVkForm(f => ({ ...f, confirmation_code: e.target.value }))}
+                    placeholder="a1b2c3d4" className="w-full input text-sm" />
+                </div>
+                <div>
+                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Секретный ключ (опционально)</label>
+                  <input type="password" value={vkForm.webhook_secret} onChange={e => setVkForm(f => ({ ...f, webhook_secret: e.target.value }))}
+                    placeholder="secret_key" className="w-full input text-sm" />
+                </div>
+                <Button onClick={connectVK} disabled={vkLoading || !vkForm.group_id || !vkForm.access_token} variant="gradient" className="w-full text-sm">
+                  <Plug className="w-4 h-4 mr-1.5" />
+                  {vkLoading ? 'Подключение...' : 'Подключить сообщество'}
+                </Button>
+                <p className="text-[rgb(var(--text-secondary))] text-xs">
+                  Токен берётся в настройках сообщества: Управление → Настройки → Работа с API → Ключи доступа
+                </p>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {activeTab === 'protection' && (
             <Card className="p-5">
               <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-cyan-400" />

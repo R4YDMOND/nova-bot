@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, UniqueConstraint, ForeignKey
 from datetime import datetime
 from database import Base
 
@@ -223,3 +223,33 @@ class ModerationEvent(Base):
     title = Column(String, default="")
     description = Column(String, default="")
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ══ ТЗ №5: VK Bot API интеграция ══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class VKConnection(Base):
+    """
+    Подключение VK-сообщества к Nova Bot.
+    Хранит токен сообщества (community access token) для вызовов
+    методов Bot API: messages.delete, groups.banUser, messages.send и т.д.
+
+    Отличается от VK ID (OAuth пользователя):
+      - VK ID токен — для входа пользователя через /api/auth/vk
+      - Community token — для модерации сообщества через Bot API
+    """
+    __tablename__ = "vk_connections"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
+    group_id = Column(String(50), nullable=False, index=True)           # ID сообщества VK (без минуса)
+    group_name = Column(String(255), default="")                        # Название сообщества (кэш)
+    access_token = Column(String(1024), nullable=False)                 # Токен сообщества
+    webhook_secret = Column(String(255), default="")                   # Секретный ключ Callback API
+    confirmation_code = Column(String(255), default="")                # Код подтверждения Callback API
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint('server_id', 'group_id', name='uq_server_group'),)

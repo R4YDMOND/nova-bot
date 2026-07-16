@@ -5,7 +5,10 @@ import hashlib
 import base64
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection
+from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
+from fastapi.responses import PlainTextResponse
+from typing import Optional
 from auth_utils import (
     hash_password, verify_password, generate_verification_token, token_expiry,
     create_access_token, create_refresh_token, verify_token,
@@ -58,6 +61,28 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+
+class VKConnectRequest(BaseModel):
+    server_id: str           # server_id из таблицы servers (строка)
+    group_id: str           # ID сообщества VK (число или clubXXXX)
+    access_token: str       # Токен сообщества
+    webhook_secret: str = ""
+    confirmation_code: str = ""
+
+
+class VKModerateRequest(BaseModel):
+    group_id: str
+    message_id: int
+    action: str             # "delete" | "ban" | "warn" | "mute"
+    user_id: Optional[int] = None
+    reason: Optional[str] = None
+
+
+class VKSendMessageRequest(BaseModel):
+    group_id: str
+    peer_id: int
+    message: str
 
 app = FastAPI(title="Nova API", version="0.7.0")
 
@@ -2416,5 +2441,705 @@ async def get_moderation_stats(
             ],
             "platform": platform
         }
+    finally:
+        db.close()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ══ ТЗ №5: VK Bot API интеграция — добавки к main.py ══════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Добавить в imports (после существующих импортов models):
+# from models import ..., VKConnection
+# from vk_bot_service import VKBotService, VKAPIError, get_vk_service
+
+# Добавить новые Pydantic-модели:
+
+class VKConnectRequest(BaseModel):
+    server_id: str           # server_id из таблицы servers (строка)
+    group_id: str           # ID сообщества VK (число или clubXXXX)
+    access_token: str       # Токен сообщества
+    webhook_secret: str = ""
+    confirmation_code: str = ""
+
+
+class VKModerateRequest(BaseModel):
+    group_id: str
+    message_id: int
+    action: str             # "delete" | "ban" | "warn" | "mute"
+    user_id: Optional[int] = None
+    reason: Optional[str] = None
+
+
+class VKSendMessageRequest(BaseModel):
+    group_id: str
+    peer_id: int
+    message: str
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ══ Эндпоинты управления подключением VK ═══════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/vk/connections")
+def get_vk_connections(server_id: str = Query(...)):
+    """Список подключённых VK-сообществ для сервера."""
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            return {"connections": []}
+
+        connections = db.query(VKConnection).filter(
+            VKConnection.server_id == server.id
+        ).all()
+
+        return {
+            "connections": [
+                {
+                    "id": c.id,
+                    "group_id": c.group_id,
+                    "group_name": c.group_name,
+                    "is_active": c.is_active,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                }
+                for c in connections
+            ]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/vk/connections")
+def create_vk_connection(data: VKConnectRequest):
+    """
+    Подключить VK-сообщество к серверу.
+    Проверяет токен через groups.getById перед сохранением.
+    """
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == data.server_id).first()
+        if not server:
+            return {"error": "Сервер не найден"}
+
+        # Нормализуем group_id
+        group_id = data.group_id.strip().lstrip("-").replace("club", "").replace("public", "")
+        if not group_id.isdigit():
+            return {"error": "group_id должен быть числом (например 240082352)"}
+
+        # Проверяем токен — вызываем VK API
+        try:
+            service = VKBotService(data.access_token)
+            group_info = service.get_group_info(group_id)
+            group_name = group_info.get("name", "")
+        except VKAPIError as e:
+            return {"error": f"Невалидный токен или group_id: {e.message}"}
+        except Exception as e:
+            return {"error": f"Ошибка проверки токена: {str(e)}"}
+
+        # Проверяем, нет ли уже такого подключения
+        existing = db.query(VKConnection).filter(
+            VKConnection.server_id == server.id,
+            VKConnection.group_id == group_id
+        ).first()
+
+        if existing:
+            # Обновляем токен
+            existing.access_token = data.access_token
+            existing.webhook_secret = data.webhook_secret
+            existing.confirmation_code = data.confirmation_code
+            existing.group_name = group_name
+            existing.is_active = True
+            existing.updated_at = datetime.utcnow()
+            db.commit()
+            return {"status": "updated", "connection_id": existing.id, "group_name": group_name}
+
+        # Создаём новое подключение
+        conn = VKConnection(
+            server_id=server.id,
+            group_id=group_id,
+            group_name=group_name,
+            access_token=data.access_token,
+            webhook_secret=data.webhook_secret,
+            confirmation_code=data.confirmation_code,
+            is_active=True,
+        )
+        db.add(conn)
+        db.commit()
+        db.refresh(conn)
+
+        return {
+            "status": "created",
+            "connection_id": conn.id,
+            "group_id": group_id,
+            "group_name": group_name,
+        }
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.delete("/api/vk/connections/{connection_id}")
+def delete_vk_connection(connection_id: int):
+    """Отключить VK-сообщество от сервера."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(VKConnection.id == connection_id).first()
+        if not conn:
+            return {"error": "Подключение не найдено"}
+
+        # Удаляем сервис из кэша
+        clear_vk_service(conn.access_token)
+
+        db.delete(conn)
+        db.commit()
+        return {"status": "deleted"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/vk/connections/{connection_id}/test")
+def test_vk_connection(connection_id: int):
+    """Проверить, что токен всё ещё валиден."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(VKConnection.id == connection_id).first()
+        if not conn:
+            return {"error": "Подключение не найдено"}
+
+        service = get_vk_service(conn.access_token)
+        info = service.get_group_info(conn.group_id)
+
+        return {
+            "status": "ok",
+            "group_name": info.get("name"),
+            "members_count": info.get("members_count"),
+            "is_active": True,
+        }
+    except VKAPIError as e:
+        return {"status": "error", "error": e.message, "code": e.code}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ══ Callback API Webhook ══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/vk/callback")
+async def vk_callback(request: Request):
+    """
+    Callback API от VK.
+    VK отправляет сюда события: confirmation, message_new, wall_reply_new и т.д.
+
+    Типы событий:
+      - confirmation          → возвращаем confirmation_code
+      - message_new           → новое сообщение (для автомодерации)
+      - message_edit          → редактирование сообщения
+      - message_reply         → ответ на сообщение
+      - message_allow         → пользователь разрешил писать
+      - message_deny          → пользователь запретил писать
+      - group_join            → вступление в группу
+      - group_leave           → выход из группы
+      - wall_post_new         → новый пост на стене
+      - wall_reply_new        → новый комментарий
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "invalid_json"})
+
+    event_type = body.get("type", "")
+    group_id = str(body.get("group_id", ""))
+
+    # Находим подключение по group_id
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(
+            VKConnection.group_id == group_id,
+            VKConnection.is_active == True
+        ).first()
+
+        if not conn:
+            # Для confirmation VK требует ответ даже если группа не в БД
+            # (но это странно — скорее всего confirmation придёт ДО создания подключения)
+            if event_type == "confirmation":
+                return PlainTextResponse("ok")
+            return JSONResponse(status_code=404, content={"error": "group_not_found"})
+
+        # Проверяем секрет (если настроен)
+        secret = body.get("secret", "")
+        if conn.webhook_secret and secret != conn.webhook_secret:
+            return JSONResponse(status_code=403, content={"error": "invalid_secret"})
+
+        # ── Confirmation ──────────────────────────────────────────────
+        if event_type == "confirmation":
+            return PlainTextResponse(conn.confirmation_code or "ok")
+
+        # ── Message new (для автомодерации) ───────────────────────────
+        if event_type == "message_new":
+            obj = body.get("object", {})
+            message = obj.get("message", {})
+
+            msg_id = message.get("id")
+            peer_id = message.get("peer_id")
+            from_id = message.get("from_id")
+            text = message.get("text", "")
+
+            # Логируем событие
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="message_received",
+                title=f"Сообщение от {from_id}",
+                description=text[:200],
+            )
+            db.add(log_event)
+            db.commit()
+
+            # TODO: здесь подключить движок автомодерации
+            # if should_moderate(text):
+            #     service = get_vk_service(conn.access_token)
+            #     service.moderate_message(conn.group_id, msg_id, "delete")
+
+            return JSONResponse(content={"status": "ok"})
+
+        # ── Group join / leave ────────────────────────────────────────
+        if event_type == "group_join":
+            user_id = body.get("object", {}).get("user_id")
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="user_joined",
+                title=f"Пользователь {user_id} вступил в группу",
+                description="",
+            )
+            db.add(log_event)
+            db.commit()
+            return JSONResponse(content={"status": "ok"})
+
+        if event_type == "group_leave":
+            user_id = body.get("object", {}).get("user_id")
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="user_left",
+                title=f"Пользователь {user_id} покинул группу",
+                description="",
+            )
+            db.add(log_event)
+            db.commit()
+            return JSONResponse(content={"status": "ok"})
+
+        # Для всех остальных типов — просто ок
+        return JSONResponse(content={"status": "ok"})
+
+    except Exception as e:
+        db.rollback()
+        print(f"❌ VK Callback error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ══ Прямые методы модерации (для ручного вызова из дашборда) ═══════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/vk/moderate")
+def vk_moderate(data: VKModerateRequest):
+    """
+    Ручная модерация: удалить сообщение, забанить, предупредить, замьютить.
+    Вызывается из дашборда модерации.
+    """
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(
+            VKConnection.group_id == data.group_id,
+            VKConnection.is_active == True
+        ).first()
+
+        if not conn:
+            return {"error": "VK-сообщество не подключено"}
+
+        service = get_vk_service(conn.access_token)
+        result = service.moderate_message(
+            group_id=data.group_id,
+            message_id=data.message_id,
+            action=data.action,
+            user_id=data.user_id,
+            reason=data.reason,
+        )
+
+        # Логируем действие модерации
+        if result.get("success"):
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type=f"{data.action}_message",
+                title=f"{data.action.title()}: сообщение {data.message_id}",
+                description=data.reason or "",
+            )
+            db.add(log_event)
+            db.commit()
+
+        return result
+    except VKAPIError as e:
+        return {"error": e.message, "code": e.code}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/vk/send")
+def vk_send_message(data: VKSendMessageRequest):
+    """Отправить сообщение от имени бота в VK."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(
+            VKConnection.group_id == data.group_id,
+            VKConnection.is_active == True
+        ).first()
+
+        if not conn:
+            return {"error": "VK-сообщество не подключено"}
+
+        service = get_vk_service(conn.access_token)
+        msg_id = service.send_message(data.peer_id, data.message)
+
+        return {"status": "ok", "message_id": msg_id}
+    except VKAPIError as e:
+        return {"error": e.message, "code": e.code}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.get("/api/vk/members")
+def vk_get_members(group_id: str = Query(...), count: int = Query(100)):
+    """Получить участников VK-сообщества."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(
+            VKConnection.group_id == group_id,
+            VKConnection.is_active == True
+        ).first()
+
+        if not conn:
+            return {"error": "VK-сообщество не подключено"}
+
+        service = get_vk_service(conn.access_token)
+        members = service.get_members(group_id, count=count)
+
+        return {"members": members, "total": len(members)}
+    except VKAPIError as e:
+        return {"error": e.message, "code": e.code}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ══ ТЗ №5: VK Bot API интеграция ══════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/vk/connections")
+def get_vk_connections(server_id: str = Query(...)):
+    """Список подключённых VK-сообществ для сервера."""
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            return {"connections": []}
+        connections = db.query(VKConnection).filter(
+            VKConnection.server_id == server.id
+        ).all()
+        return {
+            "connections": [
+                {
+                    "id": c.id,
+                    "group_id": c.group_id,
+                    "group_name": c.group_name,
+                    "is_active": c.is_active,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                }
+                for c in connections
+            ]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/vk/connections")
+def create_vk_connection(data: VKConnectRequest):
+    """Подключить VK-сообщество к серверу. Проверяет токен через groups.getById."""
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == data.server_id).first()
+        if not server:
+            return {"error": "Сервер не найден"}
+        group_id = data.group_id.strip().lstrip("-").replace("club", "").replace("public", "")
+        if not group_id.isdigit():
+            return {"error": "group_id должен быть числом (например 240082352)"}
+        try:
+            service = VKBotService(data.access_token)
+            group_info = service.get_group_info(group_id)
+            group_name = group_info.get("name", "")
+        except VKAPIError as e:
+            return {"error": f"Невалидный токен или group_id: {e.message}"}
+        except Exception as e:
+            return {"error": f"Ошибка проверки токена: {str(e)}"}
+        existing = db.query(VKConnection).filter(
+            VKConnection.server_id == server.id,
+            VKConnection.group_id == group_id
+        ).first()
+        if existing:
+            existing.access_token = data.access_token
+            existing.webhook_secret = data.webhook_secret
+            existing.confirmation_code = data.confirmation_code
+            existing.group_name = group_name
+            existing.is_active = True
+            existing.updated_at = datetime.utcnow()
+            db.commit()
+            return {"status": "updated", "connection_id": existing.id, "group_name": group_name}
+        conn = VKConnection(
+            server_id=server.id,
+            group_id=group_id,
+            group_name=group_name,
+            access_token=data.access_token,
+            webhook_secret=data.webhook_secret,
+            confirmation_code=data.confirmation_code,
+            is_active=True,
+        )
+        db.add(conn)
+        db.commit()
+        db.refresh(conn)
+        return {
+            "status": "created",
+            "connection_id": conn.id,
+            "group_id": group_id,
+            "group_name": group_name,
+        }
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.delete("/api/vk/connections/{connection_id}")
+def delete_vk_connection(connection_id: int):
+    """Отключить VK-сообщество от сервера."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(VKConnection.id == connection_id).first()
+        if not conn:
+            return {"error": "Подключение не найдено"}
+        clear_vk_service(conn.access_token)
+        db.delete(conn)
+        db.commit()
+        return {"status": "deleted"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/vk/connections/{connection_id}/test")
+def test_vk_connection(connection_id: int):
+    """Проверить, что токен всё ещё валиден."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(VKConnection.id == connection_id).first()
+        if not conn:
+            return {"error": "Подключение не найдено"}
+        service = get_vk_service(conn.access_token)
+        info = service.get_group_info(conn.group_id)
+        return {
+            "status": "ok",
+            "group_name": info.get("name"),
+            "members_count": info.get("members_count"),
+            "is_active": True,
+        }
+    except VKAPIError as e:
+        return {"status": "error", "error": e.message, "code": e.code}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ══ Callback API Webhook ══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/vk/callback")
+async def vk_callback(request: Request):
+    """Callback API от VK. Обрабатывает confirmation, message_new, group_join/leave."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "invalid_json"})
+    event_type = body.get("type", "")
+    group_id = str(body.get("group_id", ""))
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(
+            VKConnection.group_id == group_id,
+            VKConnection.is_active == True
+        ).first()
+        if not conn:
+            if event_type == "confirmation":
+                return PlainTextResponse("ok")
+            return JSONResponse(status_code=404, content={"error": "group_not_found"})
+        secret = body.get("secret", "")
+        if conn.webhook_secret and secret != conn.webhook_secret:
+            return JSONResponse(status_code=403, content={"error": "invalid_secret"})
+        if event_type == "confirmation":
+            return PlainTextResponse(conn.confirmation_code or "ok")
+        if event_type == "message_new":
+            obj = body.get("object", {})
+            message = obj.get("message", {})
+            msg_id = message.get("id")
+            from_id = message.get("from_id")
+            text = message.get("text", "")
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="message_received",
+                title=f"Сообщение от {from_id}",
+                description=text[:200],
+            )
+            db.add(log_event)
+            db.commit()
+            return JSONResponse(content={"status": "ok"})
+        if event_type == "group_join":
+            user_id = body.get("object", {}).get("user_id")
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="user_joined",
+                title=f"Пользователь {user_id} вступил в группу",
+                description="",
+            )
+            db.add(log_event)
+            db.commit()
+            return JSONResponse(content={"status": "ok"})
+        if event_type == "group_leave":
+            user_id = body.get("object", {}).get("user_id")
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="user_left",
+                title=f"Пользователь {user_id} покинул группу",
+                description="",
+            )
+            db.add(log_event)
+            db.commit()
+            return JSONResponse(content={"status": "ok"})
+        return JSONResponse(content={"status": "ok"})
+    except Exception as e:
+        db.rollback()
+        print(f"❌ VK Callback error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ══ Прямые методы модерации ═══════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/vk/moderate")
+def vk_moderate(data: VKModerateRequest):
+    """Ручная модерация: delete, ban, warn, mute."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(
+            VKConnection.group_id == data.group_id,
+            VKConnection.is_active == True
+        ).first()
+        if not conn:
+            return {"error": "VK-сообщество не подключено"}
+        service = get_vk_service(conn.access_token)
+        result = service.moderate_message(
+            group_id=data.group_id,
+            message_id=data.message_id,
+            action=data.action,
+            user_id=data.user_id,
+            reason=data.reason,
+        )
+        if result.get("success"):
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type=f"{data.action}_message",
+                title=f"{data.action.title()}: сообщение {data.message_id}",
+                description=data.reason or "",
+            )
+            db.add(log_event)
+            db.commit()
+        return result
+    except VKAPIError as e:
+        return {"error": e.message, "code": e.code}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/vk/send")
+def vk_send_message(data: VKSendMessageRequest):
+    """Отправить сообщение от имени бота в VK."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(
+            VKConnection.group_id == data.group_id,
+            VKConnection.is_active == True
+        ).first()
+        if not conn:
+            return {"error": "VK-сообщество не подключено"}
+        service = get_vk_service(conn.access_token)
+        msg_id = service.send_message(data.peer_id, data.message)
+        return {"status": "ok", "message_id": msg_id}
+    except VKAPIError as e:
+        return {"error": e.message, "code": e.code}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.get("/api/vk/members")
+def vk_get_members(group_id: str = Query(...), count: int = Query(100)):
+    """Получить участников VK-сообщества."""
+    db = SessionLocal()
+    try:
+        conn = db.query(VKConnection).filter(
+            VKConnection.group_id == group_id,
+            VKConnection.is_active == True
+        ).first()
+        if not conn:
+            return {"error": "VK-сообщество не подключено"}
+        service = get_vk_service(conn.access_token)
+        members = service.get_members(group_id, count=count)
+        return {"members": members, "total": len(members)}
+    except VKAPIError as e:
+        return {"error": e.message, "code": e.code}
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
