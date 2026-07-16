@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
+import { api, DashboardServer } from '@/lib/api';
 import { useServer } from '@/context/ServerProvider';
 import { NoServerSelected } from '@/components/NoServerSelected';
 import { StatsPanel } from '@/components/moderation/StatsPanel';
@@ -21,7 +21,7 @@ import {
 const API_URL = 'https://nova-bot-rpsy.onrender.com';
 const MODULE_NAME = 'moderation';
 
-type Server = { id: number; platform: 'vk' | 'lolka'; member_count: number };
+type Server = DashboardServer; // используем полный тип из API
 type Platform = 'vk' | 'lolka';
 type Tab = 'protection' | 'auto' | 'punish' | 'rules' | 'moderator' | 'log';
 type LogFilter = 'all' | 'warn' | 'mute' | 'ban';
@@ -135,9 +135,8 @@ export default function ModerationPage() {
   useEffect(() => {
     if (!effectiveServer || platformFilter !== 'vk') { setVkConnections([]); return; }
     setVkLoading(true);
-    fetch(`https://nova-bot-rpsy.onrender.com/api/vk/connections?server_id=${effectiveServer.server_id}`)
-      .then(r => r.json())
-      .then((d: { connections?: VKConnectionData[] }) => setVkConnections(d.connections || []))
+    api.vk.getConnections(effectiveServer.server_id)
+      .then((d) => setVkConnections(d.connections || []))
       .catch(() => setVkConnections([]))
       .finally(() => setVkLoading(false));
   }, [effectiveServer, platformFilter]);
@@ -146,20 +145,15 @@ export default function ModerationPage() {
     if (!effectiveServer) return;
     setVkLoading(true);
     try {
-      const res = await fetch('https://nova-bot-rpsy.onrender.com/api/vk/connections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          server_id: String(effectiveServer.server_id),
-          group_id: vkForm.group_id,
-          access_token: vkForm.access_token,
-          confirmation_code: vkForm.confirmation_code,
-          webhook_secret: vkForm.webhook_secret,
-        }),
+      const data = await api.vk.createConnection({
+        server_id: String(effectiveServer.server_id),
+        group_id: vkForm.group_id,
+        access_token: vkForm.access_token,
+        confirmation_code: vkForm.confirmation_code,
+        webhook_secret: vkForm.webhook_secret,
       });
-      const data = await res.json();
       if (data.error) { alert(data.error); return; }
-      setVkConnections(prev => [...prev, { id: data.connection_id, group_id: vkForm.group_id, group_name: data.group_name || vkForm.group_id, is_active: true, created_at: new Date().toISOString() }]);
+      setVkConnections(prev => [...prev, { id: data.connection_id!, group_id: vkForm.group_id, group_name: data.group_name || vkForm.group_id, is_active: true, created_at: new Date().toISOString() }]);
       setVkForm({ group_id: '', access_token: '', confirmation_code: '', webhook_secret: '' });
     } catch (e) {
       alert('Ошибка подключения VK');
@@ -172,7 +166,7 @@ export default function ModerationPage() {
     if (!confirm('Отключить VK-сообщество?')) return;
     setVkLoading(true);
     try {
-      await fetch(`https://nova-bot-rpsy.onrender.com/api/vk/connections/${id}`, { method: 'DELETE' });
+      await api.vk.deleteConnection(id);
       setVkConnections(prev => prev.filter(c => c.id !== id));
     } catch {
       alert('Ошибка отключения');
@@ -184,8 +178,7 @@ export default function ModerationPage() {
   const testVK = async (id: number) => {
     setVkTesting(id);
     try {
-      const res = await fetch(`https://nova-bot-rpsy.onrender.com/api/vk/connections/${id}/test`, { method: 'POST' });
-      const data = await res.json();
+      const data = await api.vk.testConnection(id);
       alert(data.status === 'ok' ? `Подключение активно: ${data.group_name}` : `Ошибка: ${data.error}`);
     } catch {
       alert('Ошибка тестирования');
@@ -221,9 +214,8 @@ export default function ModerationPage() {
   useEffect(() => {
     if (!effectiveServer) { setAuditLog([]); setLogLoading(false); return; }
     setLogLoading(true);
-    fetch(`${API_URL}/api/moderation/log?server_id=${effectiveServer.server_id}&limit=50`)
-      .then((r: Response) => r.json())
-      .then((d: { entries?: LogEntry[] }) => { setAuditLog(d.entries || []); setLogLoading(false); })
+    api.moderation.getLog(effectiveServer.server_id, 50)
+      .then((d) => { setAuditLog(d.entries as LogEntry[] || []); setLogLoading(false); })
       .catch(() => setLogLoading(false));
   }, [effectiveServer]);
 
@@ -252,27 +244,21 @@ export default function ModerationPage() {
     }
     const conn = vkConnections[0];
     try {
-      const res = await fetch(`${API_URL}/api/vk/moderate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          group_id: conn.group_id,
-          message_id: parseInt(messageId),
-          action,
-          user_id: userId ? parseInt(userId) : undefined,
-          reason: 'Ручная модерация из журнала',
-        }),
+      const data = await api.vk.moderate({
+        group_id: conn.group_id,
+        message_id: parseInt(messageId),
+        action,
+        user_id: userId ? parseInt(userId) : undefined,
+        reason: 'Ручная модерация из журнала',
       });
-      const data = await res.json();
       if (data.error) {
         alert(`Ошибка: ${data.error}`);
         return;
       }
       alert('Действие выполнено успешно');
       // Перезагружаем лог
-      fetch(`${API_URL}/api/moderation/log?server_id=${effectiveServer.server_id}&limit=50`)
-        .then(r => r.json())
-        .then((d: { entries?: LogEntry[] }) => setAuditLog(d.entries || []));
+      api.moderation.getLog(effectiveServer.server_id, 50)
+        .then((d) => setAuditLog(d.entries as LogEntry[] || []));
     } catch {
       alert('Ошибка при выполнении действия');
     }
@@ -366,7 +352,11 @@ export default function ModerationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
         <div className="lg:col-span-7 space-y-5">
-          {platformFilter === 'vk' && (
+          <div className={cn(
+          "grid transition-all ease-out duration-500",
+          platformFilter === 'vk' ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        )}>
+          <div className="overflow-hidden">
           <Card className="p-5">
             <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
               <Plug className="w-5 h-5 text-blue-400" />
@@ -427,7 +417,8 @@ export default function ModerationPage() {
               </div>
             )}
           </Card>
-        )}
+          </div>
+        </div>
 
         {activeTab === 'protection' && (
             <Card className="p-5">
