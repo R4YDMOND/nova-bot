@@ -97,7 +97,7 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 export default function ModerationPage() {
-  const { servers, selectedServer, selectedServerId, loading: serverLoading } = useServer();
+  const { servers, selectedServer, selectedServerId, selectServer, loading: serverLoading } = useServer();
   const [platformFilter, setPlatformFilter] = useState<Platform>('vk');
   const [activeTab, setActiveTab] = useState<Tab>('protection');
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -125,6 +125,16 @@ export default function ModerationPage() {
   }, [selectedServer, platformFilter, filteredServers]);
 
   const effectiveServerId = effectiveServer?.id ?? selectedServerId;
+
+  // ── Синхронизация с глобальным ServerProvider (хедер + /dashboard/servers) ──
+  // effectiveServer может отличаться от selectedServer (fallback на filteredServers[0]
+  // при смене фильтра платформы) — без этого хедер и страница /dashboard/servers
+  // показывают не тот сервер, что реально отображается/редактируется здесь.
+  useEffect(() => {
+    if (effectiveServer && effectiveServer.server_id !== selectedServerId) {
+      selectServer(effectiveServer.server_id);
+    }
+  }, [effectiveServer, selectedServerId, selectServer]);
 
   // ── VK Connection state (ТЗ №5) ──
   const [vkConnections, setVkConnections] = useState<VKConnectionData[]>([]);
