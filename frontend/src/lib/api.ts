@@ -27,6 +27,26 @@ export type DashboardWebhook = {
 
 export type AuthUser = { id: number; email: string };
 
+// ── Типы модерации (ТЗ №4) ─────────────────────────────────────────────
+
+export type ModerationEventItem = {
+  type: string;
+  title: string;
+  description: string;
+  created_at: string;
+};
+
+export type ModerationStatsResponse = {
+  stats: {
+    blocked: number;
+    warnings: number;
+    captcha_solved: number;
+    total_events: number;
+  };
+  recent_events: ModerationEventItem[];
+  platform: string;
+};
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -37,14 +57,12 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
       headers: { 'Content-Type': 'application/json', ...options.headers },
     });
     if (!res.ok) {
-      // Раньше тут терялось тело ответа — FastAPI кладёт человекочитаемую
-      // причину ошибки в JSON-поле detail, а мы показывали только "HTTP 401".
       let detail = '';
       try {
         const body = await res.json();
         detail = body?.detail || body?.error || '';
       } catch {
-        // тело не JSON — просто нет detail, не страшно
+        // тело не JSON
       }
       throw new Error(detail || `HTTP ${res.status}: ${res.statusText}`);
     }
@@ -83,9 +101,6 @@ export const api = {
   modules: {
     get: (serverId = 'default') => apiFetch<{ modules: { name: string; enabled: boolean; config: string }[] }>(`/api/settings/modules?server_id=${serverId}`),
     save: (data: object) => apiFetch<{ status: string }>('/api/settings/modules', { method: 'POST', body: JSON.stringify(data) }),
-    // Хелперы поверх generic /api/settings/modules — хранят JSON-конфиг конкретного
-    // раздела дашборда (commands/moderation/ranking) под своим module_name,
-    // чтобы не заводить под каждую страницу отдельный бэкенд-эндпоинт.
     getConfig: async <T,>(serverId: string, moduleName: string): Promise<T | null> => {
       const data = await apiFetch<{ modules: { name: string; enabled: boolean; config: string }[] }>(
         `/api/settings/modules?server_id=${serverId}`
@@ -148,6 +163,9 @@ export const api = {
   },
   moderation: {
     getLog: () => apiFetch<{ entries: object[]; total: number; warns: number; mutes: number; bans: number }>('/api/moderation/log'),
+    // ── ТЗ №4: статистика модерации ─────────────────────────────────
+    getStats: (serverId: number, platform: 'vk' | 'lolka') =>
+      apiFetch<ModerationStatsResponse>(`/api/moderation/stats?server_id=${serverId}&platform=${platform}`),
   },
   ranking: {
     getMembers: () => apiFetch<{ members: object[]; total: number }>('/api/ranking/members'),

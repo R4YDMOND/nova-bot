@@ -8,7 +8,14 @@ if DATABASE_URL.startswith("postgres://"):
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
+    # Supabase Connection Pooler (порт 6543) — SSL обязателен
+    # pool_size не задаём: Supabase Pooler сам управляет лимитом соединений
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        connect_args={"sslmode": "require"}
+    )
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 

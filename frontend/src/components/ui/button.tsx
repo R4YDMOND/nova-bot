@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "secondary" | "destructive" | "outline" | "ghost" | "link";
+  variant?: "default" | "secondary" | "destructive" | "outline" | "ghost" | "link" | "gradient";
   size?: "default" | "sm" | "lg" | "icon";
 }
 
@@ -13,6 +13,7 @@ const variantClasses: Record<string, string> = {
   outline:     "border border-[rgb(var(--border))] bg-transparent text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))]",
   ghost:       "text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))]",
   link:        "text-indigo-400 underline-offset-4 hover:underline",
+  gradient:    "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/15 hover:from-indigo-600 hover:to-purple-700 active:scale-95",
 };
 
 const sizeClasses: Record<string, string> = {

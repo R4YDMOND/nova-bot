@@ -203,3 +203,23 @@ class ModerationConfig(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (UniqueConstraint('server_id', 'platform', name='uq_server_platform'),)
+
+
+# ── Модель событий модерации (ТЗ №4) ─────────────────────────────────────────
+
+class ModerationEvent(Base):
+    """
+    События модерации.
+    Пока в проекте нет движка, который реально разбирает сообщения VK/Lolka,
+    единственный источник событий — сохранение настроек (type="settings_updated").
+    Остальные типы заведены заранее для будущего модуля автомодерации.
+    """
+    __tablename__ = "moderation_events"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(Integer, nullable=False, index=True)  # ссылка на Server.id
+    platform = Column(String, default="vk")  # "vk" или "lolka"
+    type = Column(String, nullable=False)    # "settings_updated", "blocked_message", "warning", "captcha_passed"
+    title = Column(String, default="")
+    description = Column(String, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

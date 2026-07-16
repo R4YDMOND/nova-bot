@@ -5,7 +5,7 @@ import hashlib
 import base64
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent
 from auth_utils import (
     hash_password, verify_password, generate_verification_token, token_expiry,
     create_access_token, create_refresh_token, verify_token,
@@ -316,21 +316,21 @@ def lolka_webhook(data: dict):
         response = f"🏓 Понг, {user}!"
     
     elif message.startswith("/help") or message.startswith("/помощь"):
-        response = f\"\"\"**🤖 Команды Нова:**
+        response = f"""**🤖 Команды Нова:**
 📊 `/stats` — статистика сервера
 🎵 `/play` — включить музыку
 🛡️ `/mod` — модерация
 ❓ `/help` — список команд
 💡 `/hello` — приветствие
-↗ `/forward ссылка` — переслать контент в каналы\"\"\"
+↗ `/forward ссылка` — переслать контент в каналы"""
     
     elif message.startswith("/stats"):
-        response = f\"\"\"**📊 Статистика:**
+        response = f"""**📊 Статистика:**
 👤 Пользователь: {user}
 💬 Канал: {channel}
 🤖 Бот: Нова v0.7.0
 ⚡ Статус: Работает
-🌐 Сервер: {server_id or 'Неизвестный'}\"\"\"
+🌐 Сервер: {server_id or 'Неизвестный'}"""
     
     elif message.startswith("/hello") or message.startswith("/привет"):
         greetings = [
@@ -438,6 +438,19 @@ def save_modules(data: dict):
                 db.add(new_config)
         
         db.commit()
+
+        # ── Хук логирования события модерации (ТЗ №4) ──
+        if any(m.get("name") == "moderation" for m in modules):
+            log_event = ModerationEvent(
+                server_id=server.id,
+                platform=server.platform or "vk",
+                type="settings_updated",
+                title="Настройки модерации обновлены",
+                description=f"Пользователь {data.get('user_id', 'system')} изменил конфигурацию"
+            )
+            db.add(log_event)
+            db.commit()
+
         return {"status": "saved", "modules_count": len(modules)}
     except Exception as e:
         db.rollback()
@@ -2359,3 +2372,49 @@ def get_ranking_members():
         ],
         "total": 3
     }
+
+
+# ==================== Модерация (ТЗ №4) ====================
+
+@app.get("/api/moderation/stats")
+async def get_moderation_stats(
+    server_id: int = Query(...),
+    platform: str = Query("vk")
+):
+    """
+    Получить статистику модерации для сервера.
+    ЧЕСТНОЕ ПУСТОЕ СОСТОЯНИЕ: если событий нет — вернуть нули/пустые массивы.
+    """
+    db = SessionLocal()
+    try:
+        events = db.query(ModerationEvent).filter(
+            ModerationEvent.server_id == server_id,
+            ModerationEvent.platform == platform
+        ).all()
+
+        blocked = sum(1 for e in events if e.type == "blocked_message")
+        warnings = sum(1 for e in events if e.type == "warning")
+        captcha = sum(1 for e in events if e.type == "captcha_passed")
+
+        recent_events = sorted(events, key=lambda x: x.created_at, reverse=True)[:5]
+
+        return {
+            "stats": {
+                "blocked": blocked,
+                "warnings": warnings,
+                "captcha_solved": captcha,
+                "total_events": len(events)
+            },
+            "recent_events": [
+                {
+                    "type": e.type,
+                    "title": e.title,
+                    "description": e.description,
+                    "created_at": e.created_at.isoformat()
+                }
+                for e in recent_events
+            ],
+            "platform": platform
+        }
+    finally:
+        db.close()
