@@ -237,6 +237,7 @@ def get_servers(platform: str = Query("")):
                 "platform": s.platform or "vk",
                 "icon_url": s.icon_url or "",
                 "member_count": s.member_count or 0,
+                "is_active": True if s.is_active is None else bool(s.is_active),
                 "created_at": s.created_at.isoformat() if s.created_at else None,
             }
             for s in servers
