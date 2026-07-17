@@ -13,6 +13,7 @@ export type DashboardServer = {
   platform: 'vk' | 'lolka';
   icon_url: string;
   member_count: number;
+  is_active?: boolean;
 };
 
 export type DashboardWebhook = {

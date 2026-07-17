@@ -426,6 +426,7 @@ export default function ModerationPage() {
           </Card>
           </div>
         </div>
+        </div>
 
         <div className="lg:col-span-4 space-y-5">
 
@@ -656,7 +657,7 @@ export default function ModerationPage() {
                 </h3>
                 <div className="flex gap-2 flex-wrap">
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[rgb(var(--text-secondary))]}" />
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[rgb(var(--text-secondary))]" />
                     <input type="text" value={logSearch} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLogSearch(e.target.value)}
                       placeholder="Поиск..." className="pl-8 pr-3 py-1.5 input text-sm w-40" />
                   </div>
