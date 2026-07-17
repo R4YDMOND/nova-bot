@@ -358,7 +358,7 @@ export default function ModerationPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
-        <div className={cn('space-y-5', activeTab === 'protection' ? 'lg:col-span-4' : 'lg:col-span-7')}>
+        <div className="lg:col-span-4 space-y-5">
           <div className={cn(
           "grid transition-all ease-out duration-500",
           platformFilter === 'vk' ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
@@ -427,6 +427,8 @@ export default function ModerationPage() {
           </div>
         </div>
 
+        <div className="lg:col-span-4 space-y-5">
+
         {activeTab === 'protection' && (
             <Card className="p-5">
               <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
@@ -439,6 +441,9 @@ export default function ModerationPage() {
                 { key: 'badWordsFilter' as const, label: 'Фильтр мата', desc: 'Удаление запрещённых слов', icon: Filter },
                 { key: 'captchaForNew' as const, label: 'Капча для новых', desc: 'Проверка участников при входе', icon: Bot },
                 { key: 'autoDeleteLinks' as const, label: 'Удаление ссылок', desc: 'Автоудаление всех ссылок', icon: LinkIcon },
+                { key: 'blockFraudLinks' as const, label: 'Мошеннические ссылки', desc: 'Блокировка ссылок на скам/фишинг', icon: Skull },
+                { key: 'blockZalgo' as const, label: 'Zalgo-текст', desc: 'Блокировка искажённого юникода', icon: Ghost },
+                { key: 'blockInviteLinks' as const, label: 'Приглашения', desc: 'Блокировка инвайтов на другие сообщества', icon: UserPlus },
               ] as const).map((item, i, arr) => (
                 <div key={item.key} className={cn('flex justify-between items-center py-2.5', i < arr.length - 1 && 'border-b border-[rgb(var(--border))]')}>
                   <div className="flex items-center gap-2">
@@ -722,34 +727,7 @@ export default function ModerationPage() {
           )}
         </div>
 
-        {activeTab === 'protection' && (
-          <div className="lg:col-span-4 space-y-5">
-            <Card className="p-5">
-              <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-orange-400" />
-                Доп. фильтры
-              </h3>
-              {([
-                { key: 'blockFraudLinks' as const, label: 'Мошеннические ссылки', desc: 'Блокировка ссылок на скам/фишинг', icon: Skull },
-                { key: 'blockZalgo' as const, label: 'Zalgo-текст', desc: 'Блокировка искажённого юникода', icon: Ghost },
-                { key: 'blockInviteLinks' as const, label: 'Приглашения', desc: 'Блокировка инвайтов на другие сообщества', icon: UserPlus },
-              ] as const).map((item, i, arr) => (
-                <div key={item.key} className={cn('flex justify-between items-center py-2.5', i < arr.length - 1 && 'border-b border-[rgb(var(--border))]')}>
-                  <div className="flex items-center gap-2">
-                    <item.icon className="w-4 h-4 text-[rgb(var(--text-secondary))]" />
-                    <div>
-                      <div className="text-[rgb(var(--text))] font-medium text-sm">{item.label}</div>
-                      <div className="text-[rgb(var(--text-secondary))] text-xs">{item.desc}</div>
-                    </div>
-                  </div>
-                  <Switch variant="gradient" checked={settings[item.key] as boolean} onCheckedChange={() => toggle(item.key)} />
-                </div>
-              ))}
-            </Card>
-          </div>
-        )}
-
-        <div className={cn('space-y-5', activeTab === 'protection' ? 'lg:col-span-4' : 'lg:col-span-5')}>
+        <div className="lg:col-span-4 space-y-5">
           <StatsPanel
             server={effectiveServer}
             stats={stats}
