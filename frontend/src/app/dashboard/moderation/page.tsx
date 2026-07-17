@@ -95,16 +95,12 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 export default function ModerationPage() {
-  const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
+  const { servers, selectedServer, selectedServerId, selectServer, loading: serverLoading } = useServer();
+  const [platformFilter, setPlatformFilter] = useState<Platform>('vk');
   const [activeTab, setActiveTab] = useState<Tab>('protection');
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-
-  // Платформа определяется выбранным сервером из глобального провайдера
-  const platformFilter = selectedServer?.platform || 'vk';
-  const effectiveServer = selectedServer;
-  const effectiveServerId = effectiveServer?.id ?? selectedServerId;
 
   const [stats, setStats] = useState({ blocked: 0, warnings: 0, captcha_solved: 0, total_events: 0 });
   const [statsPeriod, setStatsPeriod] = useState<'24h' | '7d' | '30d'>('7d');
@@ -117,6 +113,21 @@ export default function ModerationPage() {
   const [logLoading, setLogLoading] = useState(true);
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
+  const filteredServers = useMemo(() => servers.filter((s: Server) => s.platform === platformFilter), [servers, platformFilter]);
+
+  const effectiveServer = useMemo(() => {
+    if (selectedServer && selectedServer.platform === platformFilter) return selectedServer;
+    return filteredServers[0] || null;
+  }, [selectedServer, platformFilter, filteredServers]);
+
+  const effectiveServerId = effectiveServer?.id ?? selectedServerId;
+
+  useEffect(() => {
+    if (effectiveServer && effectiveServer.server_id !== selectedServerId) {
+      selectServer(effectiveServer.server_id);
+    }
+  }, [effectiveServer, selectedServerId, selectServer]);
 
   // ── VK Connection state (ТЗ №5) ──
   const [vkConnections, setVkConnections] = useState<VKConnectionData[]>([]);
@@ -268,6 +279,19 @@ export default function ModerationPage() {
     return <div className="p-8 text-[rgb(var(--text-secondary))]">Загрузка...</div>;
   }
 
+  if (filteredServers.length === 0) {
+    return (
+      <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+        <NoServerSelected
+          heading={`Нет серверов ${platformFilter === 'vk' ? 'VK' : 'Lolka'}`}
+          description={`Добавьте и настройте сервер ${platformFilter === 'vk' ? 'VK' : 'Lolka'} на странице управления серверами.`}
+          link="/dashboard/servers"
+          linkText="Перейти к серверам"
+        />
+      </div>
+    );
+  }
+
   if (!effectiveServer) {
     return <NoServerSelected title="Модерация" />;
   }
@@ -285,6 +309,33 @@ export default function ModerationPage() {
         <Button onClick={save} disabled={saving} variant="gradient" className="flex items-center gap-1.5 text-sm">
           {saving ? 'Сохранение...' : saved ? <><Check className="w-4 h-4" /> Сохранено!</> : <><Save className="w-4 h-4" /> Сохранить настройки</>}
         </Button>
+      </div>
+
+      {/* Восстановленный блок переключения платформ */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border mb-5 bg-[rgb(var(--surface-2))] border-[rgb(var(--border))]">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-secondary))]">Платформа:</span>
+          <div className="flex p-1 rounded-lg border bg-[rgb(var(--surface))] border-[rgb(var(--border))]">
+            {[
+              { id: 'vk' as Platform, label: 'VK', color: 'bg-blue-500' },
+              { id: 'lolka' as Platform, label: 'Lolka', color: 'bg-purple-500' }
+            ].map(p => (
+              <button
+                key={p.id}
+                onClick={() => setPlatformFilter(p.id)}
+                className={cn(
+                  'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all',
+                  platformFilter === p.id
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
+                )}
+              >
+                <span className={cn("w-2 h-2 rounded-full", p.color)} />
+                <span>{p.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-1 mb-5">
@@ -600,7 +651,7 @@ export default function ModerationPage() {
                 </h3>
                 <div className="flex gap-2 flex-wrap">
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[rgb(var(--text-secondary))]" />
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[rgb(var(--text-secondary))]}" />
                     <input type="text" value={logSearch} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLogSearch(e.target.value)}
                       placeholder="Поиск..." className="pl-8 pr-3 py-1.5 input text-sm w-40" />
                   </div>
