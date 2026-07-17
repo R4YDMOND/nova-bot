@@ -29,6 +29,12 @@ export type DashboardWebhook = {
 export type AuthUser = { id: number; email: string };
 
 // ── Типы модерации (ТЗ №4) ─────────────────────────────────────────────
+export type ModerationEventItem = {
+  type: string;
+  title: string;
+  description: string;
+  created_at: string;
+};
 
 export type ModerationTimelinePoint = {
   date: string;
@@ -51,12 +57,14 @@ export type ModerationStatsResponse = {
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
+  
   try {
     const res = await fetch(`${API_URL}${path}`, {
       ...options,
       signal: controller.signal,
       headers: { 'Content-Type': 'application/json', ...options.headers },
     });
+    
     if (!res.ok) {
       let detail = '';
       try {
@@ -67,6 +75,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
       }
       throw new Error(detail || `HTTP ${res.status}: ${res.statusText}`);
     }
+    
     return (await res.json()) as T;
   } catch (error) {
     if ((error as Error).name === 'AbortError') throw new Error('Превышено время ожидания');
