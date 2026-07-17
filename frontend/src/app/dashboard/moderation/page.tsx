@@ -425,6 +425,7 @@ export default function ModerationPage() {
             )}
           </Card>
           </div>
+          </div>
         </div>
 
         <div className="lg:col-span-4 space-y-5">

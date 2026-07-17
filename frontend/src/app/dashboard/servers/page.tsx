@@ -57,6 +57,11 @@ export default function ServersPage() {
 
   const vkServers = useMemo(() => servers.filter(s => s.platform === 'vk'), [servers]);
   const lolkaServers = useMemo(() => servers.filter(s => s.platform === 'lolka'), [servers]);
+  const filteredServers = useMemo(() => {
+    if (platformFilter === 'vk') return vkServers;
+    if (platformFilter === 'lolka') return lolkaServers;
+    return servers;
+  }, [platformFilter, servers, vkServers, lolkaServers]);
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', server_id: '', platform: 'vk' as 'vk' | 'lolka', webhook_url: '' });
@@ -259,81 +264,54 @@ export default function ServersPage() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-10">
-            {platformFilter !== 'lolka' && (
-              <section>
-                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-[rgb(var(--text))]">
-                  <span className="text-blue-500">🔵</span>
-                  ВКонтакте
-                  <span className="text-sm font-normal text-[rgb(var(--text-secondary))]">({vkServers.length})</span>
-                </h2>
-                {vkServers.length === 0 ? (
-                  <p className="text-[rgb(var(--text-secondary))] text-sm">Нет подключённых сообществ VK</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {vkServers.map(s => (
-                      <ServerCard
-                        key={s.id}
-                        server={s}
-                        selected={s.server_id === selectedServerId}
-                        onSelect={() => selectServer(s.server_id)}
-                        onRemove={() => removeServer(s.id)}
-                        deleting={deletingId === s.id}
-                      />
-                    ))}
-                  </div>
+          <div className="space-y-4">
+            {platformFilter !== 'vk' && (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {botStatus && (
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                    botStatus.connected
+                      ? 'bg-green-500/10 text-green-500 border border-green-500/30'
+                      : botStatus.configured
+                        ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/30'
+                        : 'bg-red-500/10 text-red-500 border border-red-500/30'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      botStatus.connected ? 'bg-green-400' : botStatus.configured ? 'bg-yellow-400' : 'bg-red-400'
+                    }`}></span>
+                    {botStatus.connected ? 'Бот подключён' : botStatus.configured ? 'Ждём соединения' : 'Не настроен'}
+                  </span>
                 )}
-              </section>
+                <Button onClick={inviteBot} disabled={inviteLoading} size="sm" variant="outline">
+                  {inviteLoading ? 'Открываем...' : '➕ Добавить бота на сервер'}
+                </Button>
+              </div>
             )}
 
-            {platformFilter !== 'vk' && (
-              <section>
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <h2 className="text-2xl font-bold flex items-center gap-2 text-[rgb(var(--text))]">
-                    <span className="text-purple-500">💜</span>
-                    Lolka
-                    <span className="text-sm font-normal text-[rgb(var(--text-secondary))]">({lolkaServers.length})</span>
-                  </h2>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {botStatus && (
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-                        botStatus.connected
-                          ? 'bg-green-500/10 text-green-500 border border-green-500/30'
-                          : botStatus.configured
-                            ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/30'
-                            : 'bg-red-500/10 text-red-500 border border-red-500/30'
-                      }`}>
-                        <span className={`w-2 h-2 rounded-full ${
-                          botStatus.connected ? 'bg-green-400' : botStatus.configured ? 'bg-yellow-400' : 'bg-red-400'
-                        }`}></span>
-                        {botStatus.connected ? 'Бот подключён' : botStatus.configured ? 'Ждём соединения' : 'Не настроен'}
-                      </span>
-                    )}
-                    <Button onClick={inviteBot} disabled={inviteLoading} size="sm" variant="outline">
-                      {inviteLoading ? 'Открываем...' : '➕ Добавить бота на сервер'}
-                    </Button>
-                  </div>
-                </div>
-                {inviteError && (
-                  <p className="text-red-400 text-xs mb-3">⚠️ {inviteError}</p>
-                )}
-                {lolkaServers.length === 0 ? (
-                  <p className="text-[rgb(var(--text-secondary))] text-sm">Нет подключённых серверов Lolka</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {lolkaServers.map(s => (
-                      <ServerCard
-                        key={s.id}
-                        server={s}
-                        selected={s.server_id === selectedServerId}
-                        onSelect={() => selectServer(s.server_id)}
-                        onRemove={() => removeServer(s.id)}
-                        deleting={deletingId === s.id}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
+            {inviteError && platformFilter !== 'vk' && (
+              <p className="text-red-400 text-xs">⚠️ {inviteError}</p>
+            )}
+
+            {filteredServers.length === 0 ? (
+              <p className="text-[rgb(var(--text-secondary))] text-sm text-center py-12">
+                {platformFilter === 'vk'
+                  ? 'Нет подключённых сообществ VK'
+                  : platformFilter === 'lolka'
+                    ? 'Нет подключённых серверов Lolka'
+                    : 'Нет подключённых серверов'}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredServers.map(s => (
+                  <ServerCard
+                    key={s.id}
+                    server={s}
+                    selected={s.server_id === selectedServerId}
+                    onSelect={() => selectServer(s.server_id)}
+                    onRemove={() => removeServer(s.id)}
+                    deleting={deletingId === s.id}
+                  />
+                ))}
+              </div>
             )}
           </div>
         )}
