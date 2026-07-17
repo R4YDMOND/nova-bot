@@ -208,43 +208,36 @@ export default function ServersPage() {
             )}
           </div>
 
-          <div className="hidden md:flex gap-3 flex-wrap items-center justify-between">
-            <div className="flex gap-2">
-              <Button
-                variant={platformFilter === 'all' ? 'default' : 'outline'}
-                onClick={() => setPlatformFilter('all')}
-              >
+          <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+            {/* Фильтр платформы — теперь виден на всех экранах, не только md+ */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 md:overflow-visible md:pb-0">
+              <Button variant={platformFilter === 'all' ? 'default' : 'outline'} onClick={() => setPlatformFilter('all')} className="shrink-0">
                 Все ({servers.length})
               </Button>
-              <Button
-                variant={platformFilter === 'vk' ? 'default' : 'outline'}
-                onClick={() => setPlatformFilter('vk')}
-                className={platformFilter === 'vk' ? 'bg-blue-500 hover:bg-blue-600' : ''}
-              >
+              <Button variant={platformFilter === 'vk' ? 'default' : 'outline'} onClick={() => setPlatformFilter('vk')}
+                className={`shrink-0 ${platformFilter === 'vk' ? 'bg-blue-500 hover:bg-blue-600' : ''}`}>
                 VK ({vkServers.length})
               </Button>
-              <Button
-                variant={platformFilter === 'lolka' ? 'default' : 'outline'}
-                onClick={() => setPlatformFilter('lolka')}
-                className={platformFilter === 'lolka' ? 'bg-purple-500 hover:bg-purple-600' : ''}
-              >
+              <Button variant={platformFilter === 'lolka' ? 'default' : 'outline'} onClick={() => setPlatformFilter('lolka')}
+                className={`shrink-0 ${platformFilter === 'lolka' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}>
                 Lolka ({lolkaServers.length})
               </Button>
             </div>
 
-            <div className="flex gap-3">
+            {/* Синхронизация/Добавление — оставлены только для md+, на мобильном их дублируют
+      floating-кнопки ниже по файлу (блок "md:hidden fixed bottom-6 right-6") */}
+            <div className="hidden md:flex gap-3">
               <Button onClick={syncAllPlatforms} disabled={syncing} variant="secondary">
                 {syncing ? '🔄 Синхронизируем...' : '🔄 Синхронизировать'}
               </Button>
               <Button onClick={openModal}>
                 <Plus className="w-4 h-4 mr-2" />
                 Добавить сервер
-              </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {loading ? (
+           {loading ? (
           <div className="text-center py-16">
             <div className="inline-block">
               <div className="w-8 h-8 border-2 border-[rgb(var(--text-secondary))] border-t-primary rounded-full animate-spin"></div>
