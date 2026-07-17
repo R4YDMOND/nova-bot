@@ -4,7 +4,6 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
-import { ServerSwitcher } from './ServerSwitcher';
 
 interface Profile {
   name: string;
@@ -54,8 +53,6 @@ export function Header() {
             </span>
           ))}
         </nav>
-
-        <ServerSwitcher />
       </div>
 
       <div className="flex items-center gap-3">

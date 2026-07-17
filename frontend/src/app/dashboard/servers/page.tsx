@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
 import { api, DashboardServer } from '@/lib/api';
 import { useServer } from '@/context/ServerProvider';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { PlatformIcon, PLATFORM_LABEL } from '@/components/PlatformIcon';
+import { ServerCard } from '@/components/ServerCard';
 
 type Detection =
   | { status: 'ok'; platform: 'vk' | 'lolka'; id: string; label: string }
@@ -50,81 +51,10 @@ function detectServerLink(raw: string): Detection | null {
   return null;
 }
 
-function ServerCard({
-  server, selected, onSelect, onRemove, deleting,
-}: {
-  server: DashboardServer;
-  selected: boolean;
-  onSelect: () => void;
-  onRemove: () => void;
-  deleting: boolean;
-}) {
-  return (
-    <Card
-      className={`group relative flex flex-col items-center text-center gap-4 p-6 min-h-[200px] cursor-pointer transition-all hover:shadow-lg ${
-        selected
-          ? 'border-2 border-primary bg-primary/5'
-          : 'border border-[rgb(var(--border))] hover:border-primary/40'
-      }`}
-      onClick={onSelect}
-    >
-      {/* Аватар: единый формат 64x64px, круглый. Значок платформы — бейдж поверх аватара */}
-      <div className="relative w-16 h-16 shrink-0">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center overflow-hidden">
-          {server.icon_url ? (
-            <img src={server.icon_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <PlatformIcon platform={server.platform} className="w-8 h-8 rounded-lg" />
-          )}
-        </div>
-        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full ring-2 ring-[rgb(var(--surface))] overflow-hidden bg-[rgb(var(--surface))]">
-          <PlatformIcon platform={server.platform} className="w-6 h-6" />
-        </div>
-      </div>
-
-      {/* Название и платформа */}
-      <div className="w-full">
-        <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{server.name}</h3>
-        <div className="flex justify-center mt-2">
-          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
-            <PlatformIcon platform={server.platform} className="w-3.5 h-3.5 rounded" /> {PLATFORM_LABEL[server.platform]}
-          </span>
-        </div>
-      </div>
-
-      {/* Участники */}
-      <div className="text-sm text-[rgb(var(--text))] font-semibold">
-        👥 {server.member_count > 0 ? server.member_count.toLocaleString('ru-RU') : 'N/A'}
-      </div>
-
-      {/* ID */}
-      <div className="text-xs text-[rgb(var(--text-secondary))] font-mono">
-        ID: {server.server_id}
-      </div>
-
-      {/* Статус */}
-      {selected && (
-        <div className="text-xs text-primary font-bold">✓ Выбран</div>
-      )}
-
-      {/* Кнопка удаления */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onRemove(); }}
-        disabled={deleting}
-        className="p-2 rounded-lg text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 md:opacity-0 md:group-hover:opacity-100"
-        title="Удалить из панели"
-      >
-        <Trash2 className="w-5 h-5" />
-      </button>
-    </Card>
-  );
-}
-
 export default function ServersPage() {
   const { servers, loading, selectedServerId, selectServer, refresh } = useServer();
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'vk' | 'lolka'>('all');
 
-  // Раздельные блоки VK/Lolka (ТЗ №4.1, п. 2.1.2) — оба показываются одновременно,
-  // без табов-фильтра: серверы уже в кэше ServerProvider, фильтрация чисто на клиенте.
   const vkServers = useMemo(() => servers.filter(s => s.platform === 'vk'), [servers]);
   const lolkaServers = useMemo(() => servers.filter(s => s.platform === 'lolka'), [servers]);
 
@@ -244,9 +174,7 @@ export default function ServersPage() {
 
   return (
     <div className="min-h-screen pb-32 md:pb-8">
-      {/* Основной контент */}
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
-        {/* Заголовок и кнопки управления */}
         <div className="mb-8">
           <div className="flex flex-col gap-4 mb-6">
             <div>
@@ -258,7 +186,6 @@ export default function ServersPage() {
               </p>
             </div>
 
-            {/* Сообщение синхронизации */}
             {syncMessage && (
               <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium ${
                 syncMessage.type === 'ok'
@@ -269,7 +196,6 @@ export default function ServersPage() {
               </div>
             )}
 
-            {/* Сообщение об ошибке удаления */}
             {deleteError && (
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium text-red-400 bg-red-500/10 border-red-500/20">
                 ⚠️ {deleteError}
@@ -277,23 +203,42 @@ export default function ServersPage() {
             )}
           </div>
 
-          {/* Кнопки управления — сверху на Desktop, FAB на Mobile */}
-          <div className="hidden md:flex gap-3 flex-wrap">
-            <Button 
-              onClick={syncAllPlatforms} 
-              disabled={syncing}
-              variant="secondary"
-            >
-              {syncing ? '🔄 Синхронизируем...' : '🔄 Синхронизировать'}
-            </Button>
-            <Button onClick={openModal} className="ml-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              Добавить сервер
-            </Button>
+          <div className="hidden md:flex gap-3 flex-wrap items-center justify-between">
+            <div className="flex gap-2">
+              <Button
+                variant={platformFilter === 'all' ? 'default' : 'outline'}
+                onClick={() => setPlatformFilter('all')}
+              >
+                Все ({servers.length})
+              </Button>
+              <Button
+                variant={platformFilter === 'vk' ? 'default' : 'outline'}
+                onClick={() => setPlatformFilter('vk')}
+                className={platformFilter === 'vk' ? 'bg-blue-500 hover:bg-blue-600' : ''}
+              >
+                VK ({vkServers.length})
+              </Button>
+              <Button
+                variant={platformFilter === 'lolka' ? 'default' : 'outline'}
+                onClick={() => setPlatformFilter('lolka')}
+                className={platformFilter === 'lolka' ? 'bg-purple-500 hover:bg-purple-600' : ''}
+              >
+                Lolka ({lolkaServers.length})
+              </Button>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={syncAllPlatforms} disabled={syncing} variant="secondary">
+                {syncing ? '🔄 Синхронизируем...' : '🔄 Синхронизировать'}
+              </Button>
+              <Button onClick={openModal}>
+                <Plus className="w-4 h-4 mr-2" />
+                Добавить сервер
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Серверы — адаптивная сетка */}
         {loading ? (
           <div className="text-center py-16">
             <div className="inline-block">
@@ -315,84 +260,85 @@ export default function ServersPage() {
           </div>
         ) : (
           <div className="space-y-10">
-            {/* VK Section */}
-            <section>
-              <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-[rgb(var(--text))]">
-                <span className="text-blue-500">🔵</span>
-                ВКонтакте
-                <span className="text-sm font-normal text-[rgb(var(--text-secondary))]">({vkServers.length})</span>
-              </h2>
-              {vkServers.length === 0 ? (
-                <p className="text-[rgb(var(--text-secondary))] text-sm">Нет подключённых сообществ VK</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {vkServers.map(s => (
-                    <ServerCard
-                      key={s.id}
-                      server={s}
-                      selected={s.server_id === selectedServerId}
-                      onSelect={() => selectServer(s.server_id)}
-                      onRemove={() => removeServer(s.id)}
-                      deleting={deletingId === s.id}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* Lolka Section */}
-            <section>
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-[rgb(var(--text))]">
-                  <span className="text-purple-500">💜</span>
-                  Lolka
-                  <span className="text-sm font-normal text-[rgb(var(--text-secondary))]">({lolkaServers.length})</span>
+            {platformFilter !== 'lolka' && (
+              <section>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-[rgb(var(--text))]">
+                  <span className="text-blue-500">🔵</span>
+                  ВКонтакте
+                  <span className="text-sm font-normal text-[rgb(var(--text-secondary))]">({vkServers.length})</span>
                 </h2>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {botStatus && (
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-                      botStatus.connected
-                        ? 'bg-green-500/10 text-green-500 border border-green-500/30'
-                        : botStatus.configured
-                          ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/30'
-                          : 'bg-red-500/10 text-red-500 border border-red-500/30'
-                    }`}>
-                      <span className={`w-2 h-2 rounded-full ${
-                        botStatus.connected ? 'bg-green-400' : botStatus.configured ? 'bg-yellow-400' : 'bg-red-400'
-                      }`}></span>
-                      {botStatus.connected ? 'Бот подключён' : botStatus.configured ? 'Ждём соединения' : 'Не настроен'}
-                    </span>
-                  )}
-                  <Button onClick={inviteBot} disabled={inviteLoading} size="sm" variant="outline">
-                    {inviteLoading ? 'Открываем...' : '➕ Добавить бота на сервер'}
-                  </Button>
+                {vkServers.length === 0 ? (
+                  <p className="text-[rgb(var(--text-secondary))] text-sm">Нет подключённых сообществ VK</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {vkServers.map(s => (
+                      <ServerCard
+                        key={s.id}
+                        server={s}
+                        selected={s.server_id === selectedServerId}
+                        onSelect={() => selectServer(s.server_id)}
+                        onRemove={() => removeServer(s.id)}
+                        deleting={deletingId === s.id}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {platformFilter !== 'vk' && (
+              <section>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-2xl font-bold flex items-center gap-2 text-[rgb(var(--text))]">
+                    <span className="text-purple-500">💜</span>
+                    Lolka
+                    <span className="text-sm font-normal text-[rgb(var(--text-secondary))]">({lolkaServers.length})</span>
+                  </h2>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {botStatus && (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                        botStatus.connected
+                          ? 'bg-green-500/10 text-green-500 border border-green-500/30'
+                          : botStatus.configured
+                            ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/30'
+                            : 'bg-red-500/10 text-red-500 border border-red-500/30'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full ${
+                          botStatus.connected ? 'bg-green-400' : botStatus.configured ? 'bg-yellow-400' : 'bg-red-400'
+                        }`}></span>
+                        {botStatus.connected ? 'Бот подключён' : botStatus.configured ? 'Ждём соединения' : 'Не настроен'}
+                      </span>
+                    )}
+                    <Button onClick={inviteBot} disabled={inviteLoading} size="sm" variant="outline">
+                      {inviteLoading ? 'Открываем...' : '➕ Добавить бота на сервер'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              {inviteError && (
-                <p className="text-red-400 text-xs mb-3">⚠️ {inviteError}</p>
-              )}
-              {lolkaServers.length === 0 ? (
-                <p className="text-[rgb(var(--text-secondary))] text-sm">Нет подключённых серверов Lolka</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {lolkaServers.map(s => (
-                    <ServerCard
-                      key={s.id}
-                      server={s}
-                      selected={s.server_id === selectedServerId}
-                      onSelect={() => selectServer(s.server_id)}
-                      onRemove={() => removeServer(s.id)}
-                      deleting={deletingId === s.id}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+                {inviteError && (
+                  <p className="text-red-400 text-xs mb-3">⚠️ {inviteError}</p>
+                )}
+                {lolkaServers.length === 0 ? (
+                  <p className="text-[rgb(var(--text-secondary))] text-sm">Нет подключённых серверов Lolka</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {lolkaServers.map(s => (
+                      <ServerCard
+                        key={s.id}
+                        server={s}
+                        selected={s.server_id === selectedServerId}
+                        onSelect={() => selectServer(s.server_id)}
+                        onRemove={() => removeServer(s.id)}
+                        deleting={deletingId === s.id}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
           </div>
         )}
       </div>
 
-      {/* Плавающие кнопки на мобайле */}
       <div className="md:hidden fixed bottom-6 right-6 z-40 flex flex-col gap-3">
         <Button
           onClick={syncAllPlatforms}
@@ -414,7 +360,6 @@ export default function ServersPage() {
         </Button>
       </div>
 
-      {/* Модалка добавления сервера */}
       {showModal && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"

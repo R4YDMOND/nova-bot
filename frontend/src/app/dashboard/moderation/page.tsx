@@ -12,16 +12,14 @@ import {
   Shield, Bot, Scale, ScrollText, UserCog, ClipboardList,
   Ban, ShieldAlert, Filter, Link as LinkIcon, Users, Smile,
   Type, Repeat, AlertTriangle, VolumeX, Gavel, Mail, FileText,
-  MessageSquare, Sparkles, Search, Check, Save, BarChart3,
-  Circle, Bell, Moon, Sun, TrendingUp, Lock, Eye, Swords,
-  Hammer, CheckCircle, MessageSquareOff, ShieldCheck, ShieldOff,
-  Plug, Unplug, Trash2, TestTube, Skull, Ghost, UserPlus
+  MessageSquare, Sparkles, Search, Check, Save,
+  MessageSquareOff, Lock, Eye, Swords,
+  Hammer, Plug, Trash2, TestTube, Skull, Ghost, UserPlus
 } from 'lucide-react';
 
-const API_URL = 'https://nova-bot-rpsy.onrender.com';
 const MODULE_NAME = 'moderation';
 
-type Server = DashboardServer; // используем полный тип из API
+type Server = DashboardServer;
 type Platform = 'vk' | 'lolka';
 type Tab = 'protection' | 'auto' | 'punish' | 'rules' | 'moderator' | 'log';
 type LogFilter = 'all' | 'warn' | 'mute' | 'ban';
@@ -70,8 +68,6 @@ type LogEntry = {
   created_at: string;
 };
 
-
-// ── VK Connection (ТЗ №5) ──
 type VKConnectionData = {
   id: number;
   group_id: string;
@@ -99,12 +95,16 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 export default function ModerationPage() {
-  const { servers, selectedServer, selectedServerId, selectServer, loading: serverLoading } = useServer();
-  const [platformFilter, setPlatformFilter] = useState<Platform>('vk');
+  const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState<Tab>('protection');
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Платформа определяется выбранным сервером из глобального провайдера
+  const platformFilter = selectedServer?.platform || 'vk';
+  const effectiveServer = selectedServer;
+  const effectiveServerId = effectiveServer?.id ?? selectedServerId;
 
   const [stats, setStats] = useState({ blocked: 0, warnings: 0, captcha_solved: 0, total_events: 0 });
   const [statsPeriod, setStatsPeriod] = useState<'24h' | '7d' | '30d'>('7d');
@@ -117,27 +117,6 @@ export default function ModerationPage() {
   const [logLoading, setLogLoading] = useState(true);
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-
-
-
-  const filteredServers = useMemo(() => servers.filter((s: Server) => s.platform === platformFilter), [servers, platformFilter]);
-
-  const effectiveServer = useMemo(() => {
-    if (selectedServer && selectedServer.platform === platformFilter) return selectedServer;
-    return filteredServers[0] || null;
-  }, [selectedServer, platformFilter, filteredServers]);
-
-  const effectiveServerId = effectiveServer?.id ?? selectedServerId;
-
-  // ── Синхронизация с глобальным ServerProvider (хедер + /dashboard/servers) ──
-  // effectiveServer может отличаться от selectedServer (fallback на filteredServers[0]
-  // при смене фильтра платформы) — без этого хедер и страница /dashboard/servers
-  // показывают не тот сервер, что реально отображается/редактируется здесь.
-  useEffect(() => {
-    if (effectiveServer && effectiveServer.server_id !== selectedServerId) {
-      selectServer(effectiveServer.server_id);
-    }
-  }, [effectiveServer, selectedServerId, selectServer]);
 
   // ── VK Connection state (ТЗ №5) ──
   const [vkConnections, setVkConnections] = useState<VKConnectionData[]>([]);
@@ -269,7 +248,6 @@ export default function ModerationPage() {
         return;
       }
       alert('Действие выполнено успешно');
-      // Перезагружаем лог
       api.moderation.getLog(effectiveServer.server_id, 50)
         .then((d) => setAuditLog(d.entries as LogEntry[] || []));
     } catch {
@@ -290,54 +268,19 @@ export default function ModerationPage() {
     return <div className="p-8 text-[rgb(var(--text-secondary))]">Загрузка...</div>;
   }
 
-  if (filteredServers.length === 0) {
-    return (
-      <div className="p-6 lg:p-8 max-w-3xl mx-auto">
-        <NoServerSelected
-          heading={`Нет серверов ${platformFilter === 'vk' ? 'VK' : 'Lolka'}`}
-          description={`Добавьте и настройте сервер ${platformFilter === 'vk' ? 'VK' : 'Lolka'} на странице управления серверами.`}
-          link="/dashboard/servers"
-          linkText="Перейти к серверам"
-        />
-      </div>
-    );
-  }
-
   if (!effectiveServer) {
     return <NoServerSelected title="Модерация" />;
   }
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold text-[rgb(var(--text))] mb-1 flex items-center gap-2">
-        <Shield className="w-6 h-6 text-cyan-400" />
-        Модерация
-      </h1>
-      <p className="text-[rgb(var(--text-secondary))] text-sm mb-5">Защита, автомодерация, правила и журнал</p>
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border mb-5 bg-[rgb(var(--surface-2))] border-[rgb(var(--border))]">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-secondary))]">Платформа:</span>
-          <div className="flex p-1 rounded-lg border bg-[rgb(var(--surface))] border-[rgb(var(--border))]">
-            {[
-              { id: 'vk' as Platform, label: 'VK', color: 'bg-blue-500' },
-              { id: 'lolka' as Platform, label: 'Lolka', color: 'bg-purple-500' }
-            ].map(p => (
-              <button
-                key={p.id}
-                onClick={() => setPlatformFilter(p.id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all',
-                  platformFilter === p.id
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
-                )}
-              >
-                <span className={cn("w-2 h-2 rounded-full", p.color)} />
-                <span>{p.label}</span>
-              </button>
-            ))}
-          </div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-[rgb(var(--text))] flex items-center gap-2">
+            <Shield className="w-6 h-6 text-cyan-400" />
+            Модерация
+          </h1>
+          <p className="text-[rgb(var(--text-secondary))] text-sm mt-1">Защита, автомодерация, правила и журнал</p>
         </div>
         <Button onClick={save} disabled={saving} variant="gradient" className="flex items-center gap-1.5 text-sm">
           {saving ? 'Сохранение...' : saved ? <><Check className="w-4 h-4" /> Сохранено!</> : <><Save className="w-4 h-4" /> Сохранить настройки</>}
