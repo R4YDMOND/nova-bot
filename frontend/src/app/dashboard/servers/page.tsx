@@ -3,17 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
-import { api } from '@/lib/api';
+import { api, DashboardServer } from '@/lib/api';
 import { useServer } from '@/context/ServerProvider';
 import { Plus, Trash2, X } from 'lucide-react';
 import { PlatformIcon, PLATFORM_LABEL } from '@/components/PlatformIcon';
-
-type PlatformFilter = 'all' | 'vk' | 'lolka';
-const FILTER_TABS: { value: PlatformFilter; label: string }[] = [
-  { value: 'all', label: 'Все' },
-  { value: 'vk', label: 'VK' },
-  { value: 'lolka', label: 'Lolka' },
-];
 
 type Detection =
   | { status: 'ok'; platform: 'vk' | 'lolka'; id: string; label: string }
@@ -57,16 +50,83 @@ function detectServerLink(raw: string): Detection | null {
   return null;
 }
 
+function ServerCard({
+  server, selected, onSelect, onRemove, deleting,
+}: {
+  server: DashboardServer;
+  selected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <Card
+      className={`group relative flex flex-col items-center text-center gap-4 p-6 min-h-[200px] cursor-pointer transition-all hover:shadow-lg ${
+        selected
+          ? 'border-2 border-primary bg-primary/5'
+          : 'border border-[rgb(var(--border))] hover:border-primary/40'
+      }`}
+      onClick={onSelect}
+    >
+      {/* Аватар: единый формат 64x64px, круглый. Значок платформы — бейдж поверх аватара */}
+      <div className="relative w-16 h-16 shrink-0">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center overflow-hidden">
+          {server.icon_url ? (
+            <img src={server.icon_url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <PlatformIcon platform={server.platform} className="w-8 h-8 rounded-lg" />
+          )}
+        </div>
+        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full ring-2 ring-[rgb(var(--surface))] overflow-hidden bg-[rgb(var(--surface))]">
+          <PlatformIcon platform={server.platform} className="w-6 h-6" />
+        </div>
+      </div>
+
+      {/* Название и платформа */}
+      <div className="w-full">
+        <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{server.name}</h3>
+        <div className="flex justify-center mt-2">
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
+            <PlatformIcon platform={server.platform} className="w-3.5 h-3.5 rounded" /> {PLATFORM_LABEL[server.platform]}
+          </span>
+        </div>
+      </div>
+
+      {/* Участники */}
+      <div className="text-sm text-[rgb(var(--text))] font-semibold">
+        👥 {server.member_count > 0 ? server.member_count.toLocaleString('ru-RU') : 'N/A'}
+      </div>
+
+      {/* ID */}
+      <div className="text-xs text-[rgb(var(--text-secondary))] font-mono">
+        ID: {server.server_id}
+      </div>
+
+      {/* Статус */}
+      {selected && (
+        <div className="text-xs text-primary font-bold">✓ Выбран</div>
+      )}
+
+      {/* Кнопка удаления */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        disabled={deleting}
+        className="p-2 rounded-lg text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 md:opacity-0 md:group-hover:opacity-100"
+        title="Удалить из панели"
+      >
+        <Trash2 className="w-5 h-5" />
+      </button>
+    </Card>
+  );
+}
+
 export default function ServersPage() {
   const { servers, loading, selectedServerId, selectServer, refresh } = useServer();
 
-  // Фильтр платформ: серверы уже загружены один раз в ServerProvider (кэш в React state),
-  // поэтому переключение вкладок — это чистая фильтрация на клиенте, без запросов к API.
-  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>('all');
-  const filteredServers = useMemo(() => {
-    if (platformFilter === 'all') return servers;
-    return servers.filter(s => s.platform === platformFilter);
-  }, [servers, platformFilter]);
+  // Раздельные блоки VK/Lolka (ТЗ №4.1, п. 2.1.2) — оба показываются одновременно,
+  // без табов-фильтра: серверы уже в кэше ServerProvider, фильтрация чисто на клиенте.
+  const vkServers = useMemo(() => servers.filter(s => s.platform === 'vk'), [servers]);
+  const lolkaServers = useMemo(() => servers.filter(s => s.platform === 'lolka'), [servers]);
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', server_id: '', platform: 'vk' as 'vk' | 'lolka', webhook_url: '' });
@@ -184,49 +244,6 @@ export default function ServersPage() {
 
   return (
     <div className="min-h-screen pb-32 md:pb-8">
-      {/* Главный баннер — Nova Bot Status */}
-      <div className="bg-gradient-to-r from-primary via-secondary to-primary bg-[length:200%_100%] animate-gradient px-4 sm:px-8 py-12 sm:py-16 rounded-b-3xl shadow-xl">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white/10 backdrop-blur flex items-center justify-center shrink-0 overflow-hidden p-4 sm:p-5">
-              <PlatformIcon platform="lolka" className="w-full h-full rounded-xl" />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Nova Bot в Lolka</h1>
-              <p className="text-white/80 text-sm sm:text-base mb-4">
-                Управляйте подключёнными сообществами VK и серверами Lolka
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                {botStatus && (
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
-                      botStatus.connected
-                        ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                        : botStatus.configured
-                          ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-                          : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                    }`}>
-                      <span className={`w-2 h-2 rounded-full ${
-                        botStatus.connected ? 'bg-green-400' : botStatus.configured ? 'bg-yellow-400' : 'bg-red-400'
-                      }`}></span>
-                      {botStatus.connected ? 'Бот подключён' : botStatus.configured ? 'Ждём соединения' : 'Не настроен'}
-                    </span>
-                  </div>
-                )}
-                <Button 
-                  onClick={inviteBot} 
-                  disabled={inviteLoading}
-                  className="bg-white/20 hover:bg-white/30 text-white border border-white/30 w-full sm:w-auto"
-                  variant="outline"
-                >
-                  {inviteLoading ? 'Открываем...' : '➕ Добавить бота на сервер'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Основной контент */}
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
         {/* Заголовок и кнопки управления */}
@@ -276,31 +293,7 @@ export default function ServersPage() {
           </div>
         </div>
 
-        {/* Фильтр платформ — данные уже в кэше (ServerProvider), переключение мгновенное */}
-        {!loading && servers.length > 0 && (
-          <div className="flex gap-2 mb-6 flex-wrap">
-            {FILTER_TABS.map(tab => {
-              const count = tab.value === 'all' ? servers.length : servers.filter(s => s.platform === tab.value).length;
-              const active = platformFilter === tab.value;
-              return (
-                <button
-                  key={tab.value}
-                  onClick={() => setPlatformFilter(tab.value)}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    active
-                      ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-md'
-                      : 'bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] border border-[rgb(var(--border))] hover:border-primary/40'
-                  }`}
-                >
-                  {tab.value !== 'all' && <PlatformIcon platform={tab.value} className="w-4 h-4 rounded" />}
-                  {tab.label} <span className={active ? 'text-white/80' : 'text-[rgb(var(--text-secondary))]'}>({count})</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Сетка/список серверов — адаптивная */}
+        {/* Серверы — адаптивная сетка */}
         {loading ? (
           <div className="text-center py-16">
             <div className="inline-block">
@@ -320,78 +313,82 @@ export default function ServersPage() {
               Добавить сервер
             </Button>
           </div>
-        ) : filteredServers.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-xl font-semibold text-[rgb(var(--text))] mb-2">Нет серверов на этой платформе</h3>
-            <p className="text-[rgb(var(--text-secondary))]">Попробуйте выбрать другую вкладку фильтра</p>
-          </div>
         ) : (
-          <>
-            {/* Адаптивная сетка: 1 колонка mobile / 2 tablet / 3 desktop */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredServers.map(s => (
-                <Card
-                  key={s.id}
-                  className={`group relative flex flex-col items-center text-center gap-4 p-6 min-h-[200px] cursor-pointer transition-all hover:shadow-lg ${
-                    s.server_id === selectedServerId
-                      ? 'border-2 border-primary bg-primary/5'
-                      : 'border border-[rgb(var(--border))] hover:border-primary/40'
-                  }`}
-                  onClick={() => selectServer(s.server_id)}
-                >
-                  {/* Аватар: единый формат 64x64px, круглый. Значок платформы — бейдж поверх аватара */}
-                  <div className="relative w-16 h-16 shrink-0">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center overflow-hidden">
-                      {s.icon_url ? (
-                        <img src={s.icon_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <PlatformIcon platform={s.platform} className="w-8 h-8 rounded-lg" />
-                      )}
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full ring-2 ring-[rgb(var(--surface))] overflow-hidden bg-[rgb(var(--surface))]">
-                      <PlatformIcon platform={s.platform} className="w-6 h-6" />
-                    </div>
-                  </div>
+          <div className="space-y-10">
+            {/* VK Section */}
+            <section>
+              <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-[rgb(var(--text))]">
+                <span className="text-blue-500">🔵</span>
+                ВКонтакте
+                <span className="text-sm font-normal text-[rgb(var(--text-secondary))]">({vkServers.length})</span>
+              </h2>
+              {vkServers.length === 0 ? (
+                <p className="text-[rgb(var(--text-secondary))] text-sm">Нет подключённых сообществ VK</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {vkServers.map(s => (
+                    <ServerCard
+                      key={s.id}
+                      server={s}
+                      selected={s.server_id === selectedServerId}
+                      onSelect={() => selectServer(s.server_id)}
+                      onRemove={() => removeServer(s.id)}
+                      deleting={deletingId === s.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
 
-                  {/* Название и платформа */}
-                  <div className="w-full">
-                    <h3 className="font-bold text-base truncate text-[rgb(var(--text))]">{s.name}</h3>
-                    <div className="flex justify-center mt-2">
-                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
-                        <PlatformIcon platform={s.platform} className="w-3.5 h-3.5 rounded" /> {PLATFORM_LABEL[s.platform]}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Участники */}
-                  <div className="text-sm text-[rgb(var(--text))] font-semibold">
-                    👥 {s.member_count > 0 ? s.member_count.toLocaleString('ru-RU') : 'N/A'}
-                  </div>
-
-                  {/* ID */}
-                  <div className="text-xs text-[rgb(var(--text-secondary))] font-mono">
-                    ID: {s.server_id}
-                  </div>
-
-                  {/* Статус */}
-                  {s.server_id === selectedServerId && (
-                    <div className="text-xs text-primary font-bold">✓ Выбран</div>
+            {/* Lolka Section */}
+            <section>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 className="text-2xl font-bold flex items-center gap-2 text-[rgb(var(--text))]">
+                  <span className="text-purple-500">💜</span>
+                  Lolka
+                  <span className="text-sm font-normal text-[rgb(var(--text-secondary))]">({lolkaServers.length})</span>
+                </h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {botStatus && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                      botStatus.connected
+                        ? 'bg-green-500/10 text-green-500 border border-green-500/30'
+                        : botStatus.configured
+                          ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/30'
+                          : 'bg-red-500/10 text-red-500 border border-red-500/30'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        botStatus.connected ? 'bg-green-400' : botStatus.configured ? 'bg-yellow-400' : 'bg-red-400'
+                      }`}></span>
+                      {botStatus.connected ? 'Бот подключён' : botStatus.configured ? 'Ждём соединения' : 'Не настроен'}
+                    </span>
                   )}
-
-                  {/* Кнопка удаления */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeServer(s.id); }}
-                    disabled={deletingId === s.id}
-                    className="p-2 rounded-lg text-[rgb(var(--text-secondary))] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 md:opacity-0 md:group-hover:opacity-100"
-                    title="Удалить из панели"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </Card>
-              ))}
-            </div>
-          </>
+                  <Button onClick={inviteBot} disabled={inviteLoading} size="sm" variant="outline">
+                    {inviteLoading ? 'Открываем...' : '➕ Добавить бота на сервер'}
+                  </Button>
+                </div>
+              </div>
+              {inviteError && (
+                <p className="text-red-400 text-xs mb-3">⚠️ {inviteError}</p>
+              )}
+              {lolkaServers.length === 0 ? (
+                <p className="text-[rgb(var(--text-secondary))] text-sm">Нет подключённых серверов Lolka</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {lolkaServers.map(s => (
+                    <ServerCard
+                      key={s.id}
+                      server={s}
+                      selected={s.server_id === selectedServerId}
+                      onSelect={() => selectServer(s.server_id)}
+                      onRemove={() => removeServer(s.id)}
+                      deleting={deletingId === s.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         )}
       </div>
 
