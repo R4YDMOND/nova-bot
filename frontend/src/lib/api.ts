@@ -30,11 +30,9 @@ export type AuthUser = { id: number; email: string };
 
 // ── Типы модерации (ТЗ №4) ─────────────────────────────────────────────
 
-export type ModerationEventItem = {
-  type: string;
-  title: string;
-  description: string;
-  created_at: string;
+export type ModerationTimelinePoint = {
+  date: string;
+  count: number;
 };
 
 export type ModerationStatsResponse = {
@@ -45,6 +43,7 @@ export type ModerationStatsResponse = {
     total_events: number;
   };
   recent_events: ModerationEventItem[];
+  timeline: ModerationTimelinePoint[];
   platform: string;
   period?: string;
 };

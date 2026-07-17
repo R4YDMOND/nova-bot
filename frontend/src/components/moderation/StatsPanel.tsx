@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { EventItem } from './EventItem';
+import { ActivityChart } from './ActivityChart';
 import { cn } from '@/lib/utils';
 
 type Platform = 'vk' | 'lolka';
@@ -24,12 +25,18 @@ type Server = {
   member_count: number;
 };
 
+type TimelinePoint = {
+  date: string;
+  count: number;
+};
+
 type StatsPeriod = '24h' | '7d' | '30d';
 
 interface StatsPanelProps {
   server: Server | null;
   stats: ModerationStats;
   events: ModerationEvent[];
+  timeline?: TimelinePoint[];
   isLoading: boolean;
   platform: Platform;
   period: StatsPeriod;
@@ -40,6 +47,7 @@ export function StatsPanel({
   server,
   stats,
   events,
+  timeline = [],
   isLoading,
   platform,
   period,
@@ -173,6 +181,28 @@ export function StatsPanel({
               <EventItem key={idx} event={event} platform={platform} />
             ))}
           </div>
+        )}
+      </Card>
+      {/* Activity */}
+      <Card className="p-5 space-y-4">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-[rgb(var(--text))]">
+          Активность
+        </h4>
+        {isLoading ? (
+          <div className="py-6 text-center text-xs text-[rgb(var(--text-secondary))]">
+            Загрузка...
+          </div>
+        ) : timeline.every((p) => p.count === 0) ? (
+          <div className="text-center py-6">
+            <p className="text-xs font-bold text-[rgb(var(--text))] mb-1">
+              Активность пока не собирается
+            </p>
+            <p className="text-[10px] text-[rgb(var(--text-secondary))]">
+              События модерации отсутствуют для этой платформы.
+            </p>
+          </div>
+        ) : (
+          <ActivityChart points={timeline} period={period} />
         )}
       </Card>
     </div>

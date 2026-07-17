@@ -30,11 +30,9 @@ export function ServerCard({ server, selected, onSelect, onRemove, deleting }: S
     <Card 
       className={cn(
         'relative overflow-hidden transition-all hover:shadow-lg cursor-pointer group',
-        selected
-          ? 'border-2 border-primary'
-          : server.platform === 'vk' 
-            ? 'border-2 border-blue-500/30 hover:border-blue-500/50' 
-            : 'border-2 border-purple-500/30 hover:border-purple-500/50'
+        server.platform === 'vk' 
+          ? 'border-2 border-blue-500/30 hover:border-blue-500/50' 
+          : 'border-2 border-purple-500/30 hover:border-purple-500/50'
       )}
       onClick={onSelect}
     >
@@ -73,13 +71,13 @@ export function ServerCard({ server, selected, onSelect, onRemove, deleting }: S
         <div className="flex items-center gap-2">
           <div className={cn(
             "w-2 h-2 rounded-full",
-            isActive ? "bg-green-500" : "bg-yellow-500"
+            selected ? "bg-green-500" : "bg-yellow-500"
           )} />
           <span className={cn(
             "text-xs font-medium",
-            isActive ? "text-green-500" : "text-yellow-500"
+            selected ? "text-green-500" : "text-yellow-500"
           )}>
-            {isActive ? 'Подключен' : 'Ограничен'}
+            {selected ? 'Подключен' : 'Ограничен'}
           </span>
         </div>
 

@@ -2415,6 +2415,12 @@ PERIOD_DELTAS = {
     "30d": timedelta(days=30),
 }
 
+TIMELINE_BUCKETS = {
+    "24h": (24, timedelta(hours=1)),
+    "7d": (7, timedelta(days=1)),
+    "30d": (30, timedelta(days=1)),
+}
+
 
 @app.get("/api/moderation/stats")
 async def get_moderation_stats(
@@ -2443,6 +2449,18 @@ async def get_moderation_stats(
 
         recent_events = sorted(events, key=lambda x: x.created_at, reverse=True)[:5]
 
+        bucket_count, bucket_size = TIMELINE_BUCKETS.get(period, TIMELINE_BUCKETS["7d"])
+        buckets = [0] * bucket_count
+        for e in events:
+            idx = int((e.created_at - since) / bucket_size)
+            if 0 <= idx < bucket_count:
+                buckets[idx] += 1
+
+        timeline = [
+            {"date": (since + bucket_size * i).isoformat(), "count": buckets[i]}
+            for i in range(bucket_count)
+        ]
+
         return {
             "stats": {
                 "blocked": blocked,
@@ -2460,7 +2478,7 @@ async def get_moderation_stats(
                 for e in recent_events
             ],
            "platform": platform,
-            "period": period
+            "period": platform,
         }
     finally:
         db.close()
