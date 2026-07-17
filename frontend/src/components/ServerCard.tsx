@@ -1,5 +1,4 @@
 'use client';
-
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,11 +26,11 @@ export function ServerCard({ server, selected, onSelect, onRemove, deleting }: S
   };
 
   return (
-    <Card 
+    <Card
       className={cn(
         'relative overflow-hidden transition-all hover:shadow-lg cursor-pointer group',
-        server.platform === 'vk' 
-          ? 'border-2 border-blue-500/30 hover:border-blue-500/50' 
+        server.platform === 'vk'
+          ? 'border-2 border-blue-500/30 hover:border-blue-500/50'
           : 'border-2 border-purple-500/30 hover:border-purple-500/50'
       )}
       onClick={onSelect}
@@ -56,7 +55,6 @@ export function ServerCard({ server, selected, onSelect, onRemove, deleting }: S
             )}
           </div>
         </div>
-        
         <CardTitle className="text-base font-bold truncate text-[rgb(var(--text))]">{server.name}</CardTitle>
         <CardDescription className="space-y-1 text-xs">
           <div className="font-mono text-[rgb(var(--text-secondary))]">ID: {server.server_id}</div>
@@ -68,16 +66,17 @@ export function ServerCard({ server, selected, onSelect, onRemove, deleting }: S
       </CardHeader>
 
       <CardContent className="pt-2 pb-4 flex flex-col items-center gap-3">
+        {/* ИСПРАВЛЕНИЕ: Используем isActive вместо selected */}
         <div className="flex items-center gap-2">
           <div className={cn(
             "w-2 h-2 rounded-full",
-            selected ? "bg-green-500" : "bg-yellow-500"
+            isActive ? "bg-green-500" : "bg-yellow-500"
           )} />
           <span className={cn(
             "text-xs font-medium",
-            selected ? "text-green-500" : "text-yellow-500"
+            isActive ? "text-green-500" : "text-yellow-500"
           )}>
-            {selected ? 'Подключен' : 'Ограничен'}
+            {isActive ? 'Подключен' : 'Ограничено'}
           </span>
         </div>
 
@@ -91,7 +90,6 @@ export function ServerCard({ server, selected, onSelect, onRemove, deleting }: S
           >
             Настроить
           </Button>
-          
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
             disabled={deleting}

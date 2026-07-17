@@ -105,13 +105,15 @@ export default function ModerationPage() {
   const [stats, setStats] = useState({ blocked: 0, warnings: 0, captcha_solved: 0, total_events: 0 });
   const [statsPeriod, setStatsPeriod] = useState<'24h' | '7d' | '30d'>('7d');
   const [events, setEvents] = useState<Array<{ type: string; title: string; description: string; created_at: string }>>([]);
+  
+  // ИСПРАВЛЕНИЕ 1: Добавлен стейт для таймлайна
+  const [timeline, setTimeline] = useState<Array<{ date: string; count: number }>>([]);
+  
   const [statsLoading, setStatsLoading] = useState(false);
-
   const [logFilter, setLogFilter] = useState<LogFilter>('all');
   const [logSearch, setLogSearch] = useState('');
   const [auditLog, setAuditLog] = useState<LogEntry[]>([]);
   const [logLoading, setLogLoading] = useState(true);
-
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
   const filteredServers = useMemo(() => servers.filter((s: Server) => s.platform === platformFilter), [servers, platformFilter]);
@@ -206,10 +208,13 @@ export default function ModerationPage() {
       .then(res => {
         setStats(res.stats);
         setEvents(res.recent_events);
+        // ИСПРАВЛЕНИЕ 2: Сохраняем таймлайн из ответа API
+        setTimeline(res.timeline || []);
       })
       .catch(() => {
         setStats({ blocked: 0, warnings: 0, captcha_solved: 0, total_events: 0 });
         setEvents([]);
+        setTimeline([]); // Сбрасываем при ошибке
       })
       .finally(() => setStatsLoading(false));
   }, [effectiveServer, platformFilter, statsPeriod]);
@@ -357,80 +362,78 @@ export default function ModerationPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-
         <div className="lg:col-span-4 space-y-5">
           <div className={cn(
-          "grid transition-all ease-out duration-500",
-          platformFilter === 'vk' ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-        )}>
-          <div className="overflow-hidden">
-          <Card className="p-5">
-            <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
-              <Plug className="w-5 h-5 text-blue-400" />
-              Подключение VK
-            </h3>
-            {vkLoading ? (
-              <p className="text-[rgb(var(--text-secondary))] text-sm">Загрузка...</p>
-            ) : vkConnections.length > 0 ? (
-              <div className="space-y-3">
-                {vkConnections.map(conn => (
-                  <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-2))]">
-                    <div>
-                      <div className="text-[rgb(var(--text))] font-medium text-sm">{conn.group_name || `Сообщество ${conn.group_id}`}</div>
-                      <div className="text-[rgb(var(--text-secondary))] text-xs">ID: {conn.group_id}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => testVK(conn.id)} disabled={vkTesting === conn.id}
-                        className="p-2 rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface))] transition-colors disabled:opacity-50">
-                        <TestTube className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => disconnectVK(conn.id)}
-                        className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+            "grid transition-all ease-out duration-500",
+            platformFilter === 'vk' ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          )}>
+            <div className="overflow-hidden">
+              <Card className="p-5">
+                <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
+                  <Plug className="w-5 h-5 text-blue-400" />
+                  Подключение VK
+                </h3>
+                {vkLoading ? (
+                  <p className="text-[rgb(var(--text-secondary))] text-sm">Загрузка...</p>
+                ) : vkConnections.length > 0 ? (
+                  <div className="space-y-3">
+                    {vkConnections.map(conn => (
+                      <div key={conn.id} className="flex items-center justify-between p-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--surface-2))]">
+                        <div>
+                          <div className="text-[rgb(var(--text))] font-medium text-sm">{conn.group_name || `Сообщество ${conn.group_id}`}</div>
+                          <div className="text-[rgb(var(--text-secondary))] text-xs">ID: {conn.group_id}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => testVK(conn.id)} disabled={vkTesting === conn.id}
+                            className="p-2 rounded-lg border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface))] transition-colors disabled:opacity-50">
+                            <TestTube className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => disconnectVK(conn.id)}
+                            className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <div>
-                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">ID сообщества</label>
-                  <input type="text" value={vkForm.group_id} onChange={e => setVkForm(f => ({ ...f, group_id: e.target.value }))}
-                    placeholder="240082352" className="w-full input text-sm" />
-                </div>
-                <div>
-                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Токен доступа</label>
-                  <input type="password" value={vkForm.access_token} onChange={e => setVkForm(f => ({ ...f, access_token: e.target.value }))}
-                    placeholder="vk1.a.xxx..." className="w-full input text-sm" />
-                </div>
-                <div>
-                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Код подтверждения Callback</label>
-                  <input type="text" value={vkForm.confirmation_code} onChange={e => setVkForm(f => ({ ...f, confirmation_code: e.target.value }))}
-                    placeholder="a1b2c3d4" className="w-full input text-sm" />
-                </div>
-                <div>
-                  <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Секретный ключ (опционально)</label>
-                  <input type="password" value={vkForm.webhook_secret} onChange={e => setVkForm(f => ({ ...f, webhook_secret: e.target.value }))}
-                    placeholder="secret_key" className="w-full input text-sm" />
-                </div>
-                <Button onClick={connectVK} disabled={vkLoading || !vkForm.group_id || !vkForm.access_token} variant="gradient" className="w-full text-sm">
-                  <Plug className="w-4 h-4 mr-1.5" />
-                  {vkLoading ? 'Подключение...' : 'Подключить сообщество'}
-                </Button>
-                <p className="text-[rgb(var(--text-secondary))] text-xs">
-                  Токен берётся в настройках сообщества: Управление → Настройки → Работа с API → Ключи доступа
-                </p>
-              </div>
-            )}
-          </Card>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">ID сообщества</label>
+                      <input type="text" value={vkForm.group_id} onChange={e => setVkForm(f => ({ ...f, group_id: e.target.value }))}
+                        placeholder="240082352" className="w-full input text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Токен доступа</label>
+                      <input type="password" value={vkForm.access_token} onChange={e => setVkForm(f => ({ ...f, access_token: e.target.value }))}
+                        placeholder="vk1.a.xxx..." className="w-full input text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Код подтверждения Callback</label>
+                      <input type="text" value={vkForm.confirmation_code} onChange={e => setVkForm(f => ({ ...f, confirmation_code: e.target.value }))}
+                        placeholder="a1b2c3d4" className="w-full input text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[rgb(var(--text-secondary))] text-xs block mb-1">Секретный ключ (опционально)</label>
+                      <input type="password" value={vkForm.webhook_secret} onChange={e => setVkForm(f => ({ ...f, webhook_secret: e.target.value }))}
+                        placeholder="secret_key" className="w-full input text-sm" />
+                    </div>
+                    <Button onClick={connectVK} disabled={vkLoading || !vkForm.group_id || !vkForm.access_token} variant="gradient" className="w-full text-sm">
+                      <Plug className="w-4 h-4 mr-1.5" />
+                      {vkLoading ? 'Подключение...' : 'Подключить сообщество'}
+                    </Button>
+                    <p className="text-[rgb(var(--text-secondary))] text-xs">
+                      Токен берётся в настройках сообщества: Управление → Настройки → Работа с API → Ключи доступа
+                    </p>
+                  </div>
+                )}
+              </Card>
+            </div>
           </div>
-        </div>
         </div>
 
         <div className="lg:col-span-4 space-y-5">
-
-        {activeTab === 'protection' && (
+          {activeTab === 'protection' && (
             <Card className="p-5">
               <h3 className="text-lg font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-cyan-400" />
@@ -733,6 +736,7 @@ export default function ModerationPage() {
             server={effectiveServer}
             stats={stats}
             events={events}
+            timeline={timeline} /* ИСПРАВЛЕНИЕ 3: Передаем таймлайн в компонент */
             isLoading={statsLoading}
             platform={platformFilter}
             period={statsPeriod}
