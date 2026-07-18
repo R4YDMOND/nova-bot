@@ -280,6 +280,38 @@ export default function ModerationPage() {
     return matchType && (e.title?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q));
   });
 
+  // ИСПРАВЛЕНИЕ: вынесено из основного return, чтобы переключатель платформы
+  // был доступен и в состоянии "нет серверов на этой платформе" — иначе
+  // пользователь с серверами только на одной платформе не мог переключиться
+  // на вкладку, где сервер есть.
+  const platformSwitcher = (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border mb-5 bg-[rgb(var(--surface-2))] border-[rgb(var(--border))]">
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-secondary))]">Платформа:</span>
+        <div className="flex p-1 rounded-lg border bg-[rgb(var(--surface))] border-[rgb(var(--border))]">
+          {[
+            { id: 'vk' as Platform, label: 'VK', color: 'bg-blue-500' },
+            { id: 'lolka' as Platform, label: 'Lolka', color: 'bg-purple-500' }
+          ].map(p => (
+            <button
+              key={p.id}
+              onClick={() => setPlatformFilter(p.id)}
+              className={cn(
+                'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all',
+                platformFilter === p.id
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
+              )}
+            >
+              <span className={cn("w-2 h-2 rounded-full", p.color)} />
+              <span>{p.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   if (serverLoading || settingsLoading) {
     return <div className="p-8 text-[rgb(var(--text-secondary))]">Загрузка...</div>;
   }
@@ -287,6 +319,7 @@ export default function ModerationPage() {
   if (filteredServers.length === 0) {
     return (
       <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+        {platformSwitcher}
         <NoServerSelected
           heading={`Нет серверов ${platformFilter === 'vk' ? 'VK' : 'Lolka'}`}
           description={`Добавьте и настройте сервер ${platformFilter === 'vk' ? 'VK' : 'Lolka'} на странице управления серверами.`}
@@ -316,32 +349,7 @@ export default function ModerationPage() {
         </Button>
       </div>
 
-      {/* Восстановленный блок переключения платформ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border mb-5 bg-[rgb(var(--surface-2))] border-[rgb(var(--border))]">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-secondary))]">Платформа:</span>
-          <div className="flex p-1 rounded-lg border bg-[rgb(var(--surface))] border-[rgb(var(--border))]">
-            {[
-              { id: 'vk' as Platform, label: 'VK', color: 'bg-blue-500' },
-              { id: 'lolka' as Platform, label: 'Lolka', color: 'bg-purple-500' }
-            ].map(p => (
-              <button
-                key={p.id}
-                onClick={() => setPlatformFilter(p.id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all',
-                  platformFilter === p.id
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
-                )}
-              >
-                <span className={cn("w-2 h-2 rounded-full", p.color)} />
-                <span>{p.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      {platformSwitcher}
 
       <div className="flex flex-wrap gap-1 mb-5">
         {TABS.map(tab => {
