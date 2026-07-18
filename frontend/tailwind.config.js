@@ -13,6 +13,11 @@ module.exports = {
           500: '#22d3ee',
           600: '#06b6d4',
         },
+        // ТЗ 4.2, Technical Requirements: точные брендовые цвета платформ.
+        // Используются вместо generic blue-500/purple-500 (Tailwind
+        // поддерживает /opacity-модификаторы вроде bg-vk/10 для hex-значений).
+        vk: '#0077FF',
+        lolka: '#5865F2',
         primary: 'rgb(var(--primary) / <alpha-value>)',
         secondary: 'rgb(var(--secondary) / <alpha-value>)',
         success: 'rgb(var(--success) / <alpha-value>)',
