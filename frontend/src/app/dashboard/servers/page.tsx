@@ -233,11 +233,12 @@ export default function ServersPage() {
               <Button onClick={openModal}>
                 <Plus className="w-4 h-4 mr-2" />
                 Добавить сервер
-              </div>
+              </Button>
             </div>
           </div>
+        </div>
 
-           {loading ? (
+        {loading ? (
           <div className="text-center py-16">
             <div className="inline-block">
               <div className="w-8 h-8 border-2 border-[rgb(var(--text-secondary))] border-t-primary rounded-full animate-spin"></div>
