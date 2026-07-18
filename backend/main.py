@@ -1,11 +1,14 @@
-from fastapi import FastAPI, Query, HTTPException, Request
+from fastapi import FastAPI, Query, HTTPException, Request, Header, Depends
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, EmailStr
 import hashlib
 import base64
+import logging
 from fastapi.middleware.cors import CORSMiddleware
-from database import init_db, SessionLocal
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection
+from database import init_db, SessionLocal, get_db
+from sqlalchemy.orm import Session
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings
+from ranking.xp_handler import award_xp_for_message
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
 from moderation_engine import ModerationEngine
 from fastapi.responses import PlainTextResponse
@@ -28,6 +31,12 @@ from datetime import datetime, timedelta
 import json
 from typing import Any, Dict
 from sqlalchemy import text
+
+# Импорт для системы уровней (Шаг 2: Формулы и Кэш)
+from ranking.formulas import XPFormulaEngine, XPFormulaConfig, XP_PRESETS
+from ranking.cache import cache, invalidate_cache
+
+logger = logging.getLogger(__name__)
 
 # Временное хранилище PKCE code_verifier (ключ = state)
 vk_pkce_store: dict = {}
@@ -154,16 +163,6 @@ def _normalize_server_id(raw_id: str, platform: str) -> str:
     """
     Приводит server_id к чистому виду, который безопасно ложится в БД
     и сравнивается с Integer-колонками в других таблицах (ModuleConfig и т.д.).
-
-    Принимает как готовый ID, так и вставленную ссылку:
-      - "240082352"                          -> "240082352"
-      - "https://vk.com/club240082352"       -> "240082352"
-      - "https://vk.com/public240082352"     -> "240082352"
-      - "vk.com/club240082352"               -> "240082352"
-
-    Для VK-сообществ с текстовым screen_name (без цифр, например vk.com/durov)
-    однозначно вытащить числовой ID без обращения к VK API нельзя —
-    в этом случае просим ввести ID вручную.
     """
     raw_id = (raw_id or "").strip()
     if not raw_id:
@@ -183,7 +182,6 @@ def _normalize_server_id(raw_id: str, platform: str) -> str:
         )
 
     if platform == "lolka":
-        # Вставленная ссылка вида https://lolka.app/servers/<id> или .../channels/<id>/...
         match = re.search(r"lolka\.app/(?:servers|channels)/(\d+)", raw_id)
         if match:
             return match.group(1)
@@ -194,38 +192,44 @@ def _normalize_server_id(raw_id: str, platform: str) -> str:
             "Укажите ID напрямую или ссылку вида lolka.app/servers/780713670838272."
         )
 
-    # Остальные платформы — просто чистим пробелы
     return raw_id
 
 
+# ── Аудит ТЗ 4.2, P0: авторизация ───────────────────────────────────────────
+def get_current_user(authorization: str = Header(default="")) -> User:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Не авторизован: отсутствует токен")
+
+    token = authorization.split(" ", 1)[1].strip()
+    payload = verify_token(token, expected_type="access")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Невалидный или просроченный токен")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Токен повреждён")
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Пользователь не найден")
+        return user
+    finally:
+        db.close()
+
+
 def _get_server_or_error(db, server_id: str):
-    """
-    Находит сервер по server_id для эндпоинтов сохранения настроек
-    (modules, ai, notifications, auto-forward, reports).
-
-    ВАЖНО: раньше эти эндпоинты при отсутствии сервера тихо создавали
-    новую запись Server(name="Auto-created", ...) — тот же класс бага,
-    что и старый sync_lolka_servers, только с другой стороны: настройки
-    сохранялись для server_id, который ещё не был добавлен администратором
-    на /dashboard/servers (например при гонке состояний на фронте, пока
-    ServerProvider ещё не выбрал реальный сервер, и запрос уходил с
-    server_id="default"). В результате в списке серверов всплывали
-    "призрачные" записи, не добавленные вручную.
-
-    Теперь — никогда не создаём сервер неявно. Если записи нет, вызывающий
-    код должен вернуть понятную ошибку и попросить сначала добавить сервер
-    на странице /dashboard/servers.
-    """
     if not server_id or server_id == "default":
         return None
     return db.query(Server).filter(Server.server_id == server_id).first()
 
 
 @app.get("/api/servers")
-def get_servers(platform: str = Query("")):
+def get_servers(platform: str = Query(""), user: User = Depends(get_current_user)):
     db = SessionLocal()
     try:
-        query = db.query(Server)
+        query = db.query(Server).filter(Server.owner_id == user.id)
         if platform:
             query = query.filter(Server.platform == platform)
         servers = query.all()
@@ -248,7 +252,7 @@ def get_servers(platform: str = Query("")):
         db.close()
 
 @app.post("/api/servers")
-def create_server(data: CreateServerRequest):
+def create_server(data: CreateServerRequest, user: User = Depends(get_current_user)):
     try:
         server_id = _normalize_server_id(data.server_id, data.platform)
     except ValueError as e:
@@ -266,6 +270,7 @@ def create_server(data: CreateServerRequest):
             platform=data.platform,
             icon_url=data.icon_url,
             member_count=data.member_count,
+            owner_id=user.id,
         )
         db.add(server)
         db.commit()
@@ -279,18 +284,6 @@ def create_server(data: CreateServerRequest):
 
 @app.delete("/api/servers/cleanup-ghosts")
 def cleanup_ghost_servers():
-    """
-    Одноразовая очистка: удаляет серверы, которые могли быть созданы
-    старым багом (либо старым sync_lolka_servers, либо settings-эндпоинтами,
-    которые раньше тихо создавали Server(name="Auto-created", ...)).
-
-    Удаляет только записи с именем ровно "Auto-created" — то есть только
-    то, что могло появиться исключительно через автосоздание, а не
-    что-либо добавленное вручную. Настоящие серверы с реальными именами
-    (даже если появились из-за старого бага sync_lolka_servers) эта ручка
-    не трогает — их нужно удалить вручную через кнопку 🗑 на /dashboard/servers,
-    если они не нужны, ровно так же, как любой другой сервер.
-    """
     db = SessionLocal()
     try:
         ghosts = db.query(Server).filter(Server.name == "Auto-created").all()
@@ -307,10 +300,10 @@ def cleanup_ghost_servers():
 
 
 @app.delete("/api/servers/{db_id}")
-def delete_server(db_id: int):
+def delete_server(db_id: int, user: User = Depends(get_current_user)):
     db = SessionLocal()
     try:
-        server = db.query(Server).filter(Server.id == db_id).first()
+        server = db.query(Server).filter(Server.id == db_id, Server.owner_id == user.id).first()
         if not server:
             return {"error": "Сервер не найден"}
         db.delete(server)
@@ -349,7 +342,6 @@ def lolka_webhook(data: dict):
     
     if message.startswith("/ping"):
         response = f"🏓 Понг, {user}!"
-    
     elif message.startswith("/help") or message.startswith("/помощь"):
         response = f"""**🤖 Команды Нова:**
 📊 `/stats` — статистика сервера
@@ -358,7 +350,6 @@ def lolka_webhook(data: dict):
 ❓ `/help` — список команд
 💡 `/hello` — приветствие
 ↗ `/forward ссылка` — переслать контент в каналы"""
-    
     elif message.startswith("/stats"):
         response = f"""**📊 Статистика:**
 👤 Пользователь: {user}
@@ -366,7 +357,6 @@ def lolka_webhook(data: dict):
 🤖 Бот: Нова v0.7.0
 ⚡ Статус: Работает
 🌐 Сервер: {server_id or 'Неизвестный'}"""
-    
     elif message.startswith("/hello") or message.startswith("/привет"):
         greetings = [
             f"✨ Привет, {user}! Я Нова — умный помощник этого сервера!",
@@ -374,7 +364,6 @@ def lolka_webhook(data: dict):
             f"💫 Приветствую, {user}! Чем могу быть полезна?",
         ]
         response = random.choice(greetings)
-    
     elif message.startswith("/forward") or message.startswith("/перешли"):
         urls = extract_urls(message)
         if urls:
@@ -383,7 +372,6 @@ def lolka_webhook(data: dict):
             response = f"🔍 Нашёл {len(urls)} ссылок. Отправляю в подходящие каналы..."
         else:
             response = "❌ Не нашёл ссылок. Используйте: /forward https://..."
-    
     else:
         print(f"💬 {user} написал: {message}")
     
@@ -474,7 +462,6 @@ def save_modules(data: dict):
         
         db.commit()
 
-        # ── Хук логирования события модерации (ТЗ №4) ──
         if any(m.get("name") == "moderation" for m in modules):
             log_event = ModerationEvent(
                 server_id=server.id,
@@ -552,7 +539,6 @@ def save_ai_settings(data: dict):
 
 
 # ==================== API для уведомлений (VK / MAX / Email) ====================
-# Ранее здесь были уведомления через Telegram — полностью заменены на VK, MAX и Email.
 
 @app.get("/api/settings/notifications")
 def get_notification_settings(server_id: str = Query("default")):
@@ -622,7 +608,6 @@ def save_notification_settings(data: dict):
 
 @app.post("/api/settings/notifications/test")
 def test_notification(data: dict):
-    """Отправить тестовое уведомление по выбранному каналу: vk | max | email"""
     channel = data.get("channel", "")
     title = "🔔 Тестовое уведомление Nova Bot"
     message = "Это тестовое уведомление — если вы его видите, канал настроен верно."
@@ -653,10 +638,6 @@ def test_notification(data: dict):
 
 
 # ==================== Lolka OAuth (вход пользователя) ====================
-# OAuth2-логин через приложения Lolka ещё не запущен платформой (раздел
-# "Приложения" в их портале помечен как "скоро"). Пока это так, не дёргаем
-# несуществующие oauth2/authorize и oauth2/token — фронтенд получит понятный
-# статус и покажет "скоро" вместо зависшего редиректа/непонятной ошибки.
 
 @app.get("/api/auth/lolka")
 def auth_lolka():
@@ -680,7 +661,6 @@ def auth_vk():
     redirect_uri = os.getenv("VK_REDIRECT_URI", "")
     state = secrets.token_hex(16)
 
-    # VK ID OAuth 2.1 требует PKCE (code_challenge)
     code_verifier = secrets.token_urlsafe(64)
     digest = hashlib.sha256(code_verifier.encode()).digest()
     code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
@@ -698,6 +678,8 @@ def auth_vk():
         f"&code_challenge_method=S256"
     )
     return {"url": url, "state": state}
+
+
 @app.get("/api/auth/vk/callback")
 def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
     if not code:
@@ -791,7 +773,6 @@ def register(data: RegisterRequest):
 
 @app.get("/api/auth/verify")
 def verify_email(token: str):
-    """Подтверждение e-mail по ссылке из письма"""
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.verification_token == token).first()
@@ -818,7 +799,6 @@ def verify_email(token: str):
 
 @app.post("/api/auth/login")
 def login(data: LoginRequest):
-    """Вход по e-mail и паролю — выдаёт настоящую пару JWT (access + refresh)."""
     db = SessionLocal()
     try:
         email = data.email.strip().lower()
@@ -852,8 +832,6 @@ def login(data: LoginRequest):
 
 @app.post("/api/auth/refresh")
 def refresh_access_token(data: RefreshRequest):
-    """Выдаёт новую пару токенов по действующему refresh-токену (с ротацией —
-    старый refresh-токен сразу перестаёт быть валидным)."""
     db = SessionLocal()
     try:
         payload = verify_token(data.refresh_token, expected_type="refresh")
@@ -862,8 +840,6 @@ def refresh_access_token(data: RefreshRequest):
 
         user = db.query(User).filter(User.id == int(payload["sub"])).first()
         if not user or user.refresh_token != data.refresh_token:
-            # user.refresh_token не совпадает — токен был отозван (logout)
-            # или уже использован раньше (ротация), либо это чужой/поддельный токен
             raise HTTPException(status_code=401, detail="Refresh-токен отозван")
 
         new_payload = {"sub": str(user.id), "email": user.email}
@@ -889,13 +865,10 @@ def refresh_access_token(data: RefreshRequest):
 
 @app.post("/api/auth/logout")
 def logout(data: LogoutRequest):
-    """Отзывает refresh-токен — им больше нельзя будет обновить access-токен,
-    даже если срок действия ещё не истёк."""
     db = SessionLocal()
     try:
         payload = verify_token(data.refresh_token, expected_type="refresh")
         if not payload:
-            # токен и так уже нерабочий — с точки зрения клиента это тоже успешный logout
             return {"status": "ok"}
 
         user = db.query(User).filter(User.id == int(payload["sub"])).first()
@@ -913,8 +886,6 @@ def logout(data: LogoutRequest):
 
 @app.post("/api/auth/resend-verification")
 def resend_verification(data: dict):
-    """Повторно отправить письмо с подтверждением уже существующему,
-    но ещё не подтверждённому аккаунту (без создания нового пользователя)."""
     email = data.get("email", "").strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="email обязателен")
@@ -947,9 +918,6 @@ def resend_verification(data: dict):
 
 @app.post("/api/auth/forgot-password")
 def forgot_password(data: ForgotPasswordRequest):
-    """Запросить восстановление пароля. Ответ одинаковый независимо от того,
-    существует ли такой email в базе — чтобы через этот эндпоинт нельзя было
-    проверять, какие адреса зарегистрированы."""
     db = SessionLocal()
     try:
         email = data.email.strip().lower()
@@ -974,7 +942,6 @@ def forgot_password(data: ForgotPasswordRequest):
             if not sent:
                 print(f"[forgot-password] Письмо для {user.email} НЕ отправлено")
 
-        # Намеренно не сообщаем, найден ли email — одинаковый ответ в обоих случаях
         return {"status": "ok"}
     except Exception as e:
         db.rollback()
@@ -985,8 +952,6 @@ def forgot_password(data: ForgotPasswordRequest):
 
 @app.post("/api/auth/reset-password")
 def reset_password(data: ResetPasswordRequest):
-    """Установить новый пароль по токену из письма. Заодно отзывает
-    все действующие refresh-токены — старые сессии придётся начать заново."""
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.password_reset_token == data.token).first()
@@ -1084,17 +1049,6 @@ def _lolka_bot_headers():
 
 
 def _lolka_bot_request(method: str, url: str, max_retries: int = 3, **kwargs):
-    """
-    Обёртка над запросами к Lolka Bot API с ретраем при 429 — по паттерну
-    Discord (Lolka Bot API прямо позиционируется как Discord-совместимый,
-    см. документацию, раздел «Готовые библиотеки»). Рабочая гипотеза,
-    т.к. точный формат 429 в доках Lolka не расписан отдельно:
-      - ждём время из заголовка Retry-After (или поля retry_after в JSON-теле,
-        как это делает Discord), плюс небольшой запас;
-      - если ни заголовка, ни поля нет — фиксированный backoff 0.5s * попытка.
-    Если это предположение не подтвердится документацией/поведением API —
-    достаточно поправить только эту функцию, все вызовы уже центростремительны.
-    """
     kwargs.setdefault("headers", _lolka_bot_headers())
     kwargs.setdefault("timeout", 10)
     last_resp = None
@@ -1119,13 +1073,12 @@ def _lolka_bot_request(method: str, url: str, max_retries: int = 3, **kwargs):
                 wait = None
         if wait is None:
             wait = 0.5 * (attempt + 1)
-        time.sleep(wait + 0.1)  # небольшой запас, чтобы не постучаться на грани окна
+        time.sleep(wait + 0.1)
     return last_resp
 
 
 @app.get("/api/lolka/bot/gateway")
 def get_lolka_gateway():
-    """URL и лимиты для подключения к Gateway (как discord /gateway/bot)"""
     return {
         "url": LOLKA_GATEWAY_URL,
         "shards": 1,
@@ -1135,7 +1088,6 @@ def get_lolka_gateway():
 
 @app.get("/api/lolka/bot")
 def get_lolka_bot_info():
-    """Статус собственного бота: подключён ли Gateway, какой токен настроен"""
     token = os.getenv("LOLKA_BOT_TOKEN", "")
     if not token:
         return {"configured": False, "connected": False, "bot": None}
@@ -1154,12 +1106,6 @@ def get_lolka_bot_info():
 
 @app.get("/api/lolka/bot/guilds")
 def get_lolka_bot_guilds():
-    """
-    Список серверов (гильдий), где реально состоит бот Nova в Lolka.
-    ВАЖНО: approximate_member_count в ответе появляется только если передать
-    with_counts=true — раньше этот параметр не передавался, из-за чего
-    member_count всегда приходил нулевым (см. документацию: GET /users/@me/guilds).
-    """
     if not os.getenv("LOLKA_BOT_TOKEN", ""):
         return {"error": "LOLKA_BOT_TOKEN не настроен", "guilds": []}
     try:
@@ -1189,12 +1135,6 @@ def get_lolka_bot_guilds():
 
 @app.get("/api/lolka/bot/guilds/available")
 def get_lolka_available_guilds():
-    """
-    Гильдии, где бот состоит, но которые ЕЩЁ НЕ подключены к дашборду Nova
-    (нет строки в servers). Это "кандидаты на добавление" для preview-флоу:
-    админ сам решает, какие из них добавить — в отличие от старого
-    автосинка, который добавлял их все без спроса.
-    """
     guilds_resp = get_lolka_bot_guilds()
     if guilds_resp.get("error"):
         return guilds_resp
@@ -1211,15 +1151,6 @@ def get_lolka_available_guilds():
 
 @app.post("/api/servers/sync-lolka")
 def sync_lolka_servers():
-    """
-    Подтягивает свежие name/icon/member_count для Lolka-серверов, УЖЕ
-    добавленных вручную в servers (platform='lolka'). Не создаёт новые
-    записи — раньше это делало (auto-add по факту членства бота в гильдии),
-    и в проде это привело к тому, что в дашборде сами всплывали серверы,
-    которые администратор не добавлял (бот мог состоять в них по любой
-    причине — тестовый сервер, кто-то пригласил и т.п.). Разделение прав
-    "бот состоит в сервере" и "сервер подключён к дашборду Nova" — сознательное.
-    """
     guilds_resp = get_lolka_bot_guilds()
     if guilds_resp.get("error"):
         return {"status": "error", "error": guilds_resp["error"]}
@@ -1234,7 +1165,7 @@ def sync_lolka_servers():
         for server in existing_servers:
             g = guilds_by_id.get(server.server_id)
             if not g:
-                continue  # бот не(больше) не в этом сервере — оставляем запись как есть, не трогаем
+                continue
             try:
                 icon_url = g.get("icon") or ""
                 server.name = g.get("name", server.name)
@@ -1258,21 +1189,12 @@ def sync_lolka_servers():
 
 
 # ==================== VK: сообщества (groups) ====================
-#
-# ВАЖНО (см. документацию VK + разбор ТЗ): groups.get отдаёт группы
-# ПОЛЬЗОВАТЕЛЯ, а не сообщества, где установлен бот. Единого метода
-# "дай мне все паблики с ботом" в VK нет (в отличие от Lolka/Discord-like
-# API, где есть /users/@me/guilds). Поэтому источник правды — таблица
-# servers (platform='vk'): администратор добавляет ID сообщества вручную
-# (форма на /dashboard/servers уже это умеет), а этот блок лишь
-# ДОПОЛНЯЕТ уже сохранённые записи реальными name/icon/member_count
-# через groups.getById.
 
 VK_API_VERSION = "5.199"
 VK_API_BASE = "https://api.vk.com/method"
 
-_vk_groups_cache: dict = {}  # {cache_key: (expires_at, payload)}
-_VK_CACHE_TTL = 300  # 5 минут, как рекомендовано в ТЗ
+_vk_groups_cache: dict = {}
+_VK_CACHE_TTL = 300
 
 
 class VKAPIError(Exception):
@@ -1290,10 +1212,6 @@ def _get_vk_access_token() -> str:
 
 
 def _call_vk_api(method: str, params: dict, max_retries: int = 3) -> dict:
-    """
-    Обёртка над VK API с обработкой rate limit (код ошибки 6) и таймаутов.
-    Версия API (v) передаётся в каждом запросе, а не в OAuth-ссылке.
-    """
     token = _get_vk_access_token()
     last_exc: Exception | None = None
     for attempt in range(max_retries):
@@ -1307,8 +1225,8 @@ def _call_vk_api(method: str, params: dict, max_retries: int = 3) -> dict:
             if "error" in data:
                 error_code = data["error"].get("error_code")
                 error_msg = data["error"].get("error_msg", "VK API error")
-                if error_code == 6:  # Too many requests per second
-                    time.sleep(0.5 * (attempt + 1))  # экспоненциальный backoff
+                if error_code == 6:
+                    time.sleep(0.5 * (attempt + 1))
                     continue
                 raise VKAPIError(error_code, error_msg)
             return data.get("response", {})
@@ -1321,8 +1239,6 @@ def _call_vk_api(method: str, params: dict, max_retries: int = 3) -> dict:
 
 
 def _vk_groups_by_ids(group_ids: list) -> list:
-    """groups.getById принимает до 500 ID за один запрос — так что даже
-    для большого списка серверов это один вызов, а не N запросов."""
     if not group_ids:
         return []
     response = _call_vk_api("groups.getById", {
@@ -1335,13 +1251,6 @@ def _vk_groups_by_ids(group_ids: list) -> list:
 
 @app.get("/api/vk/groups")
 def get_vk_groups(server_id: str = Query("")):
-    """
-    Информация о сообществах VK.
-    - server_id указан -> данные по одному сообществу (не обязательно из БД).
-    - server_id не указан -> данные по всем VK-сообществам, уже добавленным в servers.
-    Результат кэшируется на 5 минут, чтобы не упираться в rate limit VK
-    при частых обновлениях дашборда.
-    """
     cache_key = server_id or "__all__"
     cached = _vk_groups_cache.get(cache_key)
     if cached and cached[0] > datetime.utcnow().timestamp():
@@ -1381,10 +1290,6 @@ def get_vk_groups(server_id: str = Query("")):
 
 
 def sync_vk_groups() -> dict:
-    """Подтягивает name/icon/member_count из VK для уже сохранённых сообществ
-    (platform='vk') и обновляет строки в servers. Новые сообщества сюда не
-    добавляет — они появляются через ручное добавление на /dashboard/servers,
-    поскольку VK не отдаёт единый список 'где установлен бот'."""
     db = SessionLocal()
     try:
         vk_servers = db.query(Server).filter(Server.platform == "vk").all()
@@ -1407,7 +1312,7 @@ def sync_vk_groups() -> dict:
             server.member_count = g.get("members_count", server.member_count)
             synced += 1
         db.commit()
-        _vk_groups_cache.clear()  # инвалидируем кэш после обновления
+        _vk_groups_cache.clear()
         return {"status": "ok", "synced": synced}
     except Exception as e:
         db.rollback()
@@ -1418,14 +1323,11 @@ def sync_vk_groups() -> dict:
 
 @app.post("/api/servers/sync-vk")
 def sync_vk_servers():
-    """Ручной триггер обновления данных VK-сообществ (см. sync_vk_groups)."""
     return sync_vk_groups()
 
 
 @app.post("/api/servers/sync-all")
 def sync_all_platforms():
-    """Синхронизировать серверы из ВСЕХ платформ (Lolka + VK) одним вызовом —
-    именно так, как описано в ПРАВКЕ #1 ТЗ."""
     lolka_result = sync_lolka_servers()
     vk_result = sync_vk_groups()
     total = lolka_result.get("synced", 0) + vk_result.get("synced", 0)
@@ -1441,10 +1343,6 @@ def sync_all_platforms():
 
 @app.get("/api/lolka/bot/invite")
 def lolka_bot_invite(server_id: str = Query("")):
-    """Ссылка авторизации для добавления бота на сервер.
-    Реальный формат из портала разработчика Lolka: просто /bot-authorize?client_id=...
-    (без redirect_uri/response_type/scope — это НЕ oauth2/authorize, у ботов свой,
-    более простой эндпоинт установки)."""
     client_id = os.getenv("LOLKA_CLIENT_ID", "")
     if not client_id:
         return {"error": "LOLKA_CLIENT_ID не настроен на сервере"}
@@ -1453,14 +1351,12 @@ def lolka_bot_invite(server_id: str = Query("")):
 
 @app.post("/api/lolka/bot/add")
 def add_lolka_bot(data: dict):
-    """Совместимо со старой сигнатурой из ТЗ: возвращает ту же invite-ссылку"""
     server_id = data.get("server_id", "")
     return lolka_bot_invite(server_id=server_id)
 
 
 @app.post("/api/lolka/bot/message/send")
 def lolka_send_message(data: dict):
-    """Отправить сообщение в канал от имени бота (не webhook, а REST bot API)"""
     channel_id = data.get("channel_id", "")
     content = data.get("content", "")
     if not channel_id or not content:
@@ -1688,7 +1584,6 @@ webhook_logs = []
 
 @app.get("/api/webhooks/logs")
 def get_webhook_logs(webhook_id: str = Query(""), limit: int = 20):
-    """Логи отправленных сообщений через вебхуки"""
     logs = webhook_logs
     if webhook_id:
         logs = [l for l in logs if l.get("webhook_id") == webhook_id]
@@ -1700,7 +1595,6 @@ def get_webhook_logs(webhook_id: str = Query(""), limit: int = 20):
 
 @app.get("/api/webhooks/stats")
 def get_webhook_stats(webhook_id: str = Query("")):
-    """Статистика по вебхуку"""
     logs = webhook_logs
     if webhook_id:
         logs = [l for l in logs if l.get("webhook_id") == webhook_id]
@@ -1717,16 +1611,13 @@ def get_webhook_stats(webhook_id: str = Query("")):
 
 @app.post("/api/webhooks/auto-forward")
 def auto_forward(data: dict):
-    """Автоматический кросс-постинг между платформами"""
     source_platform = data.get("source_platform", "")
     message = data.get("message", "")
     source_channel = data.get("channel", "")
     source_server = data.get("server_name", "")
     
-    # Ищем все активные вебхуки
     db = SessionLocal()
     try:
-        # Получаем настройки авто-форварда
         config = db.query(ModuleConfig).filter(
             ModuleConfig.module_name == "auto_forward"
         ).first()
@@ -1740,13 +1631,11 @@ def auto_forward(data: dict):
         if not rules.get("enabled"):
             return {"status": "disabled"}
         
-        # Определяем платформу-назначение
         target_platform = "vk" if source_platform.lower() == "lolka" else "lolka"
         
         if not rules.get(f"from_{source_platform.lower()}_to_{target_platform}"):
             return {"status": "skipped", "reason": "rule not enabled"}
         
-        # Находим вебхуки для целевой платформы
         from models import Server
         servers = db.query(Server).all()
         
@@ -1779,7 +1668,6 @@ def auto_forward(data: dict):
 
 @app.get("/api/webhooks/auto-forward/config")
 def get_auto_forward_config(server_id: str = Query("default")):
-    """Получить настройки авто-форварда"""
     db = SessionLocal()
     try:
         server = db.query(Server).filter(Server.server_id == server_id).first()
@@ -1808,7 +1696,6 @@ def get_auto_forward_config(server_id: str = Query("default")):
 
 @app.post("/api/webhooks/auto-forward/config")
 def save_auto_forward_config(data: dict):
-    """Сохранить настройки авто-форварда"""
     db = SessionLocal()
     try:
         server_id = data.get("server_id", "default")
@@ -1850,7 +1737,6 @@ def save_auto_forward_config(data: dict):
 
 @app.get("/api/analytics/reports")
 def get_reports_config(server_id: str = Query("default")):
-    """Получить настройки отчётов"""
     db = SessionLocal()
     try:
         server = db.query(Server).filter(Server.server_id == server_id).first()
@@ -1886,7 +1772,6 @@ def get_reports_config(server_id: str = Query("default")):
 
 @app.post("/api/analytics/reports")
 def save_reports_config(data: dict):
-    """Сохранить настройки отчётов"""
     db = SessionLocal()
     try:
         server_id = data.get("server_id", "default")
@@ -1926,7 +1811,6 @@ def save_reports_config(data: dict):
 
 @app.post("/api/analytics/reports/send")
 def send_report(data: dict):
-    """Отправить отчёт вручную (тест) или по крону"""
     webhook_url = data.get("webhook_url", "")
     report_type = data.get("type", "daily")
     
@@ -1988,7 +1872,6 @@ RADIO_STATIONS = {
 
 
 def _parse_channels(raw) -> list:
-    """channels может прийти как JSON-строка из БД, список из фронта, или строка через запятую"""
     import json
     if isinstance(raw, list):
         return [c.strip() for c in raw if isinstance(c, str) and c.strip()]
@@ -2079,7 +1962,6 @@ def add_music_provider(data: dict):
 
 @app.put("/api/music/providers/{provider_id}")
 def update_music_provider(provider_id: int, data: dict):
-    """Редактирование провайдера — например, замена каналов или API-ключа без пересоздания"""
     import json
     db = SessionLocal()
     try:
@@ -2135,7 +2017,6 @@ EVENT_TEMPLATES = {
 
 @app.get("/api/events")
 def get_events(server_id: str = Query("default")):
-    """Список событий"""
     db = SessionLocal()
     try:
         events = db.query(Event).filter(
@@ -2169,7 +2050,6 @@ def get_events(server_id: str = Query("default")):
 
 @app.post("/api/events")
 def create_event(data: dict):
-    """Создать событие"""
     db = SessionLocal()
     try:
         event = Event(
@@ -2196,7 +2076,6 @@ def create_event(data: dict):
 
 @app.delete("/api/events/{event_id}")
 def delete_event(event_id: int):
-    """Удалить событие"""
     db = SessionLocal()
     try:
         db.query(Event).filter(Event.id == event_id).delete()
@@ -2211,7 +2090,6 @@ def delete_event(event_id: int):
 
 @app.post("/api/events/{event_id}/notify")
 def notify_event(event_id: int, data: dict):
-    """Отправить уведомление о событии в канал"""
     db = SessionLocal()
     try:
         event = db.query(Event).filter(Event.id == event_id).first()
@@ -2252,7 +2130,6 @@ def notify_event(event_id: int, data: dict):
 
 @app.get("/api/stats")
 def get_public_stats():
-    """Публичная статистика для лендинга — только реальные данные"""
     db = SessionLocal()
     try:
         servers_count = db.query(Server).count()
@@ -2287,14 +2164,10 @@ def get_dashboard_stats():
     return {"totalMessages": 0, "activeUsers": 0, "commandsUsed": 0, "voiceHours": 0, "onlineNow": 0, "newUsers": 0, "messagesChart": [0,0,0,0,0,0,0], "recentActivity": [], "topCommands": [], "serversCount": 0}
 
 
-
-
-
 # ==================== Вебхуки (CRUD) ====================
 
 @app.get("/api/webhooks")
 def get_webhooks(server_id: str = Query(...)):
-    """Список вебхуков конкретного сервера."""
     db = SessionLocal()
     try:
         hooks = db.query(Webhook).filter(Webhook.server_id == server_id).order_by(Webhook.created_at.desc()).all()
@@ -2320,7 +2193,6 @@ def get_webhooks(server_id: str = Query(...)):
 
 @app.post("/api/webhooks")
 def create_webhook(data: dict):
-    """Создать вебхук. Обязательные поля: server_id, platform, project, url."""
     db = SessionLocal()
     try:
         server_id = data.get("server_id", "")
@@ -2357,7 +2229,6 @@ def create_webhook(data: dict):
 
 @app.put("/api/webhooks/{webhook_id}")
 def update_webhook(webhook_id: int, data: dict):
-    """Обновить вебхук — например, переключить active."""
     db = SessionLocal()
     try:
         hook = db.query(Webhook).filter(Webhook.id == webhook_id).first()
@@ -2394,17 +2265,250 @@ def delete_webhook(webhook_id: int):
         db.close()
 
 
-@app.get("/api/ranking/members")
-def get_ranking_members():
-    """Возвращает список участников рейтинга"""
+# ═══════════════════════════════════════════════════════════════════════════
+# ══ ТЗ №5: Система уровней — API Endpoints ════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
+
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+import json
+
+class RankingSettingsUpdate(BaseModel):
+    enabled: bool = True
+    xp_per_message: int = 15
+    xp_per_voice_minute: int = 20
+    min_message_length: int = 3
+    cooldown_seconds: int = 60
+    multiplier: float = 1.0
+    xp_formula: str = '{"type":"exponential","base_xp":15,"multiplier":1.0}'
+    rewards: str = "[]"
+    notify_channel: str = ""
+    notify_message: str = ""
+    ping_user: bool = True
+    decay_enabled: bool = False
+    decay_days: int = 7
+    decay_percent: int = 10
+    blacklist_channels: str = "[]"
+    boost_channels: str = "[]"
+    boost_roles: str = "[]"
+    card_bg_color: str = "#111118"
+    card_accent_color: str = "#00E5FF"
+    card_style: str = "modern"
+
+@app.get("/api/ranking/settings")
+def get_ranking_settings(
+    server_id: str = Query(...),
+    platform: str = Query("vk"),
+    db: Session = Depends(get_db)
+):
+    server = db.query(Server).filter(Server.server_id == server_id).first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    settings = db.query(RankingSettings).filter(
+        RankingSettings.server_id == server.id,
+        RankingSettings.platform == platform
+    ).first()
+    if not settings:
+        return {
+            "enabled": True,
+            "xp_per_message": 15,
+            "xp_per_voice_minute": 20,
+            "min_message_length": 3,
+            "cooldown_seconds": 60,
+            "multiplier": 1.0,
+            "xp_formula": {"type": "exponential", "base_xp": 15, "multiplier": 1.0},
+            "rewards": [],
+            "notify_channel": "",
+            "notify_message": "🎉 {user} достиг {level} уровня!",
+            "ping_user": True,
+            "decay_enabled": False,
+            "decay_days": 7,
+            "decay_percent": 10,
+            "blacklist_channels": [],
+            "boost_channels": [],
+            "boost_roles": [],
+            "card_bg_color": "#111118",
+            "card_accent_color": "#00E5FF",
+            "card_style": "modern",
+        }
     return {
-        "members": [
-            {"name": "🦊 Лисёнок", "level": 42, "xp": 15420, "rank": 1, "avatar": "🦊", "messages": 2400, "voiceHours": 120, "reactions": 856},
-            {"name": "🐉 Dragon", "level": 38, "xp": 12800, "rank": 2, "avatar": "🐉", "messages": 1800, "voiceHours": 95, "reactions": 620},
-            {"name": "⭐ StarUser", "level": 27, "xp": 7650, "rank": 3, "avatar": "⭐", "messages": 1200, "voiceHours": 60, "reactions": 340}
-        ],
-        "total": 3
+        "enabled": settings.enabled,
+        "xp_per_message": settings.xp_per_message,
+        "xp_per_voice_minute": settings.xp_per_voice_minute,
+        "min_message_length": settings.min_message_length,
+        "cooldown_seconds": settings.cooldown_seconds,
+        "multiplier": settings.multiplier,
+        "xp_formula": json.loads(settings.xp_formula) if settings.xp_formula else {},
+        "rewards": json.loads(settings.rewards) if settings.rewards else [],
+        "notify_channel": settings.notify_channel,
+        "notify_message": settings.notify_message,
+        "ping_user": settings.ping_user,
+        "decay_enabled": settings.decay_enabled,
+        "decay_days": settings.decay_days,
+        "decay_percent": settings.decay_percent,
+        "blacklist_channels": json.loads(settings.blacklist_channels) if settings.blacklist_channels else [],
+        "boost_channels": json.loads(settings.boost_channels) if settings.boost_channels else [],
+        "boost_roles": json.loads(settings.boost_roles) if settings.boost_roles else [],
+        "card_bg_color": settings.card_bg_color,
+        "card_accent_color": settings.card_accent_color,
+        "card_style": settings.card_style,
     }
+
+@app.post("/api/ranking/settings")
+def save_ranking_settings(
+    data: RankingSettingsUpdate,
+    server_id: str = Query(...),
+    platform: str = Query("vk"),
+    db: Session = Depends(get_db)
+):
+    server = db.query(Server).filter(Server.server_id == server_id).first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    
+    settings = db.query(RankingSettings).filter(
+        RankingSettings.server_id == server.id,
+        RankingSettings.platform == platform
+    ).first()
+    
+    data_dict = data.model_dump()
+    
+    if settings:
+        for field, value in data_dict.items():
+            setattr(settings, field, value)
+    else:
+        settings = RankingSettings(
+            server_id=server.id,
+            platform=platform,
+            **data_dict
+        )
+        db.add(settings)
+        
+    db.commit()
+    db.refresh(settings)
+    return {"status": "saved"}
+
+@app.get("/api/ranking/leaderboard")
+def get_ranking_leaderboard(
+    server_id: str = Query(...),
+    platform: str = Query("vk"),
+    sort: str = Query("xp"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    server = db.query(Server).filter(Server.server_id == server_id).first()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    query = db.query(Member).filter(
+        Member.server_id == server_id,
+        Member.platform == platform
+    )
+    if sort == "level":
+        query = query.order_by(Member.level.desc(), Member.xp.desc())
+    elif sort == "messages":
+        query = query.order_by(Member.messages.desc())
+    else:
+        query = query.order_by(Member.xp.desc())
+    total = query.count()
+    entries = query.offset(offset).limit(limit).all()
+    return {
+        "platform": platform,
+        "total": total,
+        "entries": [
+            {
+                "rank": offset + i + 1,
+                "user_id": e.user_id,
+                "username": e.username,
+                "avatar_url": e.avatar_url,
+                "level": e.level,
+                "xp": e.xp,
+                "messages": e.messages,
+                "voice_minutes": e.voice_minutes,
+                "reactions": e.reactions,
+                "last_active": e.last_active.isoformat() if e.last_active else None,
+            }
+            for i, e in enumerate(entries)
+        ]
+    }
+
+@app.get("/api/ranking/preview")
+def get_ranking_preview(
+    server_id: str = Query(...),
+    platform: str = Query("vk"),
+    user_id: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    entry = db.query(Member).filter(
+        Member.server_id == server_id,
+        Member.platform == platform,
+        Member.user_id == user_id
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="User not found in ranking")
+    rank = db.query(Member).filter(
+        Member.server_id == server_id,
+        Member.platform == platform,
+        Member.xp > entry.xp
+    ).count() + 1
+    xp_for_next = 100 * (entry.level ** 2)
+    return {
+        "platform": platform,
+        "user": {
+            "id": entry.user_id,
+            "username": entry.username,
+            "avatar_url": entry.avatar_url,
+        },
+        "ranking": {
+            "rank": rank,
+            "level": entry.level,
+            "current_xp": entry.xp,
+            "xp_for_next_level": xp_for_next,
+            "messages": entry.messages,
+            "voice_minutes": entry.voice_minutes,
+            "reactions": entry.reactions,
+        }
+    }
+
+
+# ── Дополнительные эндпоинты для системы уровней (Формулы и Кэш) ──
+
+@app.post("/api/ranking/formulas/validate")
+def validate_formula(formula: XPFormulaConfig):
+    try:
+        test_xp = XPFormulaEngine.calculate_xp(
+            formula,
+            current_level=5,
+            message_length=50,
+            is_voice=False
+        )
+        level_10_xp = XPFormulaEngine.calculate_level_xp(10, formula.formula_type)
+        
+        return {
+            "valid": True,
+            "test_xp": test_xp,
+            "level_10_required_xp": level_10_xp,
+            "presets": {name: config.model_dump() for name, config in XP_PRESETS.items()}
+        }
+    except Exception as e:
+        return {"valid": False, "error": str(e)}
+
+
+@app.get("/api/ranking/formulas/presets")
+def get_formula_presets():
+    return {
+        "presets": {name: config.model_dump() for name, config in XP_PRESETS.items()}
+    }
+
+
+@app.get("/api/ranking/cache/stats")
+def get_cache_stats():
+    return cache.get_stats()
+
+
+@app.post("/api/ranking/cache/clear")
+def clear_cache():
+    cache.clear()
+    return {"status": "cleared"}
 
 
 # ==================== Модерация (ТЗ №4) ====================
@@ -2428,10 +2532,6 @@ async def get_moderation_stats(
     platform: str = Query("vk"),
     period: str = Query("7d")
 ):
-    """
-    Получить статистику модерации для сервера за период (24h/7d/30d, по умолчанию 7d).
-    ЧЕСТНОЕ ПУСТОЕ СОСТОЯНИЕ: если событий нет — вернуть нули/пустые массивы.
-    """
     db = SessionLocal()
     try:
         delta = PERIOD_DELTAS.get(period, PERIOD_DELTAS["7d"])
@@ -2477,8 +2577,9 @@ async def get_moderation_stats(
                 }
                 for e in recent_events
             ],
-           "platform": platform,
-            "period": platform,
+            "timeline": timeline,
+            "platform": platform,
+            "period": period,
         }
     finally:
         db.close()
@@ -2493,7 +2594,6 @@ async def get_moderation_stats(
 
 @app.get("/api/moderation/config")
 def get_moderation_config(server_id: str = Query(...)):
-    """Получить конфигурацию автомодерации для сервера (из ModuleConfig)."""
     db = SessionLocal()
     try:
         server = db.query(Server).filter(Server.server_id == server_id).first()
@@ -2516,7 +2616,6 @@ def get_moderation_config(server_id: str = Query(...)):
 
 @app.post("/api/moderation/config")
 def save_moderation_config(data: dict):
-    """Сохранить конфигурацию автомодерации."""
     db = SessionLocal()
     try:
         server_id = data.get("server_id", "")
@@ -2553,7 +2652,6 @@ def save_moderation_config(data: dict):
 
 @app.get("/api/moderation/log")
 def get_moderation_log(server_id: str = Query(...), limit: int = Query(50)):
-    """Журнал событий модерации из БД."""
     db = SessionLocal()
     try:
         server = db.query(Server).filter(Server.server_id == server_id).first()
@@ -2587,7 +2685,6 @@ def get_moderation_log(server_id: str = Query(...), limit: int = Query(50)):
 
 @app.get("/api/vk/connections")
 def get_vk_connections(server_id: str = Query(...)):
-    """Список подключённых VK-сообществ для сервера."""
     db = SessionLocal()
     try:
         server = db.query(Server).filter(Server.server_id == server_id).first()
@@ -2618,22 +2715,16 @@ def get_vk_connections(server_id: str = Query(...)):
 
 @app.post("/api/vk/connections")
 def create_vk_connection(data: VKConnectRequest):
-    """
-    Подключить VK-сообщество к серверу.
-    Проверяет токен через groups.getById перед сохранением.
-    """
     db = SessionLocal()
     try:
         server = db.query(Server).filter(Server.server_id == data.server_id).first()
         if not server:
             return {"error": "Сервер не найден"}
 
-        # Нормализуем group_id
         group_id = data.group_id.strip().lstrip("-").replace("club", "").replace("public", "")
         if not group_id.isdigit():
             return {"error": "group_id должен быть числом (например 240082352)"}
 
-        # Проверяем токен — вызываем VK API
         try:
             service = VKBotService(data.access_token)
             group_info = service.get_group_info(group_id)
@@ -2643,14 +2734,12 @@ def create_vk_connection(data: VKConnectRequest):
         except Exception as e:
             return {"error": f"Ошибка проверки токена: {str(e)}"}
 
-        # Проверяем, нет ли уже такого подключения
         existing = db.query(VKConnection).filter(
             VKConnection.server_id == server.id,
             VKConnection.group_id == group_id
         ).first()
 
         if existing:
-            # Обновляем токен
             existing.access_token = data.access_token
             existing.webhook_secret = data.webhook_secret
             existing.confirmation_code = data.confirmation_code
@@ -2660,7 +2749,6 @@ def create_vk_connection(data: VKConnectRequest):
             db.commit()
             return {"status": "updated", "connection_id": existing.id, "group_name": group_name}
 
-        # Создаём новое подключение
         conn = VKConnection(
             server_id=server.id,
             group_id=group_id,
@@ -2689,14 +2777,12 @@ def create_vk_connection(data: VKConnectRequest):
 
 @app.delete("/api/vk/connections/{connection_id}")
 def delete_vk_connection(connection_id: int):
-    """Отключить VK-сообщество от сервера."""
     db = SessionLocal()
     try:
         conn = db.query(VKConnection).filter(VKConnection.id == connection_id).first()
         if not conn:
             return {"error": "Подключение не найдено"}
 
-        # Удаляем сервис из кэша
         clear_vk_service(conn.access_token)
 
         db.delete(conn)
@@ -2711,7 +2797,6 @@ def delete_vk_connection(connection_id: int):
 
 @app.post("/api/vk/connections/{connection_id}/test")
 def test_vk_connection(connection_id: int):
-    """Проверить, что токен всё ещё валиден."""
     db = SessionLocal()
     try:
         conn = db.query(VKConnection).filter(VKConnection.id == connection_id).first()
@@ -2739,10 +2824,6 @@ def test_vk_connection(connection_id: int):
 
 @app.post("/api/vk/callback")
 async def vk_callback(request: Request):
-    """
-    Callback API от VK.
-    VK отправляет сюда события: confirmation, message_new, wall_reply_new и т.д.
-    """
     try:
         body = await request.json()
     except Exception:
@@ -2751,7 +2832,6 @@ async def vk_callback(request: Request):
     event_type = body.get("type", "")
     group_id = str(body.get("group_id", ""))
 
-    # Находим подключение по group_id
     db = SessionLocal()
     try:
         conn = db.query(VKConnection).filter(
@@ -2764,16 +2844,14 @@ async def vk_callback(request: Request):
                 return PlainTextResponse("ok")
             return JSONResponse(status_code=404, content={"error": "group_not_found"})
 
-        # Проверяем секрет (если настроен)
         secret = body.get("secret", "")
         if conn.webhook_secret and secret != conn.webhook_secret:
             return JSONResponse(status_code=403, content={"error": "invalid_secret"})
 
-        # ── Confirmation ──────────────────────────────────────────────
         if event_type == "confirmation":
             return PlainTextResponse(conn.confirmation_code or "ok")
 
-        # ── Message new (автомодерация) ─────────────────────────────
+        # ── Message new (автомодерация + XP) ─────────────────────────────
         if event_type == "message_new":
             obj = body.get("object", {})
             message = obj.get("message", {})
@@ -2783,7 +2861,7 @@ async def vk_callback(request: Request):
             from_id = message.get("from_id")
             text = message.get("text", "")
 
-            # Логируем получение
+            # 1. Логируем получение
             log_event = ModerationEvent(
                 server_id=conn.server_id,
                 platform="vk",
@@ -2796,7 +2874,7 @@ async def vk_callback(request: Request):
             db.add(log_event)
             db.commit()
 
-            # Загружаем конфиг автомодерации
+            # 2. Загружаем конфиг автомодерации
             import json
             mod_config_row = db.query(ModuleConfig).filter(
                 ModuleConfig.server_id == conn.server_id,
@@ -2809,7 +2887,7 @@ async def vk_callback(request: Request):
                 except Exception:
                     pass
 
-            # Проверяем движком
+            # 3. Проверяем движком
             result = _moderation_engine.check_message(from_id, text, config)
             if result:
                 service = get_vk_service(conn.access_token)
@@ -2834,6 +2912,22 @@ async def vk_callback(request: Request):
                 db.add(action_event)
                 db.commit()
 
+            # 4. 🚀 Начисляем XP за сообщение (асинхронно, чтобы не блокировать ответ VK)
+            try:
+                asyncio.create_task(
+                    award_xp_for_message(
+                        server_id=str(conn.server_id),
+                        platform="vk",
+                        user_id=str(from_id),
+                        username=str(from_id),  # Временно используем ID как имя, чтобы не делать лишний запрос к VK API
+                        message_length=len(text), # <-- ИСПРАВЛЕНО: передаем длину текста, как ожидает xp_handler
+                        channel_id=str(peer_id),
+                    )
+                )
+            except Exception as xp_error:
+                logger.error(f"XP award task failed: {xp_error}")
+
+            # 5. Возвращаем OK ВКонтакте
             return JSONResponse(content={"status": "ok"})
 
         # ── Group join / leave ────────────────────────────────────────
@@ -2880,10 +2974,6 @@ async def vk_callback(request: Request):
 
 @app.post("/api/vk/moderate")
 def vk_moderate(data: VKModerateRequest):
-    """
-    Ручная модерация: удалить сообщение, забанить, предупредить, замьютить.
-    Вызывается из дашборда модерации (журнал).
-    """
     db = SessionLocal()
     try:
         conn = db.query(VKConnection).filter(
@@ -2903,7 +2993,6 @@ def vk_moderate(data: VKModerateRequest):
             reason=data.reason,
         )
 
-        # Логируем действие модерации
         if result.get("success"):
             log_event = ModerationEvent(
                 server_id=conn.server_id,
@@ -2928,7 +3017,6 @@ def vk_moderate(data: VKModerateRequest):
 
 @app.post("/api/vk/send")
 def vk_send_message(data: VKSendMessageRequest):
-    """Отправить сообщение от имени бота в VK."""
     db = SessionLocal()
     try:
         conn = db.query(VKConnection).filter(
@@ -2953,7 +3041,6 @@ def vk_send_message(data: VKSendMessageRequest):
 
 @app.get("/api/vk/members")
 def vk_get_members(group_id: str = Query(...), count: int = Query(100)):
-    """Получить участников VK-сообщества."""
     db = SessionLocal()
     try:
         conn = db.query(VKConnection).filter(

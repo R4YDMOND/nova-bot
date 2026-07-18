@@ -11,6 +11,7 @@ class Server(Base):
     server_id = Column(String, unique=True)
     webhook_url = Column(String, default="")
     is_active = Column(Boolean, default=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # nullable для миграции старых записей
     platform = Column(String, default="vk")      # "vk" | "lolka"
     icon_url = Column(String, default="")
     member_count = Column(Integer, default=0)
@@ -43,6 +44,7 @@ class Member(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     server_id = Column(String(255), nullable=False, index=True)
+    platform = Column(String(20), default="vk", index=True)          # НОВОЕ
     user_id = Column(String(255), nullable=False)
     username = Column(String(255), nullable=False)
     avatar_url = Column(String(1024), nullable=True)
@@ -52,8 +54,12 @@ class Member(Base):
     voice_minutes = Column(Integer, default=0)
     reactions = Column(Integer, default=0)
     last_active = Column(DateTime, default=datetime.utcnow)
+    last_activity = Column(DateTime, default=datetime.utcnow)         # НОВОЕ
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    __table_args__ = (
+        UniqueConstraint('server_id', 'platform', 'user_id', name='uq_member_entry'),
+    )
 
 class MusicProvider(Base):
     __tablename__ = "music_providers"
@@ -253,3 +259,92 @@ class VKConnection(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (UniqueConstraint('server_id', 'group_id', name='uq_server_group'),)
+
+
+    # ── Rev. 3: Система уровней ───────────────────────────────────────────────────
+
+class RankingSettings(Base):
+    __tablename__ = "ranking_settings"
+    id = Column(Integer, primary_key=True)
+    server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform = Column(String(20), nullable=False, default="vk")  # 'vk' | 'lolka'
+    enabled = Column(Boolean, default=True)
+
+    xp_per_message = Column(Integer, default=15)
+    xp_per_voice_minute = Column(Integer, default=20)
+    min_message_length = Column(Integer, default=3)
+    cooldown_seconds = Column(Integer, default=60)
+    multiplier = Column(Float, default=1.0)
+
+    xp_formula = Column(Text, default='{"formula_type":"exponential","base_xp":15,"multiplier":1.0}')
+    rewards = Column(Text, default="[]")
+
+    notify_channel = Column(String(255), default="")
+    notify_message = Column(Text, default="🎉 {user} достиг {level} уровня!")
+    ping_user = Column(Boolean, default=True)
+
+    decay_enabled = Column(Boolean, default=False)
+    decay_days = Column(Integer, default=7)
+    decay_percent = Column(Integer, default=10)
+
+    blacklist_channels = Column(Text, default="[]")
+    boost_channels = Column(Text, default="[]")
+    boost_roles = Column(Text, default="[]")
+
+    card_bg_color = Column(String(20), default="#111118")
+    card_accent_color = Column(String(20), default="#00E5FF")
+    card_style = Column(String(50), default="modern")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('server_id', 'platform', name='uq_ranking_settings'),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ══ ТЗ №5: Система уровней ════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
+
+class RankingSettings(Base):
+    """
+    Настройки системы уровней для пары (server_id, platform).
+    xp_formula хранится как JSON-строка (совместимо с SQLite и PostgreSQL).
+    """
+    __tablename__ = "ranking_settings"
+    id = Column(Integer, primary_key=True)
+    server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
+    platform = Column(String(20), nullable=False, default="vk")  # 'vk' | 'lolka'
+    enabled = Column(Boolean, default=True)
+    # Параметры начисления
+    xp_per_message = Column(Integer, default=15)
+    xp_per_voice_minute = Column(Integer, default=20)
+    min_message_length = Column(Integer, default=3)
+    cooldown_seconds = Column(Integer, default=60)
+    multiplier = Column(Float, default=1.0)
+    # Формула XP (JSON-строка)
+    xp_formula = Column(Text, default='{"type":"exponential","base_xp":15,"multiplier":1.0}')
+    # Награды (JSON-строка)
+    rewards = Column(Text, default="[]")
+    # Уведомления
+    notify_channel = Column(String(255), default="")
+    notify_message = Column(Text, default=" {user} достиг {level} уровня!")
+    ping_user = Column(Boolean, default=True)
+    # Decay (снижение XP за неактивность)
+    decay_enabled = Column(Boolean, default=False)
+    decay_days = Column(Integer, default=7)
+    decay_percent = Column(Integer, default=10)
+    # Ограничения
+    blacklist_channels = Column(Text, default="[]")  # JSON-список
+    boost_channels = Column(Text, default="[]")      # JSON-список
+    boost_roles = Column(Text, default="[]")         # JSON-список
+    # Карточка
+    card_bg_color = Column(String(20), default="#111118")
+    card_accent_color = Column(String(20), default="#00E5FF")
+    card_style = Column(String(50), default="modern")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (
+        UniqueConstraint('server_id', 'platform', name='uq_ranking_settings'),
+    )
