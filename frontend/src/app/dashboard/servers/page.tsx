@@ -259,29 +259,27 @@ export default function ServersPage() {
         ) : (
           <div className="space-y-6">
             {platformFilter !== 'vk' && botStatus && (
-              <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
-                    botStatus.connected ? 'bg-green-500/10' : botStatus.configured ? 'bg-yellow-500/10' : 'bg-red-500/10'
-                  )}>
+              <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 p-7">
+                <div className="flex items-center gap-5">
+                  <div className="relative w-16 h-16 shrink-0">
+                    <img src="/logo-lolka.png" alt="Lolka" className="w-16 h-16 rounded-full object-cover border-2 border-[rgb(var(--border))]" />
                     <span className={cn(
-                      "w-2.5 h-2.5 rounded-full",
+                      "absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-[rgb(var(--surface))]",
                       botStatus.connected ? 'bg-green-400' : botStatus.configured ? 'bg-yellow-400' : 'bg-red-400'
                     )} />
                   </div>
                   <div>
-                    <div className="font-semibold text-[rgb(var(--text))]">
+                    <div className="font-semibold text-lg text-[rgb(var(--text))]">
                       {botStatus.connected ? 'Бот подключён' : botStatus.configured ? 'Ждём соединения' : 'Бот не настроен'}
                     </div>
-                    <p className="text-[rgb(var(--text-secondary))] text-sm mt-0.5">
+                    <p className="text-[rgb(var(--text-secondary))] text-sm mt-1">
                       {botStatus.connected
                         ? 'Бот Lolka успешно подключён и готов к работе. Добавьте его на дополнительные серверы.'
                         : 'Настройте бота Lolka, чтобы подключить дополнительные серверы.'}
                     </p>
                   </div>
                 </div>
-                <Button onClick={inviteBot} disabled={inviteLoading} className="shrink-0 px-5 py-2.5">
+                <Button onClick={inviteBot} disabled={inviteLoading} className="shrink-0 px-6 py-3 text-base">
                   {inviteLoading ? 'Открываем...' : '➕ Добавить бота Lolka на сервер'}
                 </Button>
               </Card>
