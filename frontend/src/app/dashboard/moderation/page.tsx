@@ -280,34 +280,38 @@ export default function ModerationPage() {
     return matchType && (e.title?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q));
   });
 
-  // ИСПРАВЛЕНИЕ: вынесено из основного return, чтобы переключатель платформы
-  // был доступен и в состоянии "нет серверов на этой платформе" — иначе
-  // пользователь с серверами только на одной платформе не мог переключиться
-  // на вкладку, где сервер есть.
+  // ИСПРАВЛЕНИЕ: переключатель платформы вынесен из основного return, чтобы
+  // быть доступным и в состоянии "нет серверов на этой платформе".
+  // platformPills — сами кнопки (переиспользуются инлайн в шапке и в
+  // отдельной обёртке platformSwitcher для пустого состояния).
+  const platformPills = (
+    <div className="flex p-1 rounded-lg border bg-[rgb(var(--surface))] border-[rgb(var(--border))]">
+      {[
+        { id: 'vk' as Platform, label: 'VK', color: 'bg-blue-500' },
+        { id: 'lolka' as Platform, label: 'Lolka', color: 'bg-purple-500' }
+      ].map(p => (
+        <button
+          key={p.id}
+          onClick={() => setPlatformFilter(p.id)}
+          className={cn(
+            'flex items-center gap-1.5 px-5 py-2.5 rounded-md text-sm font-bold transition-all',
+            platformFilter === p.id
+              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+              : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
+          )}
+        >
+          <span className={cn("w-2 h-2 rounded-full", p.color)} />
+          <span>{p.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+
   const platformSwitcher = (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border mb-5 bg-[rgb(var(--surface-2))] border-[rgb(var(--border))]">
       <div className="flex items-center gap-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-secondary))]">Платформа:</span>
-        <div className="flex p-1 rounded-lg border bg-[rgb(var(--surface))] border-[rgb(var(--border))]">
-          {[
-            { id: 'vk' as Platform, label: 'VK', color: 'bg-blue-500' },
-            { id: 'lolka' as Platform, label: 'Lolka', color: 'bg-purple-500' }
-          ].map(p => (
-            <button
-              key={p.id}
-              onClick={() => setPlatformFilter(p.id)}
-              className={cn(
-                'flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold transition-all',
-                platformFilter === p.id
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                  : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
-              )}
-            >
-              <span className={cn("w-2 h-2 rounded-full", p.color)} />
-              <span>{p.label}</span>
-            </button>
-          ))}
-        </div>
+        {platformPills}
       </div>
     </div>
   );
@@ -335,8 +339,8 @@ export default function ModerationPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-5">
+    <div className="p-6 lg:p-8 max-w-[1920px] mx-auto">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[rgb(var(--text))] flex items-center gap-2">
             <Shield className="w-6 h-6 text-cyan-400" />
@@ -344,23 +348,25 @@ export default function ModerationPage() {
           </h1>
           <p className="text-[rgb(var(--text-secondary))] text-sm mt-1">Защита, автомодерация, правила и журнал</p>
         </div>
-        <Button onClick={save} disabled={saving} variant="gradient" className="flex items-center gap-1.5 text-sm">
-          {saving ? 'Сохранение...' : saved ? <><Check className="w-4 h-4" /> Сохранено!</> : <><Save className="w-4 h-4" /> Сохранить настройки</>}
-        </Button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-secondary))] hidden sm:inline">Платформа:</span>
+          {platformPills}
+          <Button onClick={save} disabled={saving} variant="gradient" className="flex items-center gap-1.5 text-sm px-5 py-2.5">
+            {saving ? 'Сохранение...' : saved ? <><Check className="w-4 h-4" /> Сохранено!</> : <><Save className="w-4 h-4" /> Сохранить настройки</>}
+          </Button>
+        </div>
       </div>
 
-      {platformSwitcher}
-
-      <div className="flex flex-wrap gap-1 mb-5">
+      <div className="flex flex-wrap gap-2 mb-6">
         {TABS.map(tab => {
           const Icon = tab.icon;
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border',
                 activeTab === tab.id
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md'
-                  : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))]'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md border-transparent'
+                  : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] border-[rgb(var(--border))]'
               )}>
               <Icon className="w-4 h-4" />
               {tab.label}
