@@ -34,7 +34,7 @@ from sqlalchemy import text
 
 # Импорт для системы уровней (Шаг 2: Формулы и Кэш)
 from ranking.formulas import XPFormulaEngine, XPFormulaConfig, XP_PRESETS
-from ranking.cache import cache, invalidate_cache
+from ranking.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -2265,250 +2265,227 @@ def delete_webhook(webhook_id: int):
         db.close()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# ══ ТЗ №5: Система уровней — API Endpoints ════════════════════════════════
-# ═══════════════════════════════════════════════════════════════════════════
+def _serialize_ranking_settings(s: "RankingSettings") -> dict:
+    def _loads(raw, default):
+        try:
+            return json.loads(raw) if raw else default
+        except (json.JSONDecodeError, TypeError):
+            return default
 
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-import json
-
-class RankingSettingsUpdate(BaseModel):
-    enabled: bool = True
-    xp_per_message: int = 15
-    xp_per_voice_minute: int = 20
-    min_message_length: int = 3
-    cooldown_seconds: int = 60
-    multiplier: float = 1.0
-    xp_formula: str = '{"type":"exponential","base_xp":15,"multiplier":1.0}'
-    rewards: str = "[]"
-    notify_channel: str = ""
-    notify_message: str = ""
-    ping_user: bool = True
-    decay_enabled: bool = False
-    decay_days: int = 7
-    decay_percent: int = 10
-    blacklist_channels: str = "[]"
-    boost_channels: str = "[]"
-    boost_roles: str = "[]"
-    card_bg_color: str = "#111118"
-    card_accent_color: str = "#00E5FF"
-    card_style: str = "modern"
-
-@app.get("/api/ranking/settings")
-def get_ranking_settings(
-    server_id: str = Query(...),
-    platform: str = Query("vk"),
-    db: Session = Depends(get_db)
-):
-    server = db.query(Server).filter(Server.server_id == server_id).first()
-    if not server:
-        raise HTTPException(status_code=404, detail="Server not found")
-    settings = db.query(RankingSettings).filter(
-        RankingSettings.server_id == server.id,
-        RankingSettings.platform == platform
-    ).first()
-    if not settings:
-        return {
-            "enabled": True,
-            "xp_per_message": 15,
-            "xp_per_voice_minute": 20,
-            "min_message_length": 3,
-            "cooldown_seconds": 60,
-            "multiplier": 1.0,
-            "xp_formula": {"type": "exponential", "base_xp": 15, "multiplier": 1.0},
-            "rewards": [],
-            "notify_channel": "",
-            "notify_message": "🎉 {user} достиг {level} уровня!",
-            "ping_user": True,
-            "decay_enabled": False,
-            "decay_days": 7,
-            "decay_percent": 10,
-            "blacklist_channels": [],
-            "boost_channels": [],
-            "boost_roles": [],
-            "card_bg_color": "#111118",
-            "card_accent_color": "#00E5FF",
-            "card_style": "modern",
-        }
     return {
-        "enabled": settings.enabled,
-        "xp_per_message": settings.xp_per_message,
-        "xp_per_voice_minute": settings.xp_per_voice_minute,
-        "min_message_length": settings.min_message_length,
-        "cooldown_seconds": settings.cooldown_seconds,
-        "multiplier": settings.multiplier,
-        "xp_formula": json.loads(settings.xp_formula) if settings.xp_formula else {},
-        "rewards": json.loads(settings.rewards) if settings.rewards else [],
-        "notify_channel": settings.notify_channel,
-        "notify_message": settings.notify_message,
-        "ping_user": settings.ping_user,
-        "decay_enabled": settings.decay_enabled,
-        "decay_days": settings.decay_days,
-        "decay_percent": settings.decay_percent,
-        "blacklist_channels": json.loads(settings.blacklist_channels) if settings.blacklist_channels else [],
-        "boost_channels": json.loads(settings.boost_channels) if settings.boost_channels else [],
-        "boost_roles": json.loads(settings.boost_roles) if settings.boost_roles else [],
-        "card_bg_color": settings.card_bg_color,
-        "card_accent_color": settings.card_accent_color,
-        "card_style": settings.card_style,
+        "enabled": s.enabled,
+        "xp_per_message": s.xp_per_message,
+        "xp_per_voice_minute": s.xp_per_voice_minute,
+        "min_message_length": s.min_message_length,
+        "cooldown_seconds": s.cooldown_seconds,
+        "multiplier": s.multiplier,
+        "xp_formula": _loads(s.xp_formula, {"formula_type": "exponential", "base_xp": 15, "multiplier": 1.0}),
+        "rewards": _loads(s.rewards, []),
+        "notify_channel": s.notify_channel,
+        "notify_message": s.notify_message,
+        "ping_user": s.ping_user,
+        "decay_enabled": s.decay_enabled,
+        "decay_days": s.decay_days,
+        "decay_percent": s.decay_percent,
+        "blacklist_channels": _loads(s.blacklist_channels, []),
+        "boost_channels": _loads(s.boost_channels, []),
+        "boost_roles": _loads(s.boost_roles, []),
+        "card_bg_color": s.card_bg_color,
+        "card_accent_color": s.card_accent_color,
+        "card_style": s.card_style,
     }
 
+
+@app.get("/api/ranking/settings")
+def get_ranking_settings(server_id: str = Query(...), platform: str = Query("vk")):
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        settings = db.query(RankingSettings).filter(
+            RankingSettings.server_id == server.id,
+            RankingSettings.platform == platform,
+        ).first()
+        if not settings:
+            settings = RankingSettings(server_id=server.id, platform=platform)
+            db.add(settings)
+            db.commit()
+            db.refresh(settings)
+
+        return _serialize_ranking_settings(settings)
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
 @app.post("/api/ranking/settings")
-def save_ranking_settings(
-    data: RankingSettingsUpdate,
-    server_id: str = Query(...),
-    platform: str = Query("vk"),
-    db: Session = Depends(get_db)
-):
-    server = db.query(Server).filter(Server.server_id == server_id).first()
-    if not server:
-        raise HTTPException(status_code=404, detail="Server not found")
-    
-    settings = db.query(RankingSettings).filter(
-        RankingSettings.server_id == server.id,
-        RankingSettings.platform == platform
-    ).first()
-    
-    data_dict = data.model_dump()
-    
-    if settings:
-        for field, value in data_dict.items():
-            setattr(settings, field, value)
-    else:
-        settings = RankingSettings(
-            server_id=server.id,
-            platform=platform,
-            **data_dict
-        )
-        db.add(settings)
-        
-    db.commit()
-    db.refresh(settings)
-    return {"status": "saved"}
+def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk"), data: dict = None):
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        settings = db.query(RankingSettings).filter(
+            RankingSettings.server_id == server.id,
+            RankingSettings.platform == platform,
+        ).first()
+        if not settings:
+            settings = RankingSettings(server_id=server.id, platform=platform)
+            db.add(settings)
+
+        payload = data or {}
+        json_fields = {"xp_formula", "rewards", "blacklist_channels", "boost_channels", "boost_roles"}
+        simple_fields = {
+            "enabled", "xp_per_message", "xp_per_voice_minute", "min_message_length",
+            "cooldown_seconds", "multiplier", "notify_channel", "notify_message", "ping_user",
+            "decay_enabled", "decay_days", "decay_percent",
+            "card_bg_color", "card_accent_color", "card_style",
+        }
+        for field in simple_fields:
+            if field in payload:
+                setattr(settings, field, payload[field])
+        for field in json_fields:
+            if field in payload:
+                setattr(settings, field, json.dumps(payload[field], ensure_ascii=False))
+
+        db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
 
 @app.get("/api/ranking/leaderboard")
 def get_ranking_leaderboard(
     server_id: str = Query(...),
     platform: str = Query("vk"),
     sort: str = Query("xp"),
-    limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    limit: int = Query(50),
+    offset: int = Query(0),
 ):
-    server = db.query(Server).filter(Server.server_id == server_id).first()
-    if not server:
-        raise HTTPException(status_code=404, detail="Server not found")
-    query = db.query(Member).filter(
-        Member.server_id == server_id,
-        Member.platform == platform
-    )
-    if sort == "level":
-        query = query.order_by(Member.level.desc(), Member.xp.desc())
-    elif sort == "messages":
-        query = query.order_by(Member.messages.desc())
-    else:
-        query = query.order_by(Member.xp.desc())
-    total = query.count()
-    entries = query.offset(offset).limit(limit).all()
-    return {
-        "platform": platform,
-        "total": total,
-        "entries": [
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"platform": platform, "total": 0, "entries": []}
+
+        sort_column = {"xp": Member.xp, "level": Member.level, "messages": Member.messages}.get(sort, Member.xp)
+
+        base_query = db.query(Member).filter(
+            Member.server_id == str(server.id),
+            Member.platform == platform,
+        )
+        total = base_query.count()
+        rows = base_query.order_by(sort_column.desc()).offset(offset).limit(limit).all()
+
+        entries = [
             {
                 "rank": offset + i + 1,
-                "user_id": e.user_id,
-                "username": e.username,
-                "avatar_url": e.avatar_url,
-                "level": e.level,
-                "xp": e.xp,
-                "messages": e.messages,
-                "voice_minutes": e.voice_minutes,
-                "reactions": e.reactions,
-                "last_active": e.last_active.isoformat() if e.last_active else None,
+                "user_id": m.user_id,
+                "username": m.username,
+                "avatar_url": m.avatar_url,
+                "level": m.level,
+                "xp": m.xp,
+                "messages": m.messages,
+                "voice_minutes": m.voice_minutes,
+                "reactions": m.reactions,
+                "last_active": m.last_active.isoformat() if m.last_active else None,
             }
-            for i, e in enumerate(entries)
+            for i, m in enumerate(rows)
         ]
-    }
+        return {"platform": platform, "total": total, "entries": entries}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
 
 @app.get("/api/ranking/preview")
-def get_ranking_preview(
-    server_id: str = Query(...),
-    platform: str = Query("vk"),
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
-):
-    entry = db.query(Member).filter(
-        Member.server_id == server_id,
-        Member.platform == platform,
-        Member.user_id == user_id
-    ).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="User not found in ranking")
-    rank = db.query(Member).filter(
-        Member.server_id == server_id,
-        Member.platform == platform,
-        Member.xp > entry.xp
-    ).count() + 1
-    xp_for_next = 100 * (entry.level ** 2)
-    return {
-        "platform": platform,
-        "user": {
-            "id": entry.user_id,
-            "username": entry.username,
-            "avatar_url": entry.avatar_url,
-        },
-        "ranking": {
-            "rank": rank,
-            "level": entry.level,
-            "current_xp": entry.xp,
-            "xp_for_next_level": xp_for_next,
-            "messages": entry.messages,
-            "voice_minutes": entry.voice_minutes,
-            "reactions": entry.reactions,
+def get_ranking_preview(server_id: str = Query(...), platform: str = Query("vk"), user_id: str = Query(...)):
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден."}
+
+        member = db.query(Member).filter(
+            Member.server_id == str(server.id),
+            Member.platform == platform,
+            Member.user_id == user_id,
+        ).first()
+        if not member:
+            return {"error": "Пользователь не найден в рейтинге."}
+
+        settings = db.query(RankingSettings).filter(
+            RankingSettings.server_id == server.id,
+            RankingSettings.platform == platform,
+        ).first()
+        try:
+            formula_data = json.loads(settings.xp_formula) if settings and settings.xp_formula else {}
+        except json.JSONDecodeError:
+            formula_data = {}
+        formula_type = formula_data.get("formula_type", "exponential")
+
+        rank = db.query(Member).filter(
+            Member.server_id == str(server.id),
+            Member.platform == platform,
+            Member.xp > member.xp,
+        ).count() + 1
+
+        return {
+            "platform": platform,
+            "user": {"id": member.user_id, "username": member.username, "avatar_url": member.avatar_url},
+            "ranking": {
+                "rank": rank,
+                "level": member.level,
+                "current_xp": member.xp,
+                "xp_for_next_level": XPFormulaEngine.calculate_level_xp(member.level, formula_type),
+                "messages": member.messages,
+                "voice_minutes": member.voice_minutes,
+                "reactions": member.reactions,
+            },
         }
-    }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
 
-
-# ── Дополнительные эндпоинты для системы уровней (Формулы и Кэш) ──
 
 @app.post("/api/ranking/formulas/validate")
-def validate_formula(formula: XPFormulaConfig):
+def validate_ranking_formula(data: dict = None):
     try:
-        test_xp = XPFormulaEngine.calculate_xp(
-            formula,
-            current_level=5,
-            message_length=50,
-            is_voice=False
-        )
-        level_10_xp = XPFormulaEngine.calculate_level_xp(10, formula.formula_type)
-        
-        return {
-            "valid": True,
-            "test_xp": test_xp,
-            "level_10_required_xp": level_10_xp,
-            "presets": {name: config.model_dump() for name, config in XP_PRESETS.items()}
-        }
+        config = XPFormulaConfig(**(data or {}))
+    except Exception as e:
+        return {"valid": False, "error": str(e)}
+
+    try:
+        test_xp = XPFormulaEngine.calculate_xp(config, current_level=5, message_length=50)
+        level_10_required_xp = XPFormulaEngine.calculate_level_xp(10, config.formula_type)
+        return {"valid": True, "test_xp": test_xp, "level_10_required_xp": level_10_required_xp}
     except Exception as e:
         return {"valid": False, "error": str(e)}
 
 
 @app.get("/api/ranking/formulas/presets")
-def get_formula_presets():
-    return {
-        "presets": {name: config.model_dump() for name, config in XP_PRESETS.items()}
-    }
+def get_ranking_formula_presets():
+    return {"presets": {k: v.model_dump() for k, v in XP_PRESETS.items()}}
 
 
 @app.get("/api/ranking/cache/stats")
-def get_cache_stats():
-    return cache.get_stats()
+def get_ranking_cache_stats():
+    return cache.stats()
 
 
 @app.post("/api/ranking/cache/clear")
-def clear_cache():
+def clear_ranking_cache():
     cache.clear()
-    return {"status": "cleared"}
+    return {"status": "ok"}
 
 
 # ==================== Модерация (ТЗ №4) ====================
@@ -2912,20 +2889,16 @@ async def vk_callback(request: Request):
                 db.add(action_event)
                 db.commit()
 
-            # 4. 🚀 Начисляем XP за сообщение (асинхронно, чтобы не блокировать ответ VK)
-            try:
-                asyncio.create_task(
-                    award_xp_for_message(
-                        server_id=str(conn.server_id),
-                        platform="vk",
-                        user_id=str(from_id),
-                        username=str(from_id),  # Временно используем ID как имя, чтобы не делать лишний запрос к VK API
-                        message_length=len(text), # <-- ИСПРАВЛЕНО: передаем длину текста, как ожидает xp_handler
-                        channel_id=str(peer_id),
-                    )
-                )
-            except Exception as xp_error:
-                logger.error(f"XP award task failed: {xp_error}")
+            # 4. Начисляем XP за сообщение (асинхронно, чтобы не блокировать ответ VK)
+            if from_id:
+                asyncio.create_task(award_xp_for_message(
+                    server_id=str(conn.server_id),
+                    platform="vk",
+                    user_id=str(from_id),
+                    username=f"id{from_id}",
+                    message_text=text,
+                    channel_id=str(peer_id) if peer_id else None,
+                ))
 
             # 5. Возвращаем OK ВКонтакте
             return JSONResponse(content={"status": "ok"})
