@@ -24,11 +24,11 @@ export function useSaveRankingSettings() {
   });
 }
 
-export function useLeaderboard(serverId: string, platform: 'vk' | 'lolka' = 'vk', sort: 'xp' | 'level' | 'messages' = 'xp') {
+export function useLeaderboard(serverId: string, platform: 'vk' | 'lolka' = 'vk', sort: 'xp' | 'level' | 'messages' = 'xp', enabled: boolean = true) {
   return useQuery({
     queryKey: ['ranking', 'leaderboard', serverId, platform, sort],
     queryFn: () => api.ranking.getLeaderboard(serverId, platform, sort),
-    enabled: !!serverId,
+    enabled: !!serverId && enabled,
     staleTime: 30 * 1000, // 30 секунд
     refetchInterval: 60 * 1000, // Обновление каждые 60 секунд
   });
@@ -40,5 +40,19 @@ export function useRankingPreview(serverId: string, platform: 'vk' | 'lolka', us
     queryFn: () => api.ranking.getPreview(serverId, platform, userId),
     enabled: !!serverId && !!userId,
     staleTime: 60 * 1000, // 1 минута
+  });
+}
+
+export function useFormulaPresets() {
+  return useQuery({
+    queryKey: ['ranking', 'formula-presets'],
+    queryFn: () => api.ranking.getFormulaPresets(),
+    staleTime: Infinity, // пресеты статичны, менять их нельзя (см. formulas.py)
+  });
+}
+
+export function useValidateFormula() {
+  return useMutation({
+    mutationFn: (formula: import('@/types/ranking').XPFormulaConfig) => api.ranking.validateFormula(formula),
   });
 }
