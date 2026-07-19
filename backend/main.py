@@ -263,7 +263,19 @@ def create_server(data: CreateServerRequest, user: User = Depends(get_current_us
     try:
         existing = db.query(Server).filter(Server.server_id == server_id).first()
         if existing:
-            return {"error": "Сервер с таким ID уже зарегистрирован"}
+            if existing.owner_id is not None and existing.owner_id != user.id:
+                return {"error": "Этот сервер уже подключён другим аккаунтом"}
+            # existing.owner_id is None — осиротевшая запись (старые данные до введения owner_id,
+            # либо ранее удалённый владелец): текущий пользователь может забрать её себе.
+            existing.owner_id = user.id
+            existing.name = data.name
+            existing.webhook_url = data.webhook_url
+            existing.platform = data.platform
+            existing.icon_url = data.icon_url
+            existing.member_count = data.member_count
+            db.commit()
+            db.refresh(existing)
+            return {"status": "created", "server": {"id": existing.id, "name": existing.name, "platform": existing.platform}}
         server = Server(
             name=data.name,
             server_id=server_id,
@@ -723,9 +735,11 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
 
     user_data = {}
     try:
-        user_resp = requests.get("https://id.vk.com/oauth2/user_info", headers={
-            "Authorization": f"Bearer {access_token}"
-        }, timeout=10)
+        user_resp = requests.post("https://id.vk.com/oauth2/user_info", data={
+            "client_id": app_id,
+            "access_token": access_token,
+        }, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=10)
+        logger.info(f"[VK OAuth] user_info status={user_resp.status_code} body={user_resp.text[:500]}")
         user_data = user_resp.json().get("user", {}) or {}
         if not vk_id:
             vk_id = str(user_data.get("user_id", "") or "")
