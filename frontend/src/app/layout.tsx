@@ -1,49 +1,46 @@
-'use client';
+import type { Metadata } from "next";
+import { AuthProvider } from "@/context/AuthProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { Toaster } from "@/components/Toaster";
+import { QueryProvider } from "@/providers/QueryProvider"; // <-- Импорт добавлен
+import "./globals.css";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Sidebar } from '@/components/Sidebar';
-import { Header } from '@/components/Header';
-import { ServerProvider } from '@/context/ServerProvider';
-import { useAuth } from '@/context/AuthProvider';
+export const metadata: Metadata = {
+  title: "Nova Bot — Панель управления",
+  description: "Умный помощник для серверов Lolka и сообществ VK",
+  icons: { icon: "/icon.png", shortcut: "/icon.png", apple: "/apple-icon.png" },
+};
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/login');
-    }
-  }, [loading, user, router]);
-
-  if (loading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[rgb(var(--bg))]">
-        <div className="text-white text-xl">⚙️ Загрузка...</div>
-      </div>
-    );
-  }
-
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <ServerProvider>
-      <div className="relative min-h-screen bg-[rgb(var(--bg))]">
-        <div className="animated-bg" aria-hidden="true">
-          <div className="blob blob-1" />
-          <div className="blob blob-2" />
-          <div className="blob blob-3" />
-        </div>
-
-        <div className="relative z-10 flex h-screen overflow-hidden text-[rgb(var(--text))]">
-          <Sidebar />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Header />
-            <main className="flex-1 overflow-auto p-6 lg:p-8">
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="bg-[rgb(var(--bg))] text-[rgb(var(--text))] antialiased">
+        {/* <-- QueryProvider добавлен здесь, оборачивая всё приложение */}
+        <QueryProvider>
+          <AuthProvider>
+            <ThemeProvider>
               {children}
-            </main>
-          </div>
-        </div>
-      </div>
-    </ServerProvider>
+              <Toaster />
+            </ThemeProvider>
+          </AuthProvider>
+        </QueryProvider>
+      </body>
+    </html>
   );
 }

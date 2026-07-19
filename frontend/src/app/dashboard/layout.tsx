@@ -1,8 +1,30 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { ServerProvider } from '@/context/ServerProvider';
+import { useAuth } from '@/context/AuthProvider';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[rgb(var(--bg))]">
+        <div className="text-white text-xl">⚙️ Загрузка...</div>
+      </div>
+    );
+  }
+
   return (
     <ServerProvider>
       <div className="relative min-h-screen bg-[rgb(var(--bg))]">
