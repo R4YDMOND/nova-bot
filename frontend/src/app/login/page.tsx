@@ -82,8 +82,7 @@ function LoginContent() {
             </div>
           )}
 
-          <a
-            <button
+          <button
             type="button"
             onClick={handleVkLogin}
             disabled={vkLoading}
