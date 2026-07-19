@@ -131,12 +131,15 @@ class EventNotification(Base):
 
 
 class User(Base):
-    """Пользователь, зарегистрированный по e-mail и паролю."""
+    """Пользователь: вход по e-mail+паролю ИЛИ через VK (см. vk_id)."""
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=True)          # nullable: у VK-пользователей может отсутствовать
+    password_hash = Column(String, nullable=True)                           # nullable: у VK-пользователей пароля нет
+    vk_id = Column(String(50), unique=True, index=True, nullable=True)      # НОВОЕ: связка с VK ID
+    name = Column(String(255), nullable=True)                               # НОВОЕ: отображаемое имя для шапки
+    avatar_url = Column(String(1024), nullable=True)                        # НОВОЕ
     is_verified = Column(Boolean, default=False)
     verification_token = Column(String, nullable=True, index=True)
     verification_token_expires = Column(DateTime, nullable=True)

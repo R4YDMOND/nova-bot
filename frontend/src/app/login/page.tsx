@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthProvider';
+import { api } from '@/lib/api';
 
 const ERROR_MESSAGES: Record<string, string> = {
   vk_denied: 'Вы отменили вход через ВКонтакте',
@@ -24,6 +25,18 @@ function LoginContent() {
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [vkLoading, setVkLoading] = useState(false);
+
+  async function handleVkLogin() {
+    setVkLoading(true);
+    try {
+      const { url } = await api.auth.getVkUrl();
+      window.location.href = url;
+    } catch {
+      setVkLoading(false);
+      router.push('/login?error=vk_denied');
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,15 +83,18 @@ function LoginContent() {
           )}
 
           <a
-            href="/api/auth/vk"
-            className="flex items-center justify-center gap-3 w-full py-3.5 px-6 rounded-2xl font-semibold text-white transition-all active:scale-95"
+            <button
+            type="button"
+            onClick={handleVkLogin}
+            disabled={vkLoading}
+            className="flex items-center justify-center gap-3 w-full py-3.5 px-6 rounded-2xl font-semibold text-white transition-all active:scale-95 disabled:opacity-60"
             style={{ backgroundColor: '#0077FF' }}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
               <path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14C20.67 22 22 20.67 22 15.07V8.93C22 3.33 20.67 2 15.07 2zm3.29 13.17h-1.5c-.57 0-.74-.45-1.76-1.48-.89-.86-1.28-.97-1.5-.97-.3 0-.39.09-.39.51v1.35c0 .36-.11.58-1.07.58-1.57 0-3.32-.95-4.55-2.73C5.7 10.45 5.1 8.42 5.1 8.01c0-.22.09-.42.51-.42h1.5c.38 0 .52.17.67.58.74 2.13 1.97 4 2.47 4s.58-.24.58-1.61V8.79c-.06-1.16-.68-1.25-.68-1.66 0-.2.16-.4.42-.4h2.37c.32 0 .43.17.43.54v2.96c0 .32.14.43.22.43.21 0 .38-.11.77-.51 1.19-1.34 2.04-3.4 2.04-3.4.11-.22.3-.43.68-.43h1.5c.45 0 .55.23.45.54-.19.88-2.04 3.49-2.04 3.49-.16.27-.22.38 0 .68.16.22.68.68 1.03 1.09.64.74 1.13 1.36 1.26 1.78.12.42-.09.63-.51.63z" />
             </svg>
-            Войти через ВКонтакте
-          </a>
+            {vkLoading ? 'Переходим в VK...' : 'Войти через ВКонтакте'}
+          </button>
 
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-[rgb(var(--border))]" />

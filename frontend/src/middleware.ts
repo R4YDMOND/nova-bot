@@ -1,16 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export function middleware(request: NextRequest) {
-  const session = request.cookies.get('nova_session')?.value;
-
-  if (!session) {
-    const loginUrl = new URL('/', request.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
+// Гейт по nova_session-куке убран вместе со старым VK-флоу на фронте.
+// Авторизация теперь строится на Bearer JWT в localStorage, который
+// недоступен в edge middleware — проверка перенесена в
+// app/dashboard/layout.tsx (клиентский редирект через useAuth()).
+export function middleware() {
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: [],
 };

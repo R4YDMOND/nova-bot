@@ -26,6 +26,7 @@ import secrets
 import asyncio
 import time
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 # Новые импорты для JSONB endpoints
 import json
@@ -682,8 +683,9 @@ def auth_vk():
 
 @app.get("/api/auth/vk/callback")
 def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
+    frontend_url = "https://nova-bot-1-1hsz.onrender.com"
     if not code:
-        raise HTTPException(status_code=400, detail="No code")
+        return RedirectResponse(url=f"{frontend_url}/login?error=vk_denied")
 
     app_id = os.getenv("VK_APP_ID", "")
     secret_key = os.getenv("VK_SECRET_KEY", "")
@@ -691,7 +693,7 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
 
     code_verifier = vk_pkce_store.pop(state, "")
     if not code_verifier:
-        raise HTTPException(status_code=400, detail="Сессия истекла или state не найден")
+        return RedirectResponse(url=f"{frontend_url}/login?error=invalid_state")
 
     try:
         resp = requests.post("https://id.vk.com/oauth2/token", data={
@@ -721,16 +723,45 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения пользователя: {str(e)}")
 
-    nova_token = secrets.token_hex(32)
-    return {
-        "status": "ok",
-        "token": nova_token,
-        "user": {
-            "id": user_data.get("user_id"),
-            "username": f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip(),
-            "avatar": user_data.get("avatar"),
-        },
-    }
+    frontend_url = "https://nova-bot-1-1hsz.onrender.com"
+
+    vk_id = str(user_data.get("user_id", "") or "")
+    if not vk_id:
+        return RedirectResponse(url=f"{frontend_url}/login?error=vk_no_id")
+
+    display_name = f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip() or f"VK {vk_id}"
+    avatar_url = user_data.get("avatar", "") or ""
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if user:
+            user.name = display_name
+            user.avatar_url = avatar_url
+        else:
+            user = User(vk_id=vk_id, name=display_name, avatar_url=avatar_url, is_verified=True)
+            db.add(user)
+        db.flush()  # нужен user.id для payload, если пользователь новый
+
+        payload = {"sub": str(user.id), "vk_id": vk_id}
+        nova_access = create_access_token(payload)
+        nova_refresh = create_refresh_token(payload)
+        user.refresh_token = nova_refresh
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[VK OAuth] Не удалось сохранить пользователя: {e}")
+        return RedirectResponse(url=f"{frontend_url}/login?error=vk_user_save_failed")
+    finally:
+        db.close()
+
+    return RedirectResponse(
+        url=(
+            f"{frontend_url}/auth/callback"
+            f"?access_token={nova_access}&refresh_token={nova_refresh}"
+            f"&name={quote(display_name)}&avatar={quote(avatar_url)}"
+        )
+    )
 
 
 # ==================== E-mail регистрация ====================

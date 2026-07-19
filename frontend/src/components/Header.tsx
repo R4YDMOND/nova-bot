@@ -1,14 +1,9 @@
 'use client';
 import { Bell } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ThemeToggle } from './ThemeToggle';
-
-interface Profile {
-  name: string;
-  avatar: string;
-}
+import { useAuth } from '@/context/AuthProvider';
 
 const labels: Record<string, string> = {
   dashboard: 'Обзор',
@@ -26,16 +21,8 @@ const labels: Record<string, string> = {
 
 export function Header() {
   const pathname = usePathname();
-  const [profile, setProfile] = useState<Profile | null>(null);
-
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.authenticated) setProfile({ name: data.name, avatar: data.avatar });
-      })
-      .catch(() => {});
-  }, []);
+  const { user } = useAuth();
+  const profile = user ? { name: user.name || user.email || 'Пользователь', avatar: user.avatar || '' } : null;
 
   const segments = (pathname || '').split('/').filter(Boolean);
   const crumbs = segments.map((seg) => labels[seg] || seg);

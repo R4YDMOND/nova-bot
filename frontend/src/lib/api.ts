@@ -1,9 +1,6 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nova-bot-rpsy.onrender.com";
 
-// ВАЖНО: Убедитесь, что функция getAccessToken импортирована в этот файл, 
-// например: import { getAccessToken } from '@/lib/auth';
-// Если её нет, объявите заглушку, чтобы избежать ошибок:
-declare function getAccessToken(): string;
+import { getAccessToken } from '@/lib/auth';
 
 export type NotificationSettings = {
   email: { enabled: boolean; address: string };
@@ -31,7 +28,7 @@ export type DashboardWebhook = {
   active: boolean;
 };
 
-export type AuthUser = { id: number; email: string };
+export type AuthUser = { id: number; email?: string; name?: string; avatar?: string };
 
 // ── Типы модерации (ТЗ №4) ─────────────────────────────────────────────
 export type ModerationEventItem = {

@@ -10,6 +10,7 @@ type AuthContextType = {
   register: (email: string, password: string) => Promise<{ ok: boolean; error?: string; emailSent?: boolean }>;
   logout: () => Promise<void>;
   refresh: () => Promise<boolean>;
+  loginWithTokens: (access: string, refresh: string, user: AuthUser) => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -106,8 +107,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshToken, clear]);
 
+  const loginWithTokens = useCallback(
+    (access: string, refresh: string, user: AuthUser) => {
+      persist(access, refresh, user);
+    },
+    [persist]
+  );
+
   return (
-    <AuthContext.Provider value={{ user, accessToken, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ user, accessToken, loading, login, register, logout, refresh, loginWithTokens }}>
       {children}
     </AuthContext.Provider>
   );
