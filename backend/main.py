@@ -715,17 +715,23 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка обмена кода: {str(e)}")
 
+    frontend_url = "https://nova-bot-1-1hsz.onrender.com"
+
+    # user_id надёжно приходит уже в ответе на обмен кода (token_data) — это основной источник.
+    # /oauth2/user_info используем только как источник имени/аватара, необязательный.
+    vk_id = str(token_data.get("user_id", "") or "")
+
+    user_data = {}
     try:
         user_resp = requests.get("https://id.vk.com/oauth2/user_info", headers={
             "Authorization": f"Bearer {access_token}"
         }, timeout=10)
-        user_data = user_resp.json().get("user", {})
+        user_data = user_resp.json().get("user", {}) or {}
+        if not vk_id:
+            vk_id = str(user_data.get("user_id", "") or "")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения пользователя: {str(e)}")
+        logger.warning(f"[VK OAuth] Не удалось получить user_info (не критично): {e}")
 
-    frontend_url = "https://nova-bot-1-1hsz.onrender.com"
-
-    vk_id = str(user_data.get("user_id", "") or "")
     if not vk_id:
         return RedirectResponse(url=f"{frontend_url}/login?error=vk_no_id")
 

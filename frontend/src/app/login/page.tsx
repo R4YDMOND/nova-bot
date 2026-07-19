@@ -56,14 +56,14 @@ function LoginContent() {
       <div className="w-full max-w-sm mx-4">
         <div className="text-center mb-8">
           <div className="text-5xl mb-3">✨</div>
-          <h1 className="text-3xl font-bold text-white">Nova Bot</h1>
+          <h1 className="text-3xl font-bold text-[rgb(var(--text))]">Nova Bot</h1>
           <p className="text-[rgb(var(--text-secondary))] mt-1 text-sm">
             Управляйте своими серверами
           </p>
         </div>
 
         <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-8 shadow-2xl">
-          <h2 className="text-xl font-semibold text-white text-center mb-2">
+          <h2 className="text-xl font-semibold text-[rgb(var(--text))] text-center mb-2">
             Войти в Dashboard
           </h2>
           <p className="text-[rgb(var(--text-secondary))] text-sm text-center mb-6">
@@ -161,7 +161,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-[rgb(var(--bg))]">
-          <div className="text-white text-xl">⚙️ Загрузка...</div>
+          <div className="text-[rgb(var(--text))] text-xl">⚙️ Загрузка...</div>
         </div>
       }
     >
