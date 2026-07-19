@@ -669,7 +669,7 @@ def auth_vk():
     vk_pkce_store[state] = code_verifier
 
     url = (
-        f"https://id.vk.com/oauth2/auth"
+        f"https://id.vk.com/authorize"
         f"?client_id={app_id}"
         f"&redirect_uri={redirect_uri}"
         f"&response_type=code"
@@ -696,7 +696,7 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
         return RedirectResponse(url=f"{frontend_url}/login?error=invalid_state")
 
     try:
-        resp = requests.post("https://id.vk.com/oauth2/token", data={
+        resp = requests.post("https://id.vk.com/oauth2/auth", data={
             "grant_type": "authorization_code",
             "client_id": app_id,
             "client_secret": secret_key,
