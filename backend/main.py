@@ -2488,6 +2488,19 @@ def clear_ranking_cache():
     return {"status": "ok"}
 
 
+@app.get("/api/ranking/members")
+def get_ranking_members():
+    """Возвращает список участников рейтинга (legacy mock, не трогать — используется отдельно)"""
+    return {
+        "members": [
+            {"name": "🦊 Лисёнок", "level": 42, "xp": 15420, "rank": 1, "avatar": "🦊", "messages": 2400, "voiceHours": 120, "reactions": 856},
+            {"name": "🐉 Dragon", "level": 38, "xp": 12800, "rank": 2, "avatar": "🐉", "messages": 1800, "voiceHours": 95, "reactions": 620},
+            {"name": "⭐ StarUser", "level": 27, "xp": 7650, "rank": 3, "avatar": "⭐", "messages": 1200, "voiceHours": 60, "reactions": 340}
+        ],
+        "total": 3
+    }
+
+
 # ==================== Модерация (ТЗ №4) ====================
 
 PERIOD_DELTAS = {
