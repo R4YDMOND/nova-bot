@@ -142,7 +142,53 @@ export type FormulaValidationResult = {
 };
 
 // ── Утилита для запросов ───────────────────────────────────────────────
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+const ACCESS_KEY = 'nova_access_token';
+const REFRESH_KEY = 'nova_refresh_token';
+const USER_KEY = 'nova_user';
+
+// Эндпоинты auth, на которых 401 — не "токен истёк", а обычный неверный логин/просроченный refresh.
+// Ретрай через /refresh для них не запускаем, чтобы не зациклиться.
+const AUTH_ENDPOINTS = ['/api/auth/login', '/api/auth/refresh', '/api/auth/register'];
+
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return null;
+
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        localStorage.setItem(ACCESS_KEY, data.access_token);
+        localStorage.setItem(REFRESH_KEY, data.refresh_token);
+        return data.access_token as string;
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+function clearSessionAndRedirect() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem(USER_KEY);
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+}
+
+async function apiFetch<T>(path: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
@@ -158,6 +204,15 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
         ...options.headers,
       },
     });
+
+    if (res.status === 401 && !_isRetry && !AUTH_ENDPOINTS.includes(path)) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        clearTimeout(timeout);
+        return apiFetch<T>(path, options, true);
+      }
+      clearSessionAndRedirect();
+    }
 
     if (!res.ok) {
       let detail = "";

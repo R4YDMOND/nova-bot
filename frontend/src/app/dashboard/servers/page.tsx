@@ -346,7 +346,12 @@ export default function ServersPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Платформа</label>
-                <Select value={form.platform} onValueChange={(v: string) => setForm(f => ({ ...f, platform: v as 'vk' | 'lolka' }))}>
+                <Select value={form.platform} onValueChange={(v: string) => {
+                  // Сброс ID при смене платформы — иначе ID предыдущей платформы
+                  // (например, club123 от VK) остаётся подставленным в форму Lolka.
+                  setForm(f => ({ ...f, platform: v as 'vk' | 'lolka', server_id: '' }));
+                  setDetection(null);
+                }}>
                   <SelectTrigger>
                     <span className="inline-flex items-center gap-2">
                       <PlatformIcon platform={form.platform} className="w-4 h-4 rounded" /> {PLATFORM_LABEL[form.platform]}
