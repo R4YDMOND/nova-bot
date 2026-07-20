@@ -5,13 +5,11 @@ import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/toggle';
 import { useServer } from '@/context/ServerProvider';
 import { NoServerSelected } from '@/components/NoServerSelected';
-import { PlatformIcon } from '@/components/PlatformIcon';
 import {
   useRankingSettings,
   useSaveRankingSettings,
   useLeaderboard,
   useRankingPreview,
-  useFormulaPresets,
   useValidateFormula,
 } from '@/hooks/useRanking';
 import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
@@ -56,15 +54,12 @@ function calcLevelXp(level: number, formulaType: string): number {
 export default function RankingPage() {
   const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState('settings');
-  const [viewPlatform, setViewPlatform] = useState<'vk' | 'lolka' | 'both'>('vk');
+  const [viewPlatform, setViewPlatform] = useState<'vk' | 'lolka'>('vk');
   const [formData, setFormData] = useState<any>({});
   const [sort, setSort] = useState<'xp' | 'level' | 'messages'>('xp');
   const [formulaTest, setFormulaTest] = useState<{ valid: boolean; test_xp?: number; level_10_required_xp?: number; error?: string } | null>(null);
 
-  const serverPlatform = (selectedServer?.platform || 'vk') as 'vk' | 'lolka';
-  // Настройки/награды/карточка всегда для одной конкретной платформы (контракт RankingSettings
-  // не поддерживает "both"). При выборе «Обе» для них используется платформа сервера.
-  const effectivePlatform = viewPlatform === 'both' ? serverPlatform : viewPlatform;
+  const effectivePlatform = viewPlatform;
 
   const { data: settings, isLoading: settingsLoading } = useRankingSettings(selectedServerId, effectivePlatform);
   const saveMutation = useSaveRankingSettings();
@@ -73,19 +68,11 @@ export default function RankingPage() {
   const { data: lbLolka, isLoading: lbLolkaLoading } = useLeaderboard(selectedServerId, 'lolka', sort, viewPlatform !== 'vk');
 
   const leaderboardEntries = useMemo(() => {
-    if (viewPlatform === 'both') {
-      const merged = [
-        ...(lbVk?.entries || []).map(e => ({ ...e, _platform: 'vk' as const })),
-        ...(lbLolka?.entries || []).map(e => ({ ...e, _platform: 'lolka' as const })),
-      ];
-      merged.sort((a, b) => (sort === 'xp' ? b.xp - a.xp : sort === 'level' ? b.level - a.level : b.messages - a.messages));
-      return merged.map((e, i) => ({ ...e, rank: i + 1 }));
-    }
     const src = viewPlatform === 'lolka' ? lbLolka : lbVk;
-    return (src?.entries || []).map(e => ({ ...e, _platform: viewPlatform as 'vk' | 'lolka' }));
-  }, [viewPlatform, lbVk, lbLolka, sort]);
+    return (src?.entries || []).map(e => ({ ...e, _platform: viewPlatform }));
+  }, [viewPlatform, lbVk, lbLolka]);
 
-  const leaderboardLoading = viewPlatform === 'both' ? (lbVkLoading || lbLolkaLoading) : viewPlatform === 'lolka' ? lbLolkaLoading : lbVkLoading;
+  const leaderboardLoading = viewPlatform === 'lolka' ? lbLolkaLoading : lbVkLoading;
 
   // Live Preview — реальные данные топ-1 участника лидерборда (см. Объяснение).
   const topEntry: any = leaderboardEntries[0];
@@ -95,7 +82,6 @@ export default function RankingPage() {
     topEntry?.user_id || ''
   );
 
-  const presetsQuery = useFormulaPresets();
   const validateMutation = useValidateFormula();
 
   const updateField = (field: string, value: any) => setFormData((prev: any) => ({ ...prev, [field]: value }));
@@ -143,9 +129,11 @@ export default function RankingPage() {
   const cardStyle = formData.card_style ?? settings?.card_style ?? 'gradient';
   const cardRadius = formData.card_radius ?? settings?.card_radius ?? 16;
   const cardGlass = formData.card_glass_intensity ?? settings?.card_glass_intensity ?? 70;
+  const cardBgImageUrl = formData.card_bg_image_url ?? settings?.card_bg_image_url ?? '';
+  const cardBgImageEnabled = formData.card_bg_image_enabled ?? settings?.card_bg_image_enabled ?? false;
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
+    <div className="max-w-[1920px] mx-auto px-4 sm:px-8 py-8 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold">🪪 Система уровней</h1>
@@ -154,7 +142,7 @@ export default function RankingPage() {
 
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex rounded-xl border border-[rgb(var(--border))] overflow-hidden">
-            {(['vk', 'lolka', 'both'] as const).map(p => (
+            {(['vk', 'lolka'] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setViewPlatform(p)}
@@ -162,7 +150,7 @@ export default function RankingPage() {
                   viewPlatform === p ? 'bg-cyan-400 text-black' : 'bg-[rgb(var(--surface-2))] hover:bg-[rgb(var(--surface-3))]'
                 }`}
               >
-                {p === 'vk' ? 'VK' : p === 'lolka' ? 'Lolka' : 'Обе'}
+                {p === 'vk' ? 'VK' : 'Lolka'}
               </button>
             ))}
           </div>
@@ -244,25 +232,7 @@ export default function RankingPage() {
       {activeTab === 'formula' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-5 space-y-3">
-            <div className="flex justify-between items-center mb-1">
-              <h3 className="font-semibold">🧮 Конструктор формулы</h3>
-              {!!presetsQuery.data?.presets && (
-                <select
-                  className="input text-xs py-1 w-40"
-                  defaultValue=""
-                  onChange={e => {
-                    const preset = presetsQuery.data?.presets[e.target.value];
-                    if (preset) updateField('xp_formula', preset);
-                  }}
-                >
-                  <option value="" disabled>Пресет...</option>
-                  {Object.keys(presetsQuery.data.presets).map(k => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-
+            <h3 className="font-semibold mb-1">🧮 Конструктор формулы</h3>
             <div>
               <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Тип формулы</label>
               <select value={formula.formula_type} onChange={e => updateFormula('formula_type', e.target.value)} className="input w-full">
@@ -404,7 +374,6 @@ export default function RankingPage() {
                               ) : (
                                 <span className="w-8 h-8 rounded-full bg-[rgb(var(--surface-3))] flex items-center justify-center" style={entry.rank <= 3 ? { border: `2px solid ${MEDAL_COLORS[entry.rank]}` } : undefined}>👤</span>
                               )}
-                              {viewPlatform === 'both' && <PlatformIcon platform={entry._platform} className="w-4 h-4 rounded shrink-0" />}
                               <span className="font-medium">{entry.username}</span>
                             </div>
                           </td>
@@ -482,6 +451,21 @@ export default function RankingPage() {
                 ))}
               </div>
             </div>
+            <div className="pt-3 border-t border-[rgb(var(--border))]">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs text-[rgb(var(--text-secondary))]">Пользовательский фон (по ссылке)</label>
+                <Switch checked={cardBgImageEnabled} onCheckedChange={val => updateField('card_bg_image_enabled', val)} />
+              </div>
+              {cardBgImageEnabled && (
+                <input
+                  type="url"
+                  value={cardBgImageUrl}
+                  onChange={e => updateField('card_bg_image_url', e.target.value)}
+                  placeholder="https://example.com/image.png"
+                  className="input w-full"
+                />
+              )}
+            </div>
           </Card>
 
           <Card className="p-5">
@@ -494,7 +478,11 @@ export default function RankingPage() {
                 backdropFilter: cardStyle === 'glass' ? `blur(${Math.round((cardGlass / 100) * 24)}px)` : undefined,
                 border: cardStyle === 'flat' ? `1px solid ${cardAccent}40` : `2px solid ${cardAccent}`,
                 boxShadow: cardStyle === 'neon' ? `0 0 24px ${cardAccent}80, 0 0 8px ${cardAccent}` : cardStyle === 'flat' ? 'none' : `0 0 20px ${cardAccent}30`,
-                backgroundImage: cardStyle === 'gradient' ? `linear-gradient(135deg, ${cardBg}, ${cardGradient}80)` : undefined,
+                backgroundImage: cardBgImageEnabled && cardBgImageUrl
+                  ? `linear-gradient(0deg, ${cardBg}cc, ${cardBg}66), url(${cardBgImageUrl})`
+                  : cardStyle === 'gradient' ? `linear-gradient(135deg, ${cardBg}, ${cardGradient}80)` : undefined,
+                backgroundSize: cardBgImageEnabled && cardBgImageUrl ? 'cover' : undefined,
+                backgroundPosition: cardBgImageEnabled && cardBgImageUrl ? 'center' : undefined,
               }}
             >
               <div className="mb-3 flex justify-between">

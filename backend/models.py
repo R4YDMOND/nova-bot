@@ -296,14 +296,12 @@ class RankingSettings(Base):
 
     card_bg_color = Column(String(20), default="#111118")
     card_accent_color = Column(String(20), default="#00E5FF")
+    card_gradient_color = Column(String(20), default="#7B2FBE")
     card_style = Column(String(50), default="modern")
-
-    card_bg_color = Column(String(20), default="#111118")
-    card_accent_color = Column(String(20), default="#00E5FF")
-    card_gradient_color = Column(String(20), default="#7B2FBE")   # НОВОЕ
-    card_style = Column(String(50), default="modern")
-    card_radius = Column(Integer, default=16)                     # НОВОЕ
-    card_glass_intensity = Column(Integer, default=70)            # НОВОЕ
+    card_radius = Column(Integer, default=16)
+    card_glass_intensity = Column(Integer, default=70)
+    card_bg_image_url = Column(String(1024), default="")
+    card_bg_image_enabled = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)

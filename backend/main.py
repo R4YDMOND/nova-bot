@@ -2365,10 +2365,12 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "boost_roles": _loads(s.boost_roles, []),
         "card_bg_color": s.card_bg_color,
         "card_accent_color": s.card_accent_color,
-        "card_gradient_color": s.card_gradient_color,      # ← ДОБАВИТЬ
+        "card_gradient_color": s.card_gradient_color,
         "card_style": s.card_style,
-        "card_radius": s.card_radius,                      # ← ДОБАВИТЬ
-        "card_glass_intensity": s.card_glass_intensity,     # ← ДОБАВИТЬ
+        "card_radius": s.card_radius,
+        "card_glass_intensity": s.card_glass_intensity,
+        "card_bg_image_url": s.card_bg_image_url,
+        "card_bg_image_enabled": s.card_bg_image_enabled,
     }
 
 
@@ -2419,8 +2421,9 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             "enabled", "xp_per_message", "xp_per_voice_minute", "min_message_length",
             "cooldown_seconds", "multiplier", "notify_channel", "notify_message", "ping_user",
             "decay_enabled", "decay_days", "decay_percent",
-            "card_bg_color", "card_accent_color", "card_gradient_color", "card_style",   # ← "card_gradient_color" ДОБАВЛЕНО сюда
-            "card_radius", "card_glass_intensity",                                        # ← ЭТА СТРОКА ДОБАВЛЕНА целиком
+            "card_bg_color", "card_accent_color", "card_gradient_color", "card_style",
+            "card_radius", "card_glass_intensity",
+            "card_bg_image_url", "card_bg_image_enabled",
         }
         for field in simple_fields:
             if field in payload:
