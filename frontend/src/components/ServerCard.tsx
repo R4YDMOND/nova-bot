@@ -1,5 +1,6 @@
 'use client';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DashboardServer } from '@/lib/api';
@@ -49,7 +50,7 @@ export function ServerCard({ server, selected, onSelect, onRemove, deleting }: S
         <div className="mx-auto mb-4 relative w-20 h-20">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center overflow-hidden border-2 border-[rgb(var(--surface))]">
             {server.icon_url ? (
-              <img src={server.icon_url} alt="" className="w-full h-full object-cover" />
+              <Image src={server.icon_url} alt="" width={80} height={80} className="w-full h-full object-cover" />
             ) : (
               <span className="text-3xl">{server.platform === 'vk' ? '🔵' : '💜'}</span>
             )}
