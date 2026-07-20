@@ -127,6 +127,25 @@ class VKBotService:
         })
         return resp.get("items", [])
 
+    def get_users(self, user_ids: List[str], fields: str = "photo_100,online,screen_name") -> List[Dict[str, Any]]:
+        """
+        Получить данные пользователей по ID (users.get).
+        Разбивает на чанки по 1000 ID (лимит VK API).
+        """
+        if not user_ids:
+            return []
+
+        all_users: List[Dict[str, Any]] = []
+        for i in range(0, len(user_ids), 1000):
+            chunk = user_ids[i:i + 1000]
+            resp = self._call("users.get", {
+                "user_ids": ",".join(chunk),
+                "fields": fields,
+            })
+            all_users.extend(resp if isinstance(resp, list) else [])
+
+        return all_users
+
     def get_conversations(self, count: int = 200, offset: int = 0) -> List[Dict[str, Any]]:
         """Получить список бесед (peer_id)."""
         resp = self._call("messages.getConversations", {

@@ -1449,6 +1449,37 @@ def lolka_send_message(data: dict):
         return {"error": str(e)}
 
 
+@app.get("/api/lolka/channels")
+def lolka_get_channels(server_id: str = Query(...)):
+    """Автоопределение текстовых/голосовых каналов Lolka-сервера — для выбора канала уведомлений."""
+    if not os.getenv("LOLKA_BOT_TOKEN", ""):
+        return {"error": "LOLKA_BOT_TOKEN не настроен", "channels": []}
+    try:
+        resp = _lolka_bot_request("GET", f"{LOLKA_BOT_BASE_URL}/guilds/{server_id}/channels")
+        if resp is None:
+            return {"error": "Lolka API: превышен лимит запросов", "channels": []}
+        if not resp.ok:
+            return {"error": f"Lolka API вернул {resp.status_code}", "channels": []}
+
+        # Discord-совместимые типы каналов (см. lolka_gateway.py): 0 = текстовый, 2 = голосовой
+        TEXT_CHANNEL_TYPES = {0, 5}
+        VOICE_CHANNEL_TYPES = {2}
+
+        channels = [
+            {
+                "id": str(c.get("id")),
+                "name": c.get("name", ""),
+                "type": "voice" if c.get("type") in VOICE_CHANNEL_TYPES else "text",
+                "platform": "lolka",
+            }
+            for c in resp.json()
+            if c.get("type") in TEXT_CHANNEL_TYPES | VOICE_CHANNEL_TYPES
+        ]
+        return {"channels": channels, "total": len(channels)}
+    except Exception as e:
+        return {"error": str(e), "channels": []}
+
+
 @app.get("/api/lolka/bot/server/{server_id}/members")
 def lolka_get_server_members(server_id: str):
     if not os.getenv("LOLKA_BOT_TOKEN", ""):
@@ -2486,6 +2517,115 @@ def get_ranking_leaderboard(
         db.close()
 
 
+@app.post("/api/ranking/sync-members")
+def sync_ranking_members(server_id: str = Query(...), platform: str = Query("vk")):
+    """
+    Синхронизация участников сообщества (VK/Lolka) с таблицей Member.
+    Обновляет username/avatar_url для существующих записей, создаёт новые (level=1, xp=0).
+    Прогресс (level/xp/messages) уже начисленных участников не затрагивается.
+    """
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        if platform == "vk":
+            conn = db.query(VKConnection).filter(
+                VKConnection.server_id == server.id,
+                VKConnection.is_active == True
+            ).first()
+            if not conn:
+                return {"error": "VK-сообщество не подключено"}
+
+            service = get_vk_service(conn.access_token)
+            raw_members = []
+            offset = 0
+            while True:
+                batch = service.get_members(conn.group_id, count=1000, offset=offset)
+                raw_members.extend(batch)
+                if len(batch) < 1000:
+                    break
+                offset += 1000
+
+            synced = 0
+            for u in raw_members:
+                user_id = str(u.get("id"))
+                username = f"{u.get('first_name', '')} {u.get('last_name', '')}".strip() or user_id
+                avatar_url = u.get("photo_100")
+
+                member = db.query(Member).filter(
+                    Member.server_id == str(server.id),
+                    Member.platform == "vk",
+                    Member.user_id == user_id,
+                ).first()
+                if not member:
+                    member = Member(
+                        server_id=str(server.id), platform="vk", user_id=user_id,
+                        username=username, avatar_url=avatar_url, level=1, xp=0,
+                    )
+                    db.add(member)
+                else:
+                    member.username = username
+                    member.avatar_url = avatar_url
+                synced += 1
+
+            db.commit()
+            return {"status": "ok", "synced": synced}
+
+        elif platform == "lolka":
+            if not os.getenv("LOLKA_BOT_TOKEN", ""):
+                return {"error": "LOLKA_BOT_TOKEN не настроен"}
+
+            resp = _lolka_bot_request("GET", f"{LOLKA_BOT_BASE_URL}/guilds/{server.server_id}/members")
+            if resp is None:
+                return {"error": "Lolka API: превышен лимит запросов"}
+            if not resp.ok:
+                return {"error": f"Lolka API вернул {resp.status_code}"}
+
+            synced = 0
+            for m in resp.json():
+                user = m.get("user") or {}
+                user_id = str(user.get("id", ""))
+                if not user_id:
+                    continue
+                username = m.get("nick") or user.get("global_name") or user.get("username") or user_id
+                # ВНИМАНИЕ: формат CDN-ссылки на аватар Lolka в проекте пока нигде не задан.
+                # Сохраняем как есть только если это уже полный URL, иначе оставляем пустым.
+                avatar_raw = user.get("avatar") or ""
+                avatar_url = avatar_raw if avatar_raw.startswith("http") else None
+
+                member = db.query(Member).filter(
+                    Member.server_id == str(server.id),
+                    Member.platform == "lolka",
+                    Member.user_id == user_id,
+                ).first()
+                if not member:
+                    member = Member(
+                        server_id=str(server.id), platform="lolka", user_id=user_id,
+                        username=username, avatar_url=avatar_url, level=1, xp=0,
+                    )
+                    db.add(member)
+                else:
+                    member.username = username
+                    if avatar_url:
+                        member.avatar_url = avatar_url
+                synced += 1
+
+            db.commit()
+            return {"status": "ok", "synced": synced}
+
+        return {"error": f"Неизвестная платформа: {platform}"}
+    except VKAPIError as e:
+        db.rollback()
+        return {"error": e.message}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
 @app.get("/api/ranking/preview")
 def get_ranking_preview(server_id: str = Query(...), platform: str = Query("vk"), user_id: str = Query(...)):
     db = SessionLocal()
@@ -3101,6 +3241,47 @@ def vk_send_message(data: VKSendMessageRequest):
         return {"error": e.message, "code": e.code}
     except Exception as e:
         return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.get("/api/vk/channels")
+def vk_get_channels(server_id: str = Query(...)):
+    """Автоопределение каналов (бесед) VK-сообщества — для выбора канала уведомлений."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers.", "channels": []}
+
+        conn = db.query(VKConnection).filter(
+            VKConnection.server_id == server.id,
+            VKConnection.is_active == True
+        ).first()
+        if not conn:
+            return {"error": "VK-сообщество не подключено", "channels": []}
+
+        service = get_vk_service(conn.access_token)
+        conversations = service.get_conversations()
+
+        channels = []
+        for c in conversations:
+            peer = (c.get("conversation") or {}).get("peer") or {}
+            if peer.get("type") != "chat":
+                continue
+            chat_settings = (c.get("conversation") or {}).get("chat_settings") or {}
+            channels.append({
+                "id": str(peer.get("id", "")),
+                "name": chat_settings.get("title") or f"Беседа {peer.get('id', '')}",
+                "type": "chat",
+                "platform": "vk",
+            })
+
+        return {"channels": channels, "total": len(channels)}
+    except VKAPIError as e:
+        return {"error": e.message, "channels": []}
+    except Exception as e:
+        return {"error": str(e), "channels": []}
     finally:
         db.close()
 
