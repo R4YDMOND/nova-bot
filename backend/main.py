@@ -37,6 +37,7 @@ from sqlalchemy import text
 from ranking.formulas import XPFormulaEngine, XPFormulaConfig, XP_PRESETS
 from ranking.cache import cache
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Временное хранилище PKCE code_verifier (ключ = state)
