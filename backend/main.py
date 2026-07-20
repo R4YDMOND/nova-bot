@@ -749,6 +749,25 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
     except Exception as e:
         logger.warning(f"[VK OAuth] Не удалось получить user_info (не критично): {e}")
 
+    # oauth2/user_info у VK ID отдаёт first_name/last_name транслитом (подтверждено логами,
+    # lang_id на этот эндпоинт не действует) — перезабираем имя классическим API с lang=0,
+    # это документированный способ получить имя на языке анкеты пользователя.
+    try:
+        classic_resp = requests.get("https://api.vk.com/method/users.get", params={
+            "access_token": access_token,
+            "v": "5.199",
+            "lang": "0",
+        }, timeout=10)
+        classic_data = classic_resp.json()
+        logger.info(f"[VK OAuth] users.get(classic) response={classic_data}")
+        classic_user = (classic_data.get("response") or [{}])[0]
+        if classic_user.get("first_name"):
+            user_data["first_name"] = classic_user["first_name"]
+        if classic_user.get("last_name"):
+            user_data["last_name"] = classic_user["last_name"]
+    except Exception as e:
+        logger.warning(f"[VK OAuth] Не удалось получить users.get(classic) (не критично): {e}")
+
     if not vk_id:
         return RedirectResponse(url=f"{frontend_url}/login?error=vk_no_id")
 
