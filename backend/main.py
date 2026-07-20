@@ -686,6 +686,7 @@ def auth_vk():
         f"&redirect_uri={redirect_uri}"
         f"&response_type=code"
         f"&scope=vkid.personal_info+email"
+        f"&lang_id=0"
         f"&state={state}"
         f"&code_challenge={code_challenge}"
         f"&code_challenge_method=S256"
@@ -738,6 +739,7 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
         user_resp = requests.post("https://id.vk.com/oauth2/user_info", data={
             "client_id": app_id,
             "access_token": access_token,
+            "lang_id": "0",
         }, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=10)
         logger.info(f"[VK OAuth] user_info status={user_resp.status_code} body={user_resp.text[:500]}")
         user_data = user_resp.json().get("user", {}) or {}
