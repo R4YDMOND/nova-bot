@@ -56,3 +56,24 @@ export function useValidateFormula() {
     mutationFn: (formula: import('@/types/ranking').XPFormulaConfig) => api.ranking.validateFormula(formula),
   });
 }
+
+export function useRankingChannels(serverId: string, platform: 'vk' | 'lolka' = 'vk') {
+  return useQuery({
+    queryKey: ['ranking', 'channels', serverId, platform],
+    queryFn: () => api.ranking.getChannels(serverId, platform),
+    enabled: false, // запускается вручную кнопкой "Автоопределение", не при монтировании
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSyncMembers() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ serverId, platform }: { serverId: string; platform: 'vk' | 'lolka' }) =>
+      api.ranking.syncMembers(serverId, platform),
+    onSuccess: (_, { serverId, platform }) => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'leaderboard', serverId, platform] });
+    },
+  });
+}

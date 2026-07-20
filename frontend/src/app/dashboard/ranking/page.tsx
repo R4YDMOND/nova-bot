@@ -11,6 +11,8 @@ import {
   useLeaderboard,
   useRankingPreview,
   useValidateFormula,
+  useRankingChannels,
+  useSyncMembers,
 } from '@/hooks/useRanking';
 import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
 
@@ -63,6 +65,26 @@ export default function RankingPage() {
 
   const { data: settings, isLoading: settingsLoading } = useRankingSettings(selectedServerId, effectivePlatform);
   const saveMutation = useSaveRankingSettings();
+
+  const [channelDropdownOpen, setChannelDropdownOpen] = useState(false);
+  const { data: channelsData, isFetching: channelsLoading, refetch: refetchChannels } = useRankingChannels(selectedServerId, effectivePlatform);
+  const syncMembersMutation = useSyncMembers();
+  const [syncResultMsg, setSyncResultMsg] = useState<string | null>(null);
+
+  const handleDetectChannels = async () => {
+    setChannelDropdownOpen(true);
+    await refetchChannels();
+  };
+
+  const handleSyncMembers = async () => {
+    setSyncResultMsg(null);
+    try {
+      const res = await syncMembersMutation.mutateAsync({ serverId: selectedServerId, platform: effectivePlatform });
+      setSyncResultMsg(res.error ? `❌ ${res.error}` : `✅ Синхронизировано участников: ${res.synced ?? 0}`);
+    } catch (e: any) {
+      setSyncResultMsg(`❌ ${e?.message || 'Ошибка синхронизации'}`);
+    }
+  };
 
   const { data: lbVk, isLoading: lbVkLoading } = useLeaderboard(selectedServerId, 'vk', sort, viewPlatform !== 'lolka');
   const { data: lbLolka, isLoading: lbLolkaLoading } = useLeaderboard(selectedServerId, 'lolka', sort, viewPlatform !== 'vk');
@@ -214,7 +236,40 @@ export default function RankingPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Канал уведомлений</label>
-                <input type="text" value={formData.notify_channel ?? settings?.notify_channel ?? ''} onChange={e => updateField('notify_channel', e.target.value)} className="input w-full" />
+                <div className="flex gap-2">
+                  <input type="text" value={formData.notify_channel ?? settings?.notify_channel ?? ''} onChange={e => updateField('notify_channel', e.target.value)} className="input w-full" />
+                  <button
+                    type="button"
+                    onClick={handleDetectChannels}
+                    disabled={channelsLoading}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
+                  >
+                    {channelsLoading ? '⏳' : '🔍 Автоопределение'}
+                  </button>
+                </div>
+                {channelDropdownOpen && (
+                  <div className="mt-2 border border-[rgb(var(--border))] rounded-lg max-h-48 overflow-y-auto bg-[rgb(var(--surface-2))]">
+                    {channelsLoading ? (
+                      <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Поиск каналов...</p>
+                    ) : channelsData?.error ? (
+                      <p className="text-xs text-center py-3 text-red-400">{channelsData.error}</p>
+                    ) : channelsData?.channels?.length ? (
+                      channelsData.channels.map(ch => (
+                        <button
+                          key={ch.id}
+                          type="button"
+                          onClick={() => { updateField('notify_channel', ch.id); setChannelDropdownOpen(false); }}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-400/10 transition-colors flex items-center gap-2"
+                        >
+                          <span>{ch.type === 'voice' ? '🔊' : '💬'}</span>
+                          <span>{ch.name}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Каналы не найдены</p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Шаблон сообщения</label>
@@ -327,16 +382,28 @@ export default function RankingPage() {
 
       {activeTab === 'leaderboard' && (
         <div className="space-y-3">
-          <div className="flex gap-2">
-            {(['xp', 'level', 'messages'] as const).map(s => (
+          <div className="flex gap-2 items-center justify-between flex-wrap">
+            <div className="flex gap-2">
+              {(['xp', 'level', 'messages'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setSort(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${sort === s ? 'bg-cyan-400 text-black' : 'bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))]'}`}
+                >
+                  {s === 'xp' ? 'По XP' : s === 'level' ? 'По уровню' : 'По сообщениям'}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              {syncResultMsg && <span className="text-xs text-[rgb(var(--text-secondary))]">{syncResultMsg}</span>}
               <button
-                key={s}
-                onClick={() => setSort(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${sort === s ? 'bg-cyan-400 text-black' : 'bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))]'}`}
+                onClick={handleSyncMembers}
+                disabled={syncMembersMutation.isPending}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
               >
-                {s === 'xp' ? 'По XP' : s === 'level' ? 'По уровню' : 'По сообщениям'}
+                {syncMembersMutation.isPending ? '⏳ Синхронизация...' : '🔄 Синхронизировать участников'}
               </button>
-            ))}
+            </div>
           </div>
           <Card>
             {leaderboardLoading ? (

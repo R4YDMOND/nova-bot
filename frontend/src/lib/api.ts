@@ -101,6 +101,13 @@ export type RankingSettings = {
   card_bg_image_enabled: boolean;
 };
 
+export type RankingChannel = {
+  id: string;
+  name: string;
+  type: "chat" | "text" | "voice";
+  platform: "vk" | "lolka";
+};
+
 export type LeaderboardEntry = {
   rank: number;
   user_id: string;
@@ -573,6 +580,19 @@ export const api = {
 
     getMembers: () =>
       apiFetch<{ members: object[]; total: number }>("/api/ranking/members"),
+
+    getChannels: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+      apiFetch<{ channels: RankingChannel[]; total: number; error?: string }>(
+        platform === "vk"
+          ? `/api/vk/channels?server_id=${serverId}`
+          : `/api/lolka/channels?server_id=${serverId}`
+      ),
+
+    syncMembers: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+      apiFetch<{ status?: string; synced?: number; error?: string }>(
+        `/api/ranking/sync-members?server_id=${serverId}&platform=${platform}`,
+        { method: "POST" }
+      ),
   },
 
   auth: {
