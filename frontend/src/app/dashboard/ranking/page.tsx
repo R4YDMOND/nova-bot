@@ -31,6 +31,9 @@ const CARD_STYLES = [
   { value: 'flat', label: 'Плоский' },
 ];
 
+// Пресеты палитры для быстрого выбора акцентного цвета (референс: превью палитры)
+const PALETTE_PRESETS = ['#00E5FF', '#7B2FBE', '#F76FBE', '#FFA500', '#22C55E', '#94A3B8'];
+
 const FORMULA_TYPES = [
   { value: 'linear', label: 'Линейная' },
   { value: 'exponential', label: 'Экспоненциальная' },
@@ -39,6 +42,7 @@ const FORMULA_TYPES = [
 ];
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
+const MEDAL_COLORS: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
 
 // Зеркало backend XPFormulaEngine.calculate_level_xp (backend/ranking/formulas.py) —
 // используется только для прогресс-бара в UI, источник истины остаётся на бэкенде.
@@ -135,7 +139,10 @@ export default function RankingPage() {
 
   const cardBg = formData.card_bg_color ?? settings?.card_bg_color ?? '#111118';
   const cardAccent = formData.card_accent_color ?? settings?.card_accent_color ?? '#00E5FF';
+  const cardGradient = formData.card_gradient_color ?? settings?.card_gradient_color ?? '#7B2FBE';
   const cardStyle = formData.card_style ?? settings?.card_style ?? 'gradient';
+  const cardRadius = formData.card_radius ?? settings?.card_radius ?? 16;
+  const cardGlass = formData.card_glass_intensity ?? settings?.card_glass_intensity ?? 70;
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
@@ -379,14 +386,23 @@ export default function RankingPage() {
                       const required = calcLevelXp(entry.level, formula.formula_type);
                       const pct = Math.min(100, Math.round((entry.xp / required) * 100));
                       return (
-                        <tr key={`${entry._platform}-${entry.user_id}`} className="hover:bg-[rgb(var(--surface-2))] transition-colors">
-                          <td className="px-4 py-3 font-bold text-yellow-400">{MEDALS[entry.rank] || `#${entry.rank}`}</td>
+                        <tr
+                          key={`${entry._platform}-${entry.user_id}`}
+                          className="hover:bg-[rgb(var(--surface-2))] transition-colors"
+                          style={entry.rank <= 3 ? { background: `${MEDAL_COLORS[entry.rank]}0d`, borderLeft: `3px solid ${MEDAL_COLORS[entry.rank]}` } : undefined}
+                        >
+                          <td className="px-4 py-3 font-bold text-lg" style={entry.rank <= 3 ? { color: MEDAL_COLORS[entry.rank] } : undefined}>{MEDALS[entry.rank] || `#${entry.rank}`}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               {entry.avatar_url ? (
-                                <img src={entry.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                                <img
+                                  src={entry.avatar_url}
+                                  alt=""
+                                  className="w-8 h-8 rounded-full object-cover"
+                                  style={entry.rank <= 3 ? { border: `2px solid ${MEDAL_COLORS[entry.rank]}` } : undefined}
+                                />
                               ) : (
-                                <span className="w-8 h-8 rounded-full bg-[rgb(var(--surface-3))] flex items-center justify-center">👤</span>
+                                <span className="w-8 h-8 rounded-full bg-[rgb(var(--surface-3))] flex items-center justify-center" style={entry.rank <= 3 ? { border: `2px solid ${MEDAL_COLORS[entry.rank]}` } : undefined}>👤</span>
                               )}
                               {viewPlatform === 'both' && <PlatformIcon platform={entry._platform} className="w-4 h-4 rounded shrink-0" />}
                               <span className="font-medium">{entry.username}</span>
@@ -427,6 +443,10 @@ export default function RankingPage() {
               <input type="color" value={cardAccent} onChange={e => updateField('card_accent_color', e.target.value)} className="w-full h-10 rounded-lg cursor-pointer" />
             </div>
             <div>
+              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Градиент</label>
+              <input type="color" value={cardGradient} onChange={e => updateField('card_gradient_color', e.target.value)} className="w-full h-10 rounded-lg cursor-pointer" />
+            </div>
+            <div>
               <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Стиль</label>
               <select value={cardStyle} onChange={e => updateField('card_style', e.target.value)} className="input w-full">
                 {CARD_STYLES.map(s => (
@@ -434,18 +454,47 @@ export default function RankingPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
+                <label>Радиус углов</label>
+                <span>{cardRadius} px</span>
+              </div>
+              <input type="range" min={4} max={28} step={2} value={cardRadius} onChange={e => updateField('card_radius', parseInt(e.target.value))} className="w-full accent-cyan-400" />
+            </div>
+            <div>
+              <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
+                <label>Интенсивность стекла</label>
+                <span>{cardGlass}%</span>
+              </div>
+              <input type="range" min={0} max={100} step={5} value={cardGlass} onChange={e => updateField('card_glass_intensity', parseInt(e.target.value))} className="w-full accent-cyan-400" disabled={cardStyle !== 'glass'} />
+            </div>
+            <div>
+              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-2">Превью палитры</label>
+              <div className="flex gap-2">
+                {PALETTE_PRESETS.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => updateField('card_accent_color', c)}
+                    className={`w-8 h-8 rounded-full transition-transform hover:scale-110 ${cardAccent.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-offset-2 ring-offset-[rgb(var(--surface-1))] ring-white' : ''}`}
+                    style={{ background: c }}
+                    title={c}
+                  />
+                ))}
+              </div>
+            </div>
           </Card>
 
           <Card className="p-5">
             <h3 className="font-semibold mb-3">👁️ Live Preview {topEntry ? '' : '(тестовые данные)'}</h3>
             <div
-              className="rounded-2xl p-5 max-w-sm mx-auto"
+              className="p-5 max-w-sm mx-auto"
               style={{
-                background: cardStyle === 'glass' ? `${cardBg}99` : cardBg,
-                backdropFilter: cardStyle === 'glass' ? 'blur(12px)' : undefined,
+                borderRadius: `${cardRadius}px`,
+                background: cardStyle === 'glass' ? `${cardBg}${Math.round((cardGlass / 100) * 255).toString(16).padStart(2, '0')}` : cardBg,
+                backdropFilter: cardStyle === 'glass' ? `blur(${Math.round((cardGlass / 100) * 24)}px)` : undefined,
                 border: cardStyle === 'flat' ? `1px solid ${cardAccent}40` : `2px solid ${cardAccent}`,
                 boxShadow: cardStyle === 'neon' ? `0 0 24px ${cardAccent}80, 0 0 8px ${cardAccent}` : cardStyle === 'flat' ? 'none' : `0 0 20px ${cardAccent}30`,
-                backgroundImage: cardStyle === 'gradient' ? `linear-gradient(135deg, ${cardBg}, ${cardAccent}22)` : undefined,
+                backgroundImage: cardStyle === 'gradient' ? `linear-gradient(135deg, ${cardBg}, ${cardGradient}80)` : undefined,
               }}
             >
               <div className="mb-3 flex justify-between">

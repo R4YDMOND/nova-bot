@@ -36,7 +36,10 @@ export interface RankingSettings {
   boost_roles: string[];
   card_bg_color: string;
   card_accent_color: string;
+  card_gradient_color: string;      // ← ДОБАВИТЬ
   card_style: string;
+  card_radius: number;              // ← ДОБАВИТЬ
+  card_glass_intensity: number;     // ← ДОБАВИТЬ
 }
 
 export interface LeaderboardEntry {
