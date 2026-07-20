@@ -93,7 +93,12 @@ export type RankingSettings = {
   boost_roles: string[];
   card_bg_color: string;
   card_accent_color: string;
+  card_gradient_color: string;
   card_style: string;
+  card_radius: number;
+  card_glass_intensity: number;
+  card_bg_image_url: string;
+  card_bg_image_enabled: boolean;
 };
 
 export type LeaderboardEntry = {
