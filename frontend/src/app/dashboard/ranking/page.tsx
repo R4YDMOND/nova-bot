@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/toggle';
 import { useServer } from '@/context/ServerProvider';
@@ -33,13 +33,6 @@ const CARD_STYLES = [
 
 // Пресеты палитры для быстрого выбора акцентного цвета (референс: превью палитры)
 const PALETTE_PRESETS = ['#00E5FF', '#7B2FBE', '#F76FBE', '#FFA500', '#22C55E', '#94A3B8'];
-
-const FORMULA_TYPES = [
-  { value: 'linear', label: 'Линейная' },
-  { value: 'exponential', label: 'Экспоненциальная' },
-  { value: 'logarithmic', label: 'Логарифмическая' },
-  { value: 'custom', label: 'Своя формула' },
-];
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 const MEDAL_COLORS: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
@@ -85,6 +78,16 @@ export default function RankingPage() {
       setSyncResultMsg(`❌ ${e?.message || 'Ошибка синхронизации'}`);
     }
   };
+
+  // При смене платформы (VK/Lolka) или сервера сбрасываем несохранённые локальные
+  // правки и связанные транзиентные состояния — иначе значения одной платформы
+  // "залипают" поверх настроек другой (formData имел приоритет над settings).
+  useEffect(() => {
+    setFormData({});
+    setChannelDropdownOpen(false);
+    setSyncResultMsg(null);
+    setFormulaTest(null);
+  }, [effectivePlatform, selectedServerId]);
 
   const { data: lbVk, isLoading: lbVkLoading } = useLeaderboard(selectedServerId, 'vk', sort, viewPlatform !== 'lolka');
   const { data: lbLolka, isLoading: lbLolkaLoading } = useLeaderboard(selectedServerId, 'lolka', sort, viewPlatform !== 'vk');
@@ -206,26 +209,33 @@ export default function RankingPage() {
       {activeTab === 'settings' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-5">
-            <h3 className="font-semibold mb-3">📊 Основные параметры</h3>
+            <h3 className="font-semibold mb-3">⚙️ Параметры начисления опыта</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">XP за сообщение</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Опыт за сообщение (XP)</label>
                 <input type="number" value={formData.xp_per_message ?? settings?.xp_per_message ?? 15} onChange={e => updateField('xp_per_message', parseInt(e.target.value) || 0)} className="input w-full" />
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемое значение: 10–25 XP для плавной и сбалансированной прокачки</p>
               </div>
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">XP за минуту голоса</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Опыт за голосовую минуту (XP)</label>
                 <input type="number" value={formData.xp_per_voice_minute ?? settings?.xp_per_voice_minute ?? 20} onChange={e => updateField('xp_per_voice_minute', parseInt(e.target.value) || 0)} className="input w-full" />
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Количество опыта за 1 минуту в голосовом чате</p>
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Минимальная длина сообщения</label>
                 <input type="number" value={formData.min_message_length ?? settings?.min_message_length ?? 3} onChange={e => updateField('min_message_length', parseInt(e.target.value) || 0)} className="input w-full" />
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Минимум символов для получения опыта</p>
               </div>
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Кулдаун между начислениями (сек)</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Задержка между начислениями (сек)</label>
                 <input type="number" value={formData.cooldown_seconds ?? settings?.cooldown_seconds ?? 60} onChange={e => updateField('cooldown_seconds', parseInt(e.target.value) || 0)} className="input w-full" />
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Минимальный интервал между начислениями опыта одному пользователю — защита от накрутки</p>
               </div>
               <div className="flex justify-between items-center pt-1">
-                <span className="text-sm">Система уровней включена</span>
+                <div>
+                  <span className="text-sm block">Включить систему уровней</span>
+                  <span className="text-[10px] text-[rgb(var(--text-secondary))]">Участники получают опыт и повышают уровень</span>
+                </div>
                 <Switch checked={formData.enabled ?? settings?.enabled ?? true} onCheckedChange={val => updateField('enabled', val)} />
               </div>
             </div>
@@ -287,15 +297,10 @@ export default function RankingPage() {
       {activeTab === 'formula' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-5 space-y-3">
-            <h3 className="font-semibold mb-1">🧮 Конструктор формулы</h3>
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Тип формулы</label>
-              <select value={formula.formula_type} onChange={e => updateFormula('formula_type', e.target.value)} className="input w-full">
-                {FORMULA_TYPES.map(f => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-            </div>
+            <h3 className="font-semibold mb-1">🧮 Формула опыта</h3>
+            <p className="text-xs text-[rgb(var(--text-secondary))] -mt-2">
+              required_xp = base_xp × уровень² × множитель
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Базовый XP</label>
@@ -304,6 +309,7 @@ export default function RankingPage() {
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Множитель</label>
                 <input type="number" step="0.1" value={formula.multiplier} onChange={e => updateFormula('multiplier', parseFloat(e.target.value) || 0)} className="input w-full" />
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">1.5x = прокачка на 50% быстрее</p>
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Затухание</label>
@@ -314,12 +320,6 @@ export default function RankingPage() {
                 <input type="number" value={formula.max_xp_per_message ?? 100} onChange={e => updateFormula('max_xp_per_message', parseInt(e.target.value) || 0)} className="input w-full" />
               </div>
             </div>
-            {formula.formula_type === 'custom' && (
-              <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Своё выражение</label>
-                <input type="text" value={formula.custom_expression ?? ''} onChange={e => updateFormula('custom_expression', e.target.value)} className="input w-full font-mono" />
-              </div>
-            )}
 
             <button
               onClick={handleTestFormula}
@@ -524,13 +524,16 @@ export default function RankingPage() {
                 <Switch checked={cardBgImageEnabled} onCheckedChange={val => updateField('card_bg_image_enabled', val)} />
               </div>
               {cardBgImageEnabled && (
-                <input
-                  type="url"
-                  value={cardBgImageUrl}
-                  onChange={e => updateField('card_bg_image_url', e.target.value)}
-                  placeholder="https://example.com/image.png"
-                  className="input w-full"
-                />
+                <>
+                  <input
+                    type="url"
+                    value={cardBgImageUrl}
+                    onChange={e => updateField('card_bg_image_url', e.target.value)}
+                    placeholder="https://example.com/image.png"
+                    className="input w-full"
+                  />
+                  <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемый размер: 800×400px</p>
+                </>
               )}
             </div>
           </Card>

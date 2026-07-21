@@ -1459,7 +1459,17 @@ def lolka_get_channels(server_id: str = Query(...)):
         if resp is None:
             return {"error": "Lolka API: превышен лимит запросов", "channels": []}
         if not resp.ok:
-            return {"error": f"Lolka API вернул {resp.status_code}", "channels": []}
+            detail = ""
+            try:
+                body = resp.json()
+                detail = body.get("message") or body.get("error") or ""
+            except Exception:
+                detail = (resp.text or "")[:200]
+            hint = " — бот не состоит в этом сервере или у него нет прав на просмотр каналов" if resp.status_code == 403 else ""
+            msg = f"Lolka API вернул {resp.status_code}{hint}"
+            if detail:
+                msg += f" ({detail})"
+            return {"error": msg, "channels": []}
 
         # Discord-совместимые типы каналов (см. lolka_gateway.py): 0 = текстовый, 2 = голосовой
         TEXT_CHANNEL_TYPES = {0, 5}
@@ -3259,7 +3269,7 @@ def vk_get_channels(server_id: str = Query(...)):
             VKConnection.is_active == True
         ).first()
         if not conn:
-            return {"error": "VK-сообщество не подключено", "channels": []}
+            return {"error": "VK-сообщество не подключено. Подключите его на странице /dashboard/servers.", "channels": []}
 
         service = get_vk_service(conn.access_token)
         conversations = service.get_conversations()
