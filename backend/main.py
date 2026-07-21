@@ -40,6 +40,46 @@ from ranking.cache import cache
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+
+async def _award_xp_and_notify_vk(
+    access_token: str,
+    server_id: str,
+    user_id: int,
+    username: str,
+    message_text: str,
+    peer_id: Optional[int],
+) -> None:
+    """
+    Начисляет XP за сообщение VK и, если участник повысил уровень,
+    реально отправляет уведомление в канал (settings.notify_channel,
+    либо тот же peer_id, если канал уведомлений не задан).
+    """
+    result = await award_xp_for_message(
+        server_id=server_id,
+        platform="vk",
+        user_id=str(user_id),
+        username=username,
+        message_text=message_text,
+        channel_id=str(peer_id) if peer_id else None,
+    )
+    if not result or not result.get("leveled_up"):
+        return
+
+    try:
+        notify_channel = result.get("notify_channel")
+        target_peer_id = int(notify_channel) if notify_channel else peer_id
+        if not target_peer_id:
+            return
+
+        mention = f"[id{user_id}|{username}]" if result.get("ping_user") else username
+        template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
+        text_to_send = template.replace("{user}", mention).replace("{level}", str(result["new_level"]))
+
+        service = get_vk_service(access_token)
+        service.send_message(peer_id=target_peer_id, message=text_to_send)
+    except Exception as e:
+        logger.error(f"level-up notify (VK) error: {e}")
+
 # Временное хранилище PKCE code_verifier (ключ = state)
 vk_pkce_store: dict = {}
 LOLKA_BOT_BASE_URL = "https://lolka.app/api/bot/v10"
@@ -3158,15 +3198,15 @@ async def vk_callback(request: Request):
                 db.add(action_event)
                 db.commit()
 
-            # 4. Начисляем XP за сообщение (асинхронно, чтобы не блокировать ответ VK)
+            # 4. Начисляем XP за сообщение и уведомляем о level-up (асинхронно, чтобы не блокировать ответ VK)
             if from_id:
-                asyncio.create_task(award_xp_for_message(
+                asyncio.create_task(_award_xp_and_notify_vk(
+                    access_token=conn.access_token,
                     server_id=str(conn.server_id),
-                    platform="vk",
-                    user_id=str(from_id),
+                    user_id=from_id,
                     username=f"id{from_id}",
                     message_text=text,
-                    channel_id=str(peer_id) if peer_id else None,
+                    peer_id=peer_id,
                 ))
 
             # 5. Возвращаем OK ВКонтакте

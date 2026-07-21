@@ -96,7 +96,16 @@ async def award_xp_for_message(
         db.commit()
         _last_xp_award[cache_key] = datetime.utcnow()
 
-        return {"xp_gained": xp_gained, "new_level": member.level, "leveled_up": leveled_up}
+        return {
+            "xp_gained": xp_gained,
+            "new_level": member.level,
+            "leveled_up": leveled_up,
+            # Данные для уведомления о повышении уровня — отправка реализована на стороне
+            # платформенного обработчика (main.py), т.к. этот модуль платформо-независим.
+            "notify_channel": settings.notify_channel,
+            "notify_message": settings.notify_message,
+            "ping_user": settings.ping_user,
+        }
     except Exception as e:
         logger.error(f"award_xp_for_message error: {e}")
         db.rollback()
