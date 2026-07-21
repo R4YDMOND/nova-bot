@@ -5,7 +5,10 @@ Gateway-клиент для собственного бота Nova в Lolka.
 import asyncio
 import json
 import random
+from typing import Optional
 import websockets
+
+from ranking.xp_handler import award_xp_for_message
 
 # Простейший набор команд бота — независим от backend/main.py,
 # чтобы не создавать циклический импорт (main.py импортирует этот модуль).
@@ -146,6 +149,7 @@ class LolkaGateway:
     async def on_message_create(self, data: dict):
         content = (data.get("content") or "").strip()
         channel_id = data.get("channel_id")
+        guild_id = data.get("guild_id")
         author = data.get("author", {}) or {}
 
         # Бот не должен отвечать сам себе
@@ -156,6 +160,71 @@ class LolkaGateway:
         reply = COMMAND_RESPONSES.get(command)
         if reply and channel_id:
             await self.send_message(channel_id, reply)
+
+        # Начисление XP за сообщение + level-up уведомление (по аналогии с VK, см. main.py)
+        user_id = author.get("id")
+        if guild_id and user_id:
+            username = author.get("global_name") or author.get("username") or str(user_id)
+            await self._award_xp_and_notify(str(guild_id), str(user_id), username, content, channel_id)
+
+    async def _award_xp_and_notify(
+        self,
+        guild_id: str,
+        user_id: str,
+        username: str,
+        content: str,
+        channel_id: Optional[str],
+    ) -> None:
+        """
+        Начисляет XP за сообщение Lolka и, если участник повысил уровень,
+        реально отправляет уведомление в канал (settings.notify_channel,
+        либо тот же channel_id, если канал уведомлений не задан).
+        Аналог _award_xp_and_notify_vk из backend/main.py.
+        """
+        server_id = self._resolve_server_id(guild_id)
+        if not server_id:
+            return
+
+        result = await award_xp_for_message(
+            server_id=server_id,
+            platform="lolka",
+            user_id=user_id,
+            username=username,
+            message_text=content,
+            channel_id=str(channel_id) if channel_id else None,
+        )
+        if not result or not result.get("leveled_up"):
+            return
+
+        try:
+            notify_channel = result.get("notify_channel")
+            target_channel_id = notify_channel or channel_id
+            if not target_channel_id:
+                return
+
+            mention = f"<@{user_id}>" if result.get("ping_user") else username
+            template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
+            text_to_send = template.replace("{user}", mention).replace("{level}", str(result["new_level"]))
+
+            await self.send_message(target_channel_id, text_to_send)
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка level-up уведомления — {e}")
+
+    @staticmethod
+    def _resolve_server_id(guild_id: str) -> Optional[str]:
+        """Сопоставляет Lolka guild_id с внутренним Server.id (используется как server_id в RankingSettings)."""
+        from database import SessionLocal
+        from models import Server
+
+        db = SessionLocal()
+        try:
+            server = db.query(Server).filter(
+                Server.server_id == guild_id,
+                Server.platform == "lolka",
+            ).first()
+            return str(server.id) if server else None
+        finally:
+            db.close()
 
     async def on_member_join(self, data: dict):
         username = (data.get("user") or {}).get("username", "участник")
