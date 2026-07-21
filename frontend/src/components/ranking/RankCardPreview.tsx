@@ -23,7 +23,7 @@ export interface RankCardData {
   rank: number;
   level: number;
   username: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   current_xp: number;
   xp_for_next_level: number;
 }

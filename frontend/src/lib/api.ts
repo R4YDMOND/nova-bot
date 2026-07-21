@@ -99,6 +99,7 @@ export type RankingSettings = {
   card_glass_intensity: number;
   card_bg_image_url: string;
   card_bg_image_enabled: boolean;
+  card_bg_shade: number;
 };
 
 export type RankingChannel = {
