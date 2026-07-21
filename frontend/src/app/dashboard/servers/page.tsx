@@ -70,6 +70,11 @@ export default function ServersPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [detection, setDetection] = useState<Detection | null>(null);
 
+  const [editingServer, setEditingServer] = useState<DashboardServer | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   const [botStatus, setBotStatus] = useState<{ configured: boolean; connected: boolean; bot: { username?: string } | null } | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -137,6 +142,62 @@ export default function ServersPage() {
       setFormError('Не удалось создать сервер');
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Автоподтяжка названия сервера/сообщества по уже распознанному ID —
+  // только пока поле "Название" не заполнено вручную, чтобы не перетирать ввод пользователя.
+  useEffect(() => {
+    if (!showModal || form.name.trim()) return;
+    if (!detection || detection.status === 'unresolved') return;
+    const id = form.server_id.trim();
+    const platform = form.platform;
+    if (!id) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const foundName =
+          platform === 'vk'
+            ? (await api.vk.groups(id)).groups?.find(g => g.id === id)?.name
+            : (await api.lolkaBot.getGuilds()).guilds?.find(g => g.id === id)?.name;
+        if (foundName && !cancelled) {
+          setForm(f => (f.name.trim() ? f : { ...f, name: foundName }));
+        }
+      } catch {
+        // Автоподсказка необязательна — молча пропускаем, ручной ввод названия остаётся доступен.
+      }
+    }, 500);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [showModal, form.server_id, form.platform, form.name, detection]);
+
+  function openEditModal(server: DashboardServer) {
+    setEditingServer(server);
+    setEditName(server.name);
+    setEditError(null);
+  }
+
+  async function updateServer() {
+    if (!editingServer) return;
+    if (!editName.trim()) {
+      setEditError('Название не может быть пустым');
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const res = await api.servers.update(editingServer.id, { name: editName.trim() });
+      if (res.error) {
+        setEditError(res.error);
+        return;
+      }
+      setEditingServer(null);
+      await refresh();
+    } catch {
+      setEditError('Не удалось сохранить изменения');
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -302,6 +363,7 @@ export default function ServersPage() {
                     server={s}
                     selected={s.server_id === selectedServerId}
                     onSelect={() => selectServer(s.server_id)}
+                    onConfigure={() => openEditModal(s)}
                     onRemove={() => removeServer(s.id)}
                     deleting={deletingId === s.id}
                   />
@@ -403,6 +465,58 @@ export default function ServersPage() {
                 </button>
                 <Button onClick={createServer} disabled={saving} className="flex-1">
                   {saving ? 'Создаём...' : 'Добавить'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingServer && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingServer(null); }}
+        >
+          <div className="bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-3xl p-8 max-w-md w-full relative shadow-2xl" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setEditingServer(null)} className="absolute top-4 right-4 p-2 rounded-xl text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold mb-6 text-[rgb(var(--text))]">Настроить сервер</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Платформа</label>
+                <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
+                  <PlatformIcon platform={editingServer.platform} className="w-4 h-4 rounded" /> {PLATFORM_LABEL[editingServer.platform]}
+                </span>
+              </div>
+              <div>
+                <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Название</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  placeholder="Например, Моё сообщество"
+                  className="input w-full px-4 py-2.5 rounded-xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text))] placeholder:text-[rgb(var(--text-secondary))] outline-none focus:border-primary transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">
+                  ID {editingServer.platform === 'vk' ? 'сообщества VK' : 'сервера Lolka'}
+                </label>
+                <div className="font-mono text-sm px-4 py-2.5 rounded-xl bg-[rgb(var(--surface-2))]/50 border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
+                  {editingServer.server_id}
+                </div>
+                <p className="text-xs text-[rgb(var(--text-secondary))] mt-1.5">
+                  ID нельзя изменить — с ним связаны настройки модерации, уровней и другие данные сервера. Чтобы подключить другой сервер, используйте «Добавить сервер».
+                </p>
+              </div>
+              {editError && <p className="text-red-400 text-sm bg-red-500/10 px-3 py-2 rounded-lg">{editError}</p>}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEditingServer(null)} className="flex-1 px-5 py-2.5 border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] rounded-xl hover:bg-[rgb(var(--surface-2))] transition-colors font-medium">
+                  Отмена
+                </button>
+                <Button onClick={updateServer} disabled={editSaving} className="flex-1">
+                  {editSaving ? 'Сохраняем...' : 'Сохранить'}
                 </Button>
               </div>
             </div>

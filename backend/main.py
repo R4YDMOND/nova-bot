@@ -105,6 +105,9 @@ class CreateServerRequest(BaseModel):
     icon_url: str = ""
     member_count: int = 0
 
+class UpdateServerRequest(BaseModel):
+    name: str
+
 app = FastAPI(title="Nova API", version="0.7.0")
 
 app.add_middleware(
@@ -309,6 +312,28 @@ def cleanup_ghost_servers():
     except Exception as e:
         db.rollback()
         return {"status": "error", "error": str(e)}
+    finally:
+        db.close()
+
+
+@app.patch("/api/servers/{db_id}")
+def update_server(db_id: int, data: UpdateServerRequest, user: User = Depends(get_current_user)):
+    name = (data.name or "").strip()
+    if not name:
+        return {"error": "Название не может быть пустым"}
+
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.id == db_id, Server.owner_id == user.id).first()
+        if not server:
+            return {"error": "Сервер не найден"}
+        server.name = name
+        db.commit()
+        db.refresh(server)
+        return {"status": "updated", "server": {"id": server.id, "name": server.name}}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
     finally:
         db.close()
 

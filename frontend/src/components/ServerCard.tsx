@@ -1,5 +1,4 @@
 'use client';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,18 +11,17 @@ interface ServerCardProps {
   server: DashboardServer;
   selected: boolean;
   onSelect: () => void;
+  onConfigure: () => void;
   onRemove: () => void;
   deleting: boolean;
 }
 
-export function ServerCard({ server, selected, onSelect, onRemove, deleting }: ServerCardProps) {
-  const router = useRouter();
+export function ServerCard({ server, selected, onSelect, onConfigure, onRemove, deleting }: ServerCardProps) {
   const isActive = server.is_active !== false;
 
   const handleConfigure = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onSelect();
-    router.push('/dashboard/moderation');
+    onConfigure();
   };
 
   return (

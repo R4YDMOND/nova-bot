@@ -274,6 +274,11 @@ export const api = {
           member_count: data.member_count || 0,
         }),
       }),
+    update: (id: number, data: { name: string }) =>
+      apiFetch<{ status: string; error?: string; server?: object }>(`/api/servers/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
     remove: (id: number) =>
       apiFetch<{ status: string; error?: string }>(`/api/servers/${id}`, {
         method: "DELETE",
