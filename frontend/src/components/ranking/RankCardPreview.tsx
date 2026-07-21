@@ -17,6 +17,8 @@ export interface RankCardAppearance {
   bgImageUrl: string;
   bgImageEnabled: boolean;
   bgShade: number;
+  bgFit: string;      // 'cover' | 'contain' | 'stretch'
+  bgPosition: string; // 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 }
 
 export interface RankCardData {
@@ -43,17 +45,21 @@ export const RANK_CARD_TEST_DATA: RankCardData = {
 export const RANK_CARD_ASPECT_RATIO = '2 / 1';
 export const RANK_CARD_RECOMMENDED_SIZE = '800×400px';
 
-export function RankCardPreview({ appearance, data }: { appearance: RankCardAppearance; data?: RankCardData }) {
+export function RankCardPreview({ appearance, data, className }: { appearance: RankCardAppearance; data?: RankCardData; className?: string }) {
   const d = data ?? RANK_CARD_TEST_DATA;
-  const { bg, accent, gradient, style, radius, glass, bgImageUrl, bgImageEnabled, bgShade } = appearance;
+  const { bg, accent, gradient, style, radius, glass, bgImageUrl, bgImageEnabled, bgShade, bgFit, bgPosition } = appearance;
 
   const shadeTop = Math.round((bgShade / 100) * 255).toString(16).padStart(2, '0');
   const shadeBottom = Math.round((bgShade / 100) * 0.5 * 255).toString(16).padStart(2, '0');
   const progress = Math.min(100, Math.round((d.current_xp / d.xp_for_next_level) * 100));
 
+  // 'stretch' — не валидное CSS-значение background-size, растягиваем по обеим осям на 100%
+  const cssBackgroundSize = bgFit === 'stretch' ? '100% 100%' : (bgFit || 'cover');
+  const cssBackgroundPosition = (bgPosition || 'center').replace('-', ' ');
+
   return (
     <div
-      className="w-full max-w-[480px] mx-auto p-5 flex flex-col justify-center"
+      className={`w-full p-5 flex flex-col justify-center ${className ?? ''}`}
       style={{
         aspectRatio: RANK_CARD_ASPECT_RATIO,
         borderRadius: `${radius}px`,
@@ -64,8 +70,8 @@ export function RankCardPreview({ appearance, data }: { appearance: RankCardAppe
         backgroundImage: bgImageEnabled && bgImageUrl
           ? `linear-gradient(0deg, ${bg}${shadeTop}, ${bg}${shadeBottom}), url(${bgImageUrl})`
           : style === 'gradient' ? `linear-gradient(135deg, ${bg}, ${gradient}80)` : undefined,
-        backgroundSize: bgImageEnabled && bgImageUrl ? 'cover' : undefined,
-        backgroundPosition: bgImageEnabled && bgImageUrl ? 'center' : undefined,
+        backgroundSize: bgImageEnabled && bgImageUrl ? cssBackgroundSize : undefined,
+        backgroundPosition: bgImageEnabled && bgImageUrl ? cssBackgroundPosition : undefined,
       }}
     >
       <div className="mb-3 flex justify-between">
