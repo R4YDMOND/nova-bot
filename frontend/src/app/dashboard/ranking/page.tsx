@@ -56,6 +56,24 @@ const CARD_STYLES = [
   { value: 'flat', label: 'Плоский' },
 ];
 
+const CARD_BG_FIT_OPTIONS = [
+  { value: 'cover', label: 'Заполнить (обрезать края)' },
+  { value: 'contain', label: 'Вписать целиком' },
+  { value: 'stretch', label: 'Растянуть' },
+];
+
+const CARD_BG_POSITION_OPTIONS = [
+  { value: 'center', label: 'По центру' },
+  { value: 'top', label: 'Сверху' },
+  { value: 'bottom', label: 'Снизу' },
+  { value: 'left', label: 'Слева' },
+  { value: 'right', label: 'Справа' },
+  { value: 'top-left', label: 'Сверху слева' },
+  { value: 'top-right', label: 'Сверху справа' },
+  { value: 'bottom-left', label: 'Снизу слева' },
+  { value: 'bottom-right', label: 'Снизу справа' },
+];
+
 // Пресеты палитры для быстрого выбора акцентного цвета (референс: превью палитры)
 const PALETTE_PRESETS: { name: string; bg: string; accent: string; gradient: string }[] = [
   { name: 'Неон циан', bg: '#111118', accent: '#00E5FF', gradient: '#7B2FBE' },
@@ -224,6 +242,8 @@ export default function RankingPage() {
   const cardRadius = formData.card_radius ?? settings?.card_radius ?? 16;
   const cardGlass = formData.card_glass_intensity ?? settings?.card_glass_intensity ?? 70;
   const cardBgShade = formData.card_bg_shade ?? settings?.card_bg_shade ?? 80;
+  const cardBgFit = formData.card_bg_fit ?? settings?.card_bg_fit ?? 'cover';
+  const cardBgPosition = formData.card_bg_position ?? settings?.card_bg_position ?? 'center';
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 sm:px-8 py-8 space-y-6">
@@ -658,6 +678,27 @@ export default function RankingPage() {
                     <p className="text-[10px] text-red-400 mt-1">❌ Не удалось загрузить изображение по этой ссылке — проверьте, что она ведёт напрямую на файл и хостинг разрешает встраивание</p>
                   )}
                   <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемый размер: {RANK_CARD_RECOMMENDED_SIZE}</p>
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Масштабирование</label>
+                      <select value={cardBgFit} onChange={e => updateField('card_bg_fit', e.target.value)} className="input w-full">
+                        {CARD_BG_FIT_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Позиция</label>
+                      <select value={cardBgPosition} onChange={e => updateField('card_bg_position', e.target.value)} className="input w-full">
+                        {CARD_BG_POSITION_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">
+                    Если ссылка ведёт на изображение с нестандартными пропорциями (например, CDN-ссылка с встроенными размерами обрезки) — настройте, как оно должно вписываться в карточку, не редактируя саму ссылку.
+                  </p>
                   <div className="mt-3">
                     <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
                       <label>Затенение фона</label>
@@ -683,6 +724,8 @@ export default function RankingPage() {
                 bgImageUrl: cardBgImageUrl,
                 bgImageEnabled: cardBgImageEnabled,
                 bgShade: cardBgShade,
+                bgFit: cardBgFit,
+                bgPosition: cardBgPosition,
               }}
               data={preview ? {
                 rank: preview.ranking.rank,

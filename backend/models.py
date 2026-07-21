@@ -303,6 +303,8 @@ class RankingSettings(Base):
     card_bg_image_url = Column(String(1024), default="")
     card_bg_image_enabled = Column(Boolean, default=False)
     card_bg_shade = Column(Integer, default=80)
+    card_bg_fit = Column(String(20), default="cover")       # 'cover' | 'contain' | 'stretch'
+    card_bg_position = Column(String(20), default="center")  # 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)

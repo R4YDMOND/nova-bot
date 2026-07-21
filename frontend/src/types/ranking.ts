@@ -43,6 +43,8 @@ export interface RankingSettings {
   card_bg_image_url: string;
   card_bg_image_enabled: boolean;
   card_bg_shade: number;
+  card_bg_fit: string;
+  card_bg_position: string;
 }
 
 export interface LeaderboardEntry {
