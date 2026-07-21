@@ -61,7 +61,10 @@ export function useRankingChannels(serverId: string, platform: 'vk' | 'lolka' = 
   return useQuery({
     queryKey: ['ranking', 'channels', serverId, platform],
     queryFn: () => api.ranking.getChannels(serverId, platform),
-    enabled: false, // запускается вручную кнопкой "Автоопределение", не при монтировании
+    // Подгружается автоматически при наличии serverId — нужно, чтобы сопоставить
+    // сохранённый ID канала уведомлений с его названием (см. RankingPage).
+    // Кнопка "Автоопределение" по-прежнему дергает refetch() вручную для дропдауна.
+    enabled: !!serverId,
     staleTime: 5 * 60 * 1000,
   });
 }

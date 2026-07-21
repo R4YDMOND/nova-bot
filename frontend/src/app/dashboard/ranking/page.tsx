@@ -108,6 +108,12 @@ export default function RankingPage() {
   const syncMembersMutation = useSyncMembers();
   const [syncResultMsg, setSyncResultMsg] = useState<string | null>(null);
 
+  // Показываем название канала уведомлений вместо сырого ID, если он есть в списке.
+  const currentNotifyChannel: string = formData.notify_channel ?? settings?.notify_channel ?? '';
+  const resolvedNotifyChannel = channelsData?.channels?.find(ch => ch.id === currentNotifyChannel);
+  const [manualChannelEdit, setManualChannelEdit] = useState(false);
+  useEffect(() => { setManualChannelEdit(false); }, [effectiveServerId, effectivePlatform]);
+
   const handleDetectChannels = async () => {
     setChannelDropdownOpen(true);
     await refetchChannels();
@@ -316,7 +322,30 @@ export default function RankingPage() {
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Канал уведомлений</label>
                 <div className="flex gap-2">
-                  <input type="text" value={formData.notify_channel ?? settings?.notify_channel ?? ''} onChange={e => updateField('notify_channel', e.target.value)} className="input w-full" />
+                  {resolvedNotifyChannel && !manualChannelEdit ? (
+                    <div className="input w-full flex items-center gap-2 text-sm">
+                      <span>{resolvedNotifyChannel.type === 'voice' ? '🔊' : '💬'}</span>
+                      <span className="truncate">{resolvedNotifyChannel.name}</span>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={currentNotifyChannel}
+                      onChange={e => updateField('notify_channel', e.target.value)}
+                      placeholder="ID канала"
+                      className="input w-full"
+                    />
+                  )}
+                  {resolvedNotifyChannel && (
+                    <button
+                      type="button"
+                      onClick={() => setManualChannelEdit(v => !v)}
+                      title={manualChannelEdit ? 'Показать название канала' : 'Ввести ID вручную'}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors"
+                    >
+                      ✏️
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleDetectChannels}
@@ -337,7 +366,7 @@ export default function RankingPage() {
                         <button
                           key={ch.id}
                           type="button"
-                          onClick={() => { updateField('notify_channel', ch.id); setChannelDropdownOpen(false); }}
+                          onClick={() => { updateField('notify_channel', ch.id); setChannelDropdownOpen(false); setManualChannelEdit(false); }}
                           className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-400/10 transition-colors flex items-center gap-2"
                         >
                           <span>{ch.type === 'voice' ? '🔊' : '💬'}</span>
