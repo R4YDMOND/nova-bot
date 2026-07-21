@@ -17,8 +17,8 @@ export interface RankCardAppearance {
   bgImageUrl: string;
   bgImageEnabled: boolean;
   bgShade: number;
-  bgFit: string;      // 'cover' | 'contain' | 'stretch'
-  bgPosition: string; // 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  bgFit?: string;      // 'cover' | 'contain' | 'stretch' (по умолчанию 'cover')
+  bgPosition?: string; // 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' (по умолчанию 'center')
 }
 
 export interface RankCardData {
