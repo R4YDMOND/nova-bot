@@ -57,7 +57,18 @@ const CARD_STYLES = [
 ];
 
 // Пресеты палитры для быстрого выбора акцентного цвета (референс: превью палитры)
-const PALETTE_PRESETS = ['#00E5FF', '#7B2FBE', '#F76FBE', '#FFA500', '#22C55E', '#94A3B8'];
+const PALETTE_PRESETS: { name: string; bg: string; accent: string; gradient: string }[] = [
+  { name: 'Неон циан', bg: '#111118', accent: '#00E5FF', gradient: '#7B2FBE' },
+  { name: 'Пурпур', bg: '#15111f', accent: '#A855F7', gradient: '#EC4899' },
+  { name: 'Розовый', bg: '#1a0f14', accent: '#F76FBE', gradient: '#FF3D81' },
+  { name: 'Янтарь', bg: '#1a1408', accent: '#FFA500', gradient: '#F59E0B' },
+  { name: 'Изумруд', bg: '#0a1810', accent: '#22C55E', gradient: '#10B981' },
+  { name: 'Ледяной', bg: '#0d1420', accent: '#38BDF8', gradient: '#818CF8' },
+  { name: 'Огонь', bg: '#1a0a08', accent: '#F87171', gradient: '#FB923C' },
+  { name: 'Монохром', bg: '#111114', accent: '#94A3B8', gradient: '#64748B' },
+  { name: 'Лайм', bg: '#0f1408', accent: '#A3E635', gradient: '#4ADE80' },
+  { name: 'Индиго', bg: '#0e0f1f', accent: '#818CF8', gradient: '#6366F1' },
+];
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 const MEDAL_COLORS: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
@@ -556,16 +567,25 @@ export default function RankingPage() {
             </div>
             <div>
               <label className="text-xs text-[rgb(var(--text-secondary))] block mb-2">Превью палитры</label>
-              <div className="flex gap-2">
-                {PALETTE_PRESETS.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => updateField('card_accent_color', c)}
-                    className={`w-8 h-8 rounded-full transition-transform hover:scale-110 ${cardAccent.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-offset-2 ring-offset-[rgb(var(--surface-1))] ring-white' : ''}`}
-                    style={{ background: c }}
-                    title={c}
-                  />
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {PALETTE_PRESETS.map(p => {
+                  const isActive = cardBg.toLowerCase() === p.bg.toLowerCase()
+                    && cardAccent.toLowerCase() === p.accent.toLowerCase()
+                    && cardGradient.toLowerCase() === p.gradient.toLowerCase();
+                  return (
+                    <button
+                      key={p.name}
+                      onClick={() => {
+                        updateField('card_bg_color', p.bg);
+                        updateField('card_accent_color', p.accent);
+                        updateField('card_gradient_color', p.gradient);
+                      }}
+                      className={`w-8 h-8 rounded-full transition-transform hover:scale-110 shrink-0 ${isActive ? 'ring-2 ring-offset-2 ring-offset-[rgb(var(--surface-1))] ring-white' : ''}`}
+                      style={{ background: `linear-gradient(135deg, ${p.accent}, ${p.gradient})` }}
+                      title={p.name}
+                    />
+                  );
+                })}
               </div>
             </div>
             <div className="pt-3 border-t border-[rgb(var(--border))]">
