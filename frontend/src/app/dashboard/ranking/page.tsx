@@ -16,8 +16,29 @@ import {
 } from '@/hooks/useRanking';
 import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
 import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE } from '@/components/ranking/RankCardPreview';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
+/** Значок "?" со всплывающей подсказкой (ТЗ №5 Rev.5, п.3.2.2).
+ *  Триггер — кнопка (фокусируемая), поэтому подсказка открывается и по наведению,
+ *  и по тапу/фокусу на мобильных устройствах. */
+function Hint({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label="Подсказка"
+          className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] leading-none text-[rgb(var(--text-secondary))] border border-[rgb(var(--border))] hover:border-cyan-400 hover:text-cyan-400 transition-colors shrink-0"
+        >
+          ?
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[260px] text-xs">{text}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 /** Текстовое HEX-поле рядом с color-пикером: держит локальный черновик ввода,
  *  чтобы промежуточные (пока невалидные) символы не затирались контролируемым value,
@@ -246,6 +267,7 @@ export default function RankingPage() {
   const cardBgPosition = formData.card_bg_position ?? settings?.card_bg_position ?? 'center';
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="max-w-[1920px] mx-auto px-4 sm:px-8 py-8 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
@@ -307,9 +329,12 @@ export default function RankingPage() {
             <h3 className="font-semibold mb-3">⚙️ Параметры начисления опыта</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Опыт за сообщение (XP)</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
+                  Опыт за сообщение (XP)
+                  <Hint text="Сколько очков получает участник за каждое текстовое сообщение" />
+                </label>
                 <input type="number" value={formData.xp_per_message ?? settings?.xp_per_message ?? 15} onChange={e => updateField('xp_per_message', parseInt(e.target.value) || 0)} className="input w-full" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемое значение: 10–25 XP для плавной и сбалансированной прокачки</p>
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">💡 Оптимально: 10–25 XP. Меньше — медленная прокачка, больше — слишком быстрая</p>
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Опыт за голосовую минуту (XP)</label>
@@ -319,17 +344,20 @@ export default function RankingPage() {
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Минимальная длина сообщения</label>
                 <input type="number" value={formData.min_message_length ?? settings?.min_message_length ?? 3} onChange={e => updateField('min_message_length', parseInt(e.target.value) || 0)} className="input w-full" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Минимум символов для получения опыта</p>
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Сообщения короче этого значения не учитываются — защита от спама</p>
               </div>
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Задержка между начислениями (сек)</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
+                  Задержка между начислениями (сек)
+                  <Hint text="Минимальное время между начислениями опыта одному пользователю. Защита от спама и накрутки" />
+                </label>
                 <input type="number" value={formData.cooldown_seconds ?? settings?.cooldown_seconds ?? 60} onChange={e => updateField('cooldown_seconds', parseInt(e.target.value) || 0)} className="input w-full" />
                 <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Минимальный интервал между начислениями опыта одному пользователю — защита от накрутки</p>
               </div>
               <div className="flex justify-between items-center pt-1">
                 <div>
                   <span className="text-sm block">Включить систему уровней</span>
-                  <span className="text-[10px] text-[rgb(var(--text-secondary))]">Участники получают опыт и повышают уровень</span>
+                  <span className="text-[10px] text-[rgb(var(--text-secondary))]">Когда включено: участники зарабатывают XP за сообщения и голосовую активность</span>
                 </div>
                 <Switch checked={formData.enabled ?? settings?.enabled ?? true} onCheckedChange={val => updateField('enabled', val)} />
               </div>
@@ -417,7 +445,7 @@ export default function RankingPage() {
           <Card className="p-5 space-y-3">
             <h3 className="font-semibold mb-1">🧮 Формула опыта</h3>
             <p className="text-xs text-[rgb(var(--text-secondary))] -mt-2">
-              required_xp = base_xp × уровень² × множитель
+              Формула расчёта: XP для следующего уровня = базовый XP × уровень² × ваш множитель
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -425,9 +453,12 @@ export default function RankingPage() {
                 <input type="number" value={formula.base_xp} onChange={e => updateFormula('base_xp', parseInt(e.target.value) || 0)} className="input w-full" />
               </div>
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Множитель</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
+                  Множитель скорости
+                  <Hint text="Глобальный коэффициент. 1.5x = прокачка на 50% быстрее!" />
+                </label>
                 <input type="number" step="0.1" value={formula.multiplier} onChange={e => updateFormula('multiplier', parseFloat(e.target.value) || 0)} className="input w-full" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">1.5x = прокачка на 50% быстрее</p>
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">1.5 = ускорение на 50%, 0.5 = замедление в 2 раза</p>
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Затухание</label>
@@ -475,7 +506,10 @@ export default function RankingPage() {
       {activeTab === 'rewards' && (
         <Card className="p-5">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold">🎁 Награды за уровни</h3>
+            <h3 className="font-semibold flex items-center gap-1.5">
+              🎁 Награды за уровни
+              <Hint text="Автоматическая выдача бонусов при достижении уровня. Поддерживаются: роли, валюта, значки" />
+            </h3>
             <button onClick={addReward} className="px-3 py-1.5 rounded-xl text-sm font-medium bg-cyan-400 text-black hover:bg-cyan-300 transition-colors">
               + Добавить
             </button>
@@ -493,13 +527,14 @@ export default function RankingPage() {
               ))}
             </div>
           ) : (
-            <p className="text-center text-[rgb(var(--text-secondary))] py-8">Награды не настроены</p>
+            <p className="text-center text-[rgb(var(--text-secondary))] py-8">📭 Наград пока нет. Добавьте первую, чтобы мотивировать участников развиваться!</p>
           )}
         </Card>
       )}
 
       {activeTab === 'leaderboard' && (
         <div className="space-y-3">
+          <p className="text-sm text-[rgb(var(--text-secondary))] -mt-1">Публичный рейтинг самых активных участников вашего сообщества</p>
           <div className="flex gap-2 items-center justify-between flex-wrap">
             <div className="flex gap-2">
               {(['xp', 'level', 'messages'] as const).map(s => (
@@ -677,7 +712,7 @@ export default function RankingPage() {
                   {bgImageStatus === 'error' && (
                     <p className="text-[10px] text-red-400 mt-1">❌ Не удалось загрузить изображение по этой ссылке — проверьте, что она ведёт напрямую на файл и хостинг разрешает встраивание</p>
                   )}
-                  <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемый размер: {RANK_CARD_RECOMMENDED_SIZE}</p>
+                  <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Загрузите своё изображение: рекомендуемый размер {RANK_CARD_RECOMMENDED_SIZE}</p>
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div>
                       <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Масштабирование</label>
@@ -697,7 +732,7 @@ export default function RankingPage() {
                     </div>
                   </div>
                   <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">
-                    Если ссылка ведёт на изображение с нестандартными пропорциями (например, CDN-ссылка с встроенными размерами обрезки) — настройте, как оно должно вписываться в карточку, не редактируя саму ссылку.
+                    Если изображение обрезается или растягивается — выберите подходящий режим масштабирования ниже.
                   </p>
                   <div className="mt-3">
                     <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
@@ -741,5 +776,6 @@ export default function RankingPage() {
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }
