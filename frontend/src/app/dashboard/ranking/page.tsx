@@ -202,6 +202,19 @@ export default function RankingPage() {
   const cardBgImageEnabled = formData.card_bg_image_enabled ?? settings?.card_bg_image_enabled ?? false;
   const cardBgShade = formData.card_bg_shade ?? settings?.card_bg_shade ?? 80;
 
+  const [bgImageStatus, setBgImageStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  useEffect(() => {
+    if (!cardBgImageEnabled || !cardBgImageUrl.trim()) { setBgImageStatus('idle'); return; }
+    setBgImageStatus('loading');
+    const timer = setTimeout(() => {
+      const img = new window.Image();
+      img.onload = () => setBgImageStatus('ok');
+      img.onerror = () => setBgImageStatus('error');
+      img.src = cardBgImageUrl.trim();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [cardBgImageUrl, cardBgImageEnabled]);
+
   return (
     <div className="max-w-[1920px] mx-auto px-4 sm:px-8 py-8 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
@@ -598,10 +611,19 @@ export default function RankingPage() {
                   <input
                     type="url"
                     value={cardBgImageUrl}
-                    onChange={e => updateField('card_bg_image_url', e.target.value)}
+                    onChange={e => updateField('card_bg_image_url', e.target.value.trim())}
                     placeholder="https://example.com/image.png"
                     className="input w-full"
                   />
+                  {bgImageStatus === 'loading' && (
+                    <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">⏳ Проверяем ссылку…</p>
+                  )}
+                  {bgImageStatus === 'ok' && (
+                    <p className="text-[10px] text-emerald-400 mt-1">✅ Изображение загружается корректно</p>
+                  )}
+                  {bgImageStatus === 'error' && (
+                    <p className="text-[10px] text-red-400 mt-1">❌ Не удалось загрузить изображение по этой ссылке — проверьте, что она ведёт напрямую на файл и хостинг разрешает встраивание</p>
+                  )}
                   <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемый размер: {RANK_CARD_RECOMMENDED_SIZE}</p>
                   <div className="mt-3">
                     <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
