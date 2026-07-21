@@ -47,7 +47,7 @@ function calcLevelXp(level: number, formulaType: string): number {
 }
 
 export default function RankingPage() {
-  const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
+  const { servers, selectedServer, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState('settings');
   const [viewPlatform, setViewPlatform] = useState<'vk' | 'lolka'>('vk');
   const [formData, setFormData] = useState<any>({});
@@ -56,11 +56,19 @@ export default function RankingPage() {
 
   const effectivePlatform = viewPlatform;
 
-  const { data: settings, isLoading: settingsLoading } = useRankingSettings(selectedServerId, effectivePlatform);
+  // server_id должен соответствовать выбранной на этой странице платформе (VK/Lolka),
+  // а не глобально выбранному серверу на /dashboard/servers — иначе на вкладке Lolka
+  // улетал server_id VK-сообщества (и наоборот), что ломало автоопределение каналов
+  // и тихо создавало настройки не под тем сервером.
+  const vkServer = servers.find(s => s.platform === 'vk');
+  const lolkaServer = servers.find(s => s.platform === 'lolka');
+  const effectiveServerId = (effectivePlatform === 'vk' ? vkServer : lolkaServer)?.server_id ?? '';
+
+  const { data: settings, isLoading: settingsLoading } = useRankingSettings(effectiveServerId, effectivePlatform);
   const saveMutation = useSaveRankingSettings();
 
   const [channelDropdownOpen, setChannelDropdownOpen] = useState(false);
-  const { data: channelsData, isFetching: channelsLoading, refetch: refetchChannels } = useRankingChannels(selectedServerId, effectivePlatform);
+  const { data: channelsData, isFetching: channelsLoading, refetch: refetchChannels } = useRankingChannels(effectiveServerId, effectivePlatform);
   const syncMembersMutation = useSyncMembers();
   const [syncResultMsg, setSyncResultMsg] = useState<string | null>(null);
 
@@ -72,7 +80,7 @@ export default function RankingPage() {
   const handleSyncMembers = async () => {
     setSyncResultMsg(null);
     try {
-      const res = await syncMembersMutation.mutateAsync({ serverId: selectedServerId, platform: effectivePlatform });
+      const res = await syncMembersMutation.mutateAsync({ serverId: effectiveServerId, platform: effectivePlatform });
       setSyncResultMsg(res.error ? `❌ ${res.error}` : `✅ Синхронизировано участников: ${res.synced ?? 0}`);
     } catch (e: any) {
       setSyncResultMsg(`❌ ${e?.message || 'Ошибка синхронизации'}`);
@@ -87,10 +95,10 @@ export default function RankingPage() {
     setChannelDropdownOpen(false);
     setSyncResultMsg(null);
     setFormulaTest(null);
-  }, [effectivePlatform, selectedServerId]);
+  }, [effectivePlatform, effectiveServerId]);
 
-  const { data: lbVk, isLoading: lbVkLoading } = useLeaderboard(selectedServerId, 'vk', sort, viewPlatform !== 'lolka');
-  const { data: lbLolka, isLoading: lbLolkaLoading } = useLeaderboard(selectedServerId, 'lolka', sort, viewPlatform !== 'vk');
+  const { data: lbVk, isLoading: lbVkLoading } = useLeaderboard(vkServer?.server_id ?? '', 'vk', sort, viewPlatform !== 'lolka');
+  const { data: lbLolka, isLoading: lbLolkaLoading } = useLeaderboard(lolkaServer?.server_id ?? '', 'lolka', sort, viewPlatform !== 'vk');
 
   const leaderboardEntries = useMemo(() => {
     const src = viewPlatform === 'lolka' ? lbLolka : lbVk;
@@ -102,7 +110,7 @@ export default function RankingPage() {
   // Live Preview — реальные данные топ-1 участника лидерборда (см. Объяснение).
   const topEntry: any = leaderboardEntries[0];
   const { data: preview } = useRankingPreview(
-    selectedServerId,
+    effectiveServerId,
     (topEntry?._platform || effectivePlatform) as 'vk' | 'lolka',
     topEntry?.user_id || ''
   );
@@ -123,9 +131,9 @@ export default function RankingPage() {
   const removeReward = (i: number) => updateRewards(rewards.filter((_, idx) => idx !== i));
 
   const handleSave = async () => {
-    if (!selectedServer) return;
+    if (!effectiveServerId) return;
     try {
-      await saveMutation.mutateAsync({ serverId: selectedServerId, platform: effectivePlatform, settings: formData });
+      await saveMutation.mutateAsync({ serverId: effectiveServerId, platform: effectivePlatform, settings: formData });
       alert('✅ Настройки сохранены!');
     } catch {
       alert('❌ Ошибка сохранения');
@@ -205,6 +213,13 @@ export default function RankingPage() {
           </button>
         ))}
       </div>
+
+      {!effectiveServerId && (
+        <p className="mb-4 text-sm text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3">
+          ⚠️ {effectivePlatform === 'vk' ? 'VK' : 'Lolka'}-сервер не подключён. Добавьте его на странице{' '}
+          <a href="/dashboard/servers" className="underline">/dashboard/servers</a>, чтобы настроить систему уровней для этой платформы.
+        </p>
+      )}
 
       {activeTab === 'settings' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
