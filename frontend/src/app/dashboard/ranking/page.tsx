@@ -15,6 +15,7 @@ import {
   useSyncMembers,
 } from '@/hooks/useRanking';
 import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
+import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE } from '@/components/ranking/RankCardPreview';
 
 const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 
@@ -581,7 +582,7 @@ export default function RankingPage() {
                     placeholder="https://example.com/image.png"
                     className="input w-full"
                   />
-                  <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемый размер: 800×400px</p>
+                  <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемый размер: {RANK_CARD_RECOMMENDED_SIZE}</p>
                   <div className="mt-3">
                     <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
                       <label>Затенение фона</label>
@@ -596,53 +597,28 @@ export default function RankingPage() {
 
           <Card className="p-5">
             <h3 className="font-semibold mb-3">👁️ Live Preview {topEntry ? '' : '(тестовые данные)'}</h3>
-            <div
-              className="p-5 max-w-sm mx-auto"
-              style={{
-                borderRadius: `${cardRadius}px`,
-                background: cardStyle === 'glass' ? `${cardBg}${Math.round((cardGlass / 100) * 255).toString(16).padStart(2, '0')}` : cardBg,
-                backdropFilter: cardStyle === 'glass' ? `blur(${Math.round((cardGlass / 100) * 24)}px)` : undefined,
-                border: cardStyle === 'flat' ? `1px solid ${cardAccent}40` : `2px solid ${cardAccent}`,
-                boxShadow: cardStyle === 'neon' ? `0 0 24px ${cardAccent}80, 0 0 8px ${cardAccent}` : cardStyle === 'flat' ? 'none' : `0 0 20px ${cardAccent}30`,
-                backgroundImage: cardBgImageEnabled && cardBgImageUrl
-                  ? `linear-gradient(0deg, ${cardBg}${Math.round((cardBgShade / 100) * 255).toString(16).padStart(2, '0')}, ${cardBg}${Math.round((cardBgShade / 100) * 0.5 * 255).toString(16).padStart(2, '0')}), url(${cardBgImageUrl})`
-                  : cardStyle === 'gradient' ? `linear-gradient(135deg, ${cardBg}, ${cardGradient}80)` : undefined,
-                backgroundSize: cardBgImageEnabled && cardBgImageUrl ? 'cover' : undefined,
-                backgroundPosition: cardBgImageEnabled && cardBgImageUrl ? 'center' : undefined,
+            <RankCardPreview
+              appearance={{
+                bg: cardBg,
+                accent: cardAccent,
+                gradient: cardGradient,
+                style: cardStyle,
+                radius: cardRadius,
+                glass: cardGlass,
+                bgImageUrl: cardBgImageUrl,
+                bgImageEnabled: cardBgImageEnabled,
+                bgShade: cardBgShade,
               }}
-            >
-              <div className="mb-3 flex justify-between">
-                <span className="text-xs font-bold text-black px-2 py-0.5 rounded-lg" style={{ background: cardAccent }}>
-                  🪪 #{preview?.ranking.rank ?? 1}
-                </span>
-                <span className="text-white/50 text-xs">Ур. {preview?.ranking.level ?? 42}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl overflow-hidden shrink-0 bg-[rgb(var(--surface-3))]" style={{ border: `2px solid ${cardAccent}` }}>
-                  {preview?.user.avatar_url ? <img src={preview.user.avatar_url} alt="" className="w-full h-full object-cover" /> : '👤'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-white font-bold text-sm truncate">{preview?.user.username ?? 'Пользователь'}</div>
-                  <div className="mt-1.5">
-                    <div className="flex justify-between text-xs text-white/40 mb-1">
-                      <span>XP</span>
-                      <span>
-                        {(preview?.ranking.current_xp ?? 15420).toLocaleString('ru-RU')} / {(preview?.ranking.xp_for_next_level ?? 20000).toLocaleString('ru-RU')}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${preview ? Math.min(100, Math.round((preview.ranking.current_xp / preview.ranking.xp_for_next_level) * 100)) : 77}%`,
-                          background: cardAccent,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+              data={preview ? {
+                rank: preview.ranking.rank,
+                level: preview.ranking.level,
+                username: preview.user.username,
+                avatar_url: preview.user.avatar_url,
+                current_xp: preview.ranking.current_xp,
+                xp_for_next_level: preview.ranking.xp_for_next_level,
+              } : undefined}
+            />
+            <p className="text-[10px] text-[rgb(var(--text-secondary))] text-center mt-2">Реальный размер карточки: {RANK_CARD_RECOMMENDED_SIZE}</p>
           </Card>
         </div>
       )}
