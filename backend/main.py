@@ -2412,6 +2412,7 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "card_glass_intensity": s.card_glass_intensity,
         "card_bg_image_url": s.card_bg_image_url,
         "card_bg_image_enabled": s.card_bg_image_enabled,
+        "card_bg_shade": s.card_bg_shade,
     }
 
 
@@ -2464,7 +2465,7 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             "decay_enabled", "decay_days", "decay_percent",
             "card_bg_color", "card_accent_color", "card_gradient_color", "card_style",
             "card_radius", "card_glass_intensity",
-            "card_bg_image_url", "card_bg_image_enabled",
+            "card_bg_image_url", "card_bg_image_enabled", "card_bg_shade",
         }
         for field in simple_fields:
             if field in payload:

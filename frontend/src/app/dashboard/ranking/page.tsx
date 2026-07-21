@@ -16,6 +16,30 @@ import {
 } from '@/hooks/useRanking';
 import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
 
+const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
+/** Текстовое HEX-поле рядом с color-пикером: держит локальный черновик ввода,
+ *  чтобы промежуточные (пока невалидные) символы не затирались контролируемым value,
+ *  и прокидывает наверх только валидные HEX-коды. */
+function HexColorField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => { setDraft(value); }, [value]);
+  return (
+    <input
+      type="text"
+      value={draft}
+      onChange={e => {
+        const v = e.target.value;
+        setDraft(v);
+        if (HEX_COLOR_RE.test(v)) onChange(v);
+      }}
+      placeholder={placeholder}
+      maxLength={7}
+      className="input flex-1 font-mono text-sm"
+    />
+  );
+}
+
 const TABS = [
   { id: 'settings', label: '⚙️ Настройки' },
   { id: 'formula', label: '🧮 Формула XP' },
@@ -164,6 +188,7 @@ export default function RankingPage() {
   const cardGlass = formData.card_glass_intensity ?? settings?.card_glass_intensity ?? 70;
   const cardBgImageUrl = formData.card_bg_image_url ?? settings?.card_bg_image_url ?? '';
   const cardBgImageEnabled = formData.card_bg_image_enabled ?? settings?.card_bg_image_enabled ?? false;
+  const cardBgShade = formData.card_bg_shade ?? settings?.card_bg_shade ?? 80;
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 sm:px-8 py-8 space-y-6">
@@ -487,15 +512,24 @@ export default function RankingPage() {
             <h3 className="font-semibold">🎨 Дизайн карточки</h3>
             <div>
               <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Цвет фона</label>
-              <input type="color" value={cardBg} onChange={e => updateField('card_bg_color', e.target.value)} className="w-full h-10 rounded-lg cursor-pointer" />
+              <div className="flex gap-2">
+                <input type="color" value={cardBg} onChange={e => updateField('card_bg_color', e.target.value)} className="h-10 w-10 shrink-0 rounded-lg cursor-pointer" />
+                <HexColorField value={cardBg} onChange={v => updateField('card_bg_color', v)} placeholder="#111118" />
+              </div>
             </div>
             <div>
               <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Акцентный цвет</label>
-              <input type="color" value={cardAccent} onChange={e => updateField('card_accent_color', e.target.value)} className="w-full h-10 rounded-lg cursor-pointer" />
+              <div className="flex gap-2">
+                <input type="color" value={cardAccent} onChange={e => updateField('card_accent_color', e.target.value)} className="h-10 w-10 shrink-0 rounded-lg cursor-pointer" />
+                <HexColorField value={cardAccent} onChange={v => updateField('card_accent_color', v)} placeholder="#00E5FF" />
+              </div>
             </div>
             <div>
               <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Градиент</label>
-              <input type="color" value={cardGradient} onChange={e => updateField('card_gradient_color', e.target.value)} className="w-full h-10 rounded-lg cursor-pointer" />
+              <div className="flex gap-2">
+                <input type="color" value={cardGradient} onChange={e => updateField('card_gradient_color', e.target.value)} className="h-10 w-10 shrink-0 rounded-lg cursor-pointer" />
+                <HexColorField value={cardGradient} onChange={v => updateField('card_gradient_color', v)} placeholder="#7B2FBE" />
+              </div>
             </div>
             <div>
               <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Стиль</label>
@@ -548,6 +582,13 @@ export default function RankingPage() {
                     className="input w-full"
                   />
                   <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Рекомендуемый размер: 800×400px</p>
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
+                      <label>Затенение фона</label>
+                      <span>{cardBgShade}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={5} value={cardBgShade} onChange={e => updateField('card_bg_shade', parseInt(e.target.value))} className="w-full accent-cyan-400" />
+                  </div>
                 </>
               )}
             </div>
@@ -564,7 +605,7 @@ export default function RankingPage() {
                 border: cardStyle === 'flat' ? `1px solid ${cardAccent}40` : `2px solid ${cardAccent}`,
                 boxShadow: cardStyle === 'neon' ? `0 0 24px ${cardAccent}80, 0 0 8px ${cardAccent}` : cardStyle === 'flat' ? 'none' : `0 0 20px ${cardAccent}30`,
                 backgroundImage: cardBgImageEnabled && cardBgImageUrl
-                  ? `linear-gradient(0deg, ${cardBg}cc, ${cardBg}66), url(${cardBgImageUrl})`
+                  ? `linear-gradient(0deg, ${cardBg}${Math.round((cardBgShade / 100) * 255).toString(16).padStart(2, '0')}, ${cardBg}${Math.round((cardBgShade / 100) * 0.5 * 255).toString(16).padStart(2, '0')}), url(${cardBgImageUrl})`
                   : cardStyle === 'gradient' ? `linear-gradient(135deg, ${cardBg}, ${cardGradient}80)` : undefined,
                 backgroundSize: cardBgImageEnabled && cardBgImageUrl ? 'cover' : undefined,
                 backgroundPosition: cardBgImageEnabled && cardBgImageUrl ? 'center' : undefined,

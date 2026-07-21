@@ -302,6 +302,7 @@ class RankingSettings(Base):
     card_glass_intensity = Column(Integer, default=70)
     card_bg_image_url = Column(String(1024), default="")
     card_bg_image_enabled = Column(Boolean, default=False)
+    card_bg_shade = Column(Integer, default=80)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
