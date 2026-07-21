@@ -185,22 +185,11 @@ export default function RankingPage() {
     }
   };
 
-  if (serverLoading || settingsLoading) {
-    return <div className="p-8 text-center text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
-  }
-  if (!selectedServer) {
-    return <NoServerSelected title="🪪 Система уровней" />;
-  }
-
-  const cardBg = formData.card_bg_color ?? settings?.card_bg_color ?? '#111118';
-  const cardAccent = formData.card_accent_color ?? settings?.card_accent_color ?? '#00E5FF';
-  const cardGradient = formData.card_gradient_color ?? settings?.card_gradient_color ?? '#7B2FBE';
-  const cardStyle = formData.card_style ?? settings?.card_style ?? 'gradient';
-  const cardRadius = formData.card_radius ?? settings?.card_radius ?? 16;
-  const cardGlass = formData.card_glass_intensity ?? settings?.card_glass_intensity ?? 70;
+  // Вынесено выше early-return блока: хуки (useState/useEffect) не могут вызываться
+  // после условных return — иначе порядок хуков "плывёт" между рендерами и React
+  // падает с ошибкой #310 (Rendered fewer hooks than expected).
   const cardBgImageUrl = formData.card_bg_image_url ?? settings?.card_bg_image_url ?? '';
   const cardBgImageEnabled = formData.card_bg_image_enabled ?? settings?.card_bg_image_enabled ?? false;
-  const cardBgShade = formData.card_bg_shade ?? settings?.card_bg_shade ?? 80;
 
   const [bgImageStatus, setBgImageStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   useEffect(() => {
@@ -214,6 +203,21 @@ export default function RankingPage() {
     }, 500);
     return () => clearTimeout(timer);
   }, [cardBgImageUrl, cardBgImageEnabled]);
+
+  if (serverLoading || settingsLoading) {
+    return <div className="p-8 text-center text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
+  }
+  if (!selectedServer) {
+    return <NoServerSelected title="🪪 Система уровней" />;
+  }
+
+  const cardBg = formData.card_bg_color ?? settings?.card_bg_color ?? '#111118';
+  const cardAccent = formData.card_accent_color ?? settings?.card_accent_color ?? '#00E5FF';
+  const cardGradient = formData.card_gradient_color ?? settings?.card_gradient_color ?? '#7B2FBE';
+  const cardStyle = formData.card_style ?? settings?.card_style ?? 'gradient';
+  const cardRadius = formData.card_radius ?? settings?.card_radius ?? 16;
+  const cardGlass = formData.card_glass_intensity ?? settings?.card_glass_intensity ?? 70;
+  const cardBgShade = formData.card_bg_shade ?? settings?.card_bg_shade ?? 80;
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 sm:px-8 py-8 space-y-6">
