@@ -45,6 +45,19 @@ export const RANK_CARD_TEST_DATA: RankCardData = {
 export const RANK_CARD_ASPECT_RATIO = '2 / 1';
 export const RANK_CARD_RECOMMENDED_SIZE = '800×400px';
 
+/** Технически допустимые размеры пользовательского фона карточки (ТЗ №5 Rev.6, п.4.3.2/6.1.3). */
+export const RANK_CARD_IMAGE_CONSTRAINTS = {
+  minWidth: 400,
+  minHeight: 200,
+  maxWidth: 2000,
+  maxHeight: 1000,
+  recommendedWidth: 800,
+  recommendedHeight: 400,
+  aspectRatio: 2, // width / height
+  maxFileSizeMb: 5,
+  allowedFormats: ['PNG', 'JPG', 'WebP'],
+};
+
 export function RankCardPreview({ appearance, data, className }: { appearance: RankCardAppearance; data?: RankCardData; className?: string }) {
   const d = data ?? RANK_CARD_TEST_DATA;
   const { bg, accent, gradient, style, radius, glass, bgImageUrl, bgImageEnabled, bgShade, bgFit, bgPosition } = appearance;
@@ -75,23 +88,23 @@ export function RankCardPreview({ appearance, data, className }: { appearance: R
       }}
     >
       <div className="mb-3 flex justify-between">
-        <span className="text-xs font-bold text-black px-2 py-0.5 rounded-lg" style={{ background: accent }}>
+        <span className="text-sm font-bold text-black px-2.5 py-1 rounded-lg" style={{ background: accent }}>
           🪪 #{d.rank}
         </span>
-        <span className="text-white/50 text-xs">Ур. {d.level}</span>
+        <span className="text-white text-sm font-semibold" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>Ур. {d.level}</span>
       </div>
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl overflow-hidden shrink-0 bg-[rgb(var(--surface-3))]" style={{ border: `2px solid ${accent}` }}>
+        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl overflow-hidden shrink-0 bg-[rgb(var(--surface-3))]" style={{ border: `2px solid ${accent}` }}>
           {d.avatar_url ? <img src={d.avatar_url} alt="" className="w-full h-full object-cover" /> : '👤'}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-white font-bold text-sm truncate">{d.username}</div>
+          <div className="text-white font-bold text-base truncate" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>{d.username}</div>
           <div className="mt-1.5">
-            <div className="flex justify-between text-xs text-white/40 mb-1">
+            <div className="flex justify-between text-xs font-medium text-white/90 mb-1" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
               <span>XP</span>
               <span>{d.current_xp.toLocaleString('ru-RU')} / {d.xp_for_next_level.toLocaleString('ru-RU')}</span>
             </div>
-            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
               <div className="h-full rounded-full" style={{ width: `${progress}%`, background: accent }} />
             </div>
           </div>

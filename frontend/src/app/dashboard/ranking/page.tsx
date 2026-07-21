@@ -15,7 +15,7 @@ import {
   useSyncMembers,
 } from '@/hooks/useRanking';
 import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
-import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE } from '@/components/ranking/RankCardPreview';
+import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS } from '@/components/ranking/RankCardPreview';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
@@ -239,17 +239,36 @@ export default function RankingPage() {
   const cardBgImageEnabled = formData.card_bg_image_enabled ?? settings?.card_bg_image_enabled ?? false;
 
   const [bgImageStatus, setBgImageStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [bgImageDimensions, setBgImageDimensions] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
-    if (!cardBgImageEnabled || !cardBgImageUrl.trim()) { setBgImageStatus('idle'); return; }
+    if (!cardBgImageEnabled || !cardBgImageUrl.trim()) { setBgImageStatus('idle'); setBgImageDimensions(null); return; }
     setBgImageStatus('loading');
     const timer = setTimeout(() => {
       const img = new window.Image();
-      img.onload = () => setBgImageStatus('ok');
-      img.onerror = () => setBgImageStatus('error');
+      img.onload = () => {
+        setBgImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        setBgImageStatus('ok');
+      };
+      img.onerror = () => { setBgImageDimensions(null); setBgImageStatus('error'); };
       img.src = cardBgImageUrl.trim();
     }, 500);
     return () => clearTimeout(timer);
   }, [cardBgImageUrl, cardBgImageEnabled]);
+
+  // Предупреждение по фактическим размерам изображения относительно допустимого диапазона
+  // (ТЗ №5 Rev.6, п.4.3.3) — только для валидно загруженного изображения.
+  const bgImageSizeWarning = useMemo(() => {
+    if (bgImageStatus !== 'ok' || !bgImageDimensions) return null;
+    const { width, height } = bgImageDimensions;
+    const { minWidth, minHeight, maxWidth, maxHeight } = RANK_CARD_IMAGE_CONSTRAINTS;
+    if (width < minWidth || height < minHeight) {
+      return `⚠️ Изображение меньше минимального размера (${minWidth}×${minHeight}px) — качество может пострадать`;
+    }
+    if (width > maxWidth || height > maxHeight) {
+      return `⚠️ Изображение больше максимального размера (${maxWidth}×${maxHeight}px) — будет автоматически уменьшено`;
+    }
+    return null;
+  }, [bgImageStatus, bgImageDimensions]);
 
   // Онбординг-баннер (ТЗ №5 Rev.5, п.10.1) — показывается один раз в этом браузере,
   // пока участник явно не закроет/не начнёт настройку. Флаг хранится локально:
@@ -493,8 +512,14 @@ export default function RankingPage() {
                 )}
               </div>
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Шаблон сообщения</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
+                  Шаблон сообщения
+                  <Hint text="Доступные переменные: {user} — упоминание, {level} — новый уровень, {level_word} — склонение слова «уровень», {guild} — название сервера, {xp} — текущий опыт, {next_level_xp} — опыт для следующего уровня, {rank} — место в рейтинге." />
+                </label>
                 <textarea value={formData.notify_message ?? settings?.notify_message ?? '🎉 {user} достиг {level} уровня!'} onChange={e => updateField('notify_message', e.target.value)} rows={2} className="input w-full font-mono resize-none" />
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1 font-mono">
+                  {'{user} {level} {level_word} {guild} {xp} {next_level_xp} {rank}'}
+                </p>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Пинговать пользователя</span>
@@ -772,7 +797,14 @@ export default function RankingPage() {
                     <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">⏳ Проверяем ссылку…</p>
                   )}
                   {bgImageStatus === 'ok' && (
-                    <p className="text-[10px] text-emerald-400 mt-1">✅ Изображение загружается корректно</p>
+                    <>
+                      <p className="text-[10px] text-emerald-400 mt-1">
+                        ✅ Изображение загружается корректно{bgImageDimensions ? ` — ${bgImageDimensions.width}×${bgImageDimensions.height}px` : ''}
+                      </p>
+                      {bgImageSizeWarning && (
+                        <p className="text-[10px] text-amber-400 mt-1">{bgImageSizeWarning}</p>
+                      )}
+                    </>
                   )}
                   {bgImageStatus === 'error' && (
                     <p className="text-[10px] text-red-400 mt-1">❌ Не удалось загрузить изображение по этой ссылке — проверьте, что она ведёт напрямую на файл и хостинг разрешает встраивание</p>
@@ -837,6 +869,15 @@ export default function RankingPage() {
               } : undefined}
             />
             <p className="text-[10px] text-[rgb(var(--text-secondary))] text-center mt-2">Реальный размер карточки: {RANK_CARD_RECOMMENDED_SIZE}</p>
+            <div className="mt-3 pt-3 border-t border-[rgb(var(--border))] text-[10px] text-[rgb(var(--text-secondary))] space-y-0.5">
+              <p className="font-semibold text-[rgb(var(--text))] mb-1">Технические требования к изображению:</p>
+              <p>• Минимальный размер: {RANK_CARD_IMAGE_CONSTRAINTS.minWidth}×{RANK_CARD_IMAGE_CONSTRAINTS.minHeight}px</p>
+              <p>• Максимальный размер: {RANK_CARD_IMAGE_CONSTRAINTS.maxWidth}×{RANK_CARD_IMAGE_CONSTRAINTS.maxHeight}px</p>
+              <p>• Рекомендуемый размер: {RANK_CARD_IMAGE_CONSTRAINTS.recommendedWidth}×{RANK_CARD_IMAGE_CONSTRAINTS.recommendedHeight}px</p>
+              <p>• Соотношение сторон: {RANK_CARD_IMAGE_CONSTRAINTS.aspectRatio}:1</p>
+              <p>• Форматы: {RANK_CARD_IMAGE_CONSTRAINTS.allowedFormats.join(', ')}</p>
+              <p>• Макс. размер файла: {RANK_CARD_IMAGE_CONSTRAINTS.maxFileSizeMb} MB</p>
+            </div>
           </Card>
         </div>
       )}

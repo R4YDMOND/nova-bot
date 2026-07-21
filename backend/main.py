@@ -9,6 +9,7 @@ from database import init_db, SessionLocal, get_db
 from sqlalchemy.orm import Session
 from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings
 from ranking.xp_handler import award_xp_for_message
+from ranking.template import render_notify_template
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
 from moderation_engine import ModerationEngine
 from fastapi.responses import PlainTextResponse
@@ -73,7 +74,15 @@ async def _award_xp_and_notify_vk(
 
         mention = f"[id{user_id}|{username}]" if result.get("ping_user") else username
         template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
-        text_to_send = template.replace("{user}", mention).replace("{level}", str(result["new_level"]))
+        text_to_send = render_notify_template(
+            template,
+            user=mention,
+            level=result["new_level"],
+            guild=result.get("guild", ""),
+            xp=result.get("xp"),
+            next_level_xp=result.get("next_level_xp"),
+            rank=result.get("rank"),
+        )
 
         service = get_vk_service(access_token)
         service.send_message(peer_id=target_peer_id, message=text_to_send)

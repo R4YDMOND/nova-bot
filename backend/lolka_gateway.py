@@ -9,6 +9,7 @@ from typing import Optional
 import websockets
 
 from ranking.xp_handler import award_xp_for_message
+from ranking.template import render_notify_template
 
 # Простейший набор команд бота — независим от backend/main.py,
 # чтобы не создавать циклический импорт (main.py импортирует этот модуль).
@@ -204,7 +205,15 @@ class LolkaGateway:
 
             mention = f"<@{user_id}>" if result.get("ping_user") else username
             template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
-            text_to_send = template.replace("{user}", mention).replace("{level}", str(result["new_level"]))
+            text_to_send = render_notify_template(
+                template,
+                user=mention,
+                level=result["new_level"],
+                guild=result.get("guild", ""),
+                xp=result.get("xp"),
+                next_level_xp=result.get("next_level_xp"),
+                rank=result.get("rank"),
+            )
 
             await self.send_message(target_channel_id, text_to_send)
         except Exception as e:

@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy import and_
 
 from database import SessionLocal
-from models import RankingSettings, Member
+from models import RankingSettings, Member, Server
 from ranking.formulas import XPFormulaEngine, XPFormulaConfig
 
 logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ async def award_xp_for_message(
         db.commit()
         _last_xp_award[cache_key] = datetime.utcnow()
 
-        return {
+        result: Dict[str, Any] = {
             "xp_gained": xp_gained,
             "new_level": member.level,
             "leveled_up": leveled_up,
@@ -106,6 +106,24 @@ async def award_xp_for_message(
             "notify_message": settings.notify_message,
             "ping_user": settings.ping_user,
         }
+
+        # Переменные расширенного шаблона (ТЗ №5 Rev.6, п.4.4) — считаем только
+        # при реальном level-up, чтобы не нагружать БД лишними запросами на каждое сообщение.
+        if leveled_up:
+            server = db.query(Server).filter(Server.id == server_id_int).first()
+            rank = db.query(Member).filter(and_(
+                Member.server_id == server_id,
+                Member.platform == platform,
+                Member.xp > member.xp,
+            )).count() + 1
+            result.update({
+                "guild": server.name if server else "",
+                "xp": member.xp,
+                "next_level_xp": required,
+                "rank": rank,
+            })
+
+        return result
     except Exception as e:
         logger.error(f"award_xp_for_message error: {e}")
         db.rollback()
