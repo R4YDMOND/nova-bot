@@ -3295,7 +3295,7 @@ def vk_get_channels(server_id: str = Query(...)):
             VKConnection.is_active == True
         ).first()
         if not conn:
-            return {"error": "VK-сообщество не подключено. Подключите его на странице /dashboard/servers.", "channels": []}
+            return {"error": "VK-сообщество не подключено. Подключите его в разделе Модерация → Защита → Подключение VK (/dashboard/moderation).", "channels": []}
 
         service = get_vk_service(conn.access_token)
         conversations = service.get_conversations()
