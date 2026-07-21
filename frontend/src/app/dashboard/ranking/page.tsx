@@ -436,20 +436,23 @@ export default function RankingPage() {
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
                   Опыт за сообщение (XP)
-                  <Hint text="Сколько очков получает участник за каждое текстовое сообщение" />
+                  <Hint text="Сколько очков получает участник за каждое текстовое сообщение. Оптимально: 10–25 XP — меньше замедлит прокачку, больше ускорит её слишком сильно" />
                 </label>
                 <input type="number" value={formData.xp_per_message ?? settings?.xp_per_message ?? 15} onChange={e => updateField('xp_per_message', parseInt(e.target.value) || 0)} className="input w-full" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">💡 Оптимально: 10–25 XP. Меньше — медленная прокачка, больше — слишком быстрая</p>
               </div>
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Опыт за голосовую минуту (XP)</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
+                  Опыт за голосовую минуту (XP)
+                  <Hint text="Количество опыта за 1 минуту в голосовом чате" />
+                </label>
                 <input type="number" value={formData.xp_per_voice_minute ?? settings?.xp_per_voice_minute ?? 20} onChange={e => updateField('xp_per_voice_minute', parseInt(e.target.value) || 0)} className="input w-full" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Количество опыта за 1 минуту в голосовом чате</p>
               </div>
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Минимальная длина сообщения</label>
+                <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
+                  Минимальная длина сообщения
+                  <Hint text="Сообщения короче этого значения не учитываются — защита от спама" />
+                </label>
                 <input type="number" value={formData.min_message_length ?? settings?.min_message_length ?? 3} onChange={e => updateField('min_message_length', parseInt(e.target.value) || 0)} className="input w-full" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Сообщения короче этого значения не учитываются — защита от спама</p>
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
@@ -457,7 +460,6 @@ export default function RankingPage() {
                   <Hint text="Минимальное время между начислениями опыта одному пользователю. Защита от спама и накрутки" />
                 </label>
                 <input type="number" value={formData.cooldown_seconds ?? settings?.cooldown_seconds ?? 60} onChange={e => updateField('cooldown_seconds', parseInt(e.target.value) || 0)} className="input w-full" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Минимальный интервал между начислениями опыта одному пользователю — защита от накрутки</p>
               </div>
               <div className="flex justify-between items-center pt-1">
                 <div>
