@@ -555,6 +555,7 @@ export default function RankingPage() {
       )}
 
       {activeTab === 'settings' && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <Card className="p-5">
             <h3 className="font-semibold mb-3">⚙️ Параметры начисления опыта</h3>
@@ -684,23 +685,26 @@ export default function RankingPage() {
                     {templateModalOpen ? '✕ Закрыть редактор' : '✏️ Открыть редактор шаблонов'}
                   </button>
                 </div>
-                {/* Правка.jpg: редактор раскрывается вниз прямо во вкладке "Настройки",
-                    а не отдельным модальным окном — остальные карточки настроек остаются видны */}
-                <MessageTemplateModal
-                  open={templateModalOpen}
-                  onOpenChange={setTemplateModalOpen}
-                  value={formData.notify_template ?? settings?.notify_template}
-                  serverId={effectiveServerId}
-                  platform={effectivePlatform}
-                  onSave={tpl => {
-                    updateField('notify_template', tpl);
-                    updateField('notify_message', tpl.content);
-                  }}
-                />
+                {/* Правка.jpg: редактор раскрывается вниз прямо во вкладке "Настройки".
+                    Вынесен за пределы grid-колонки карточки "Уведомления" (был зажат
+                    в половину ширины страницы, неудобно для Embed/кнопок) — теперь
+                    раскрывается на всю ширину страницы под обеими карточками. */}
               </div>
             </div>
           </Card>
         </div>
+        <MessageTemplateModal
+          open={templateModalOpen}
+          onOpenChange={setTemplateModalOpen}
+          value={formData.notify_template ?? settings?.notify_template}
+          serverId={effectiveServerId}
+          platform={effectivePlatform}
+          onSave={tpl => {
+            updateField('notify_template', tpl);
+            updateField('notify_message', tpl.content);
+          }}
+        />
+        </>
       )}
 
       {activeTab === 'formula' && (

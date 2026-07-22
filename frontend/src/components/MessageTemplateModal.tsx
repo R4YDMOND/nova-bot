@@ -301,7 +301,7 @@ export function MessageTemplateModal({
     <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
       <div className="overflow-hidden">
         <div
-          className={`mt-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg max-h-[70vh] overflow-y-auto transition-opacity duration-300 ${open ? 'opacity-100 delay-100' : 'opacity-0'}`}
+          className={`mt-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg max-h-[88vh] overflow-y-auto transition-opacity duration-300 ${open ? 'opacity-100 delay-100' : 'opacity-0'}`}
         >
           <div className="flex flex-col">
           {/* Верхняя панель */}
@@ -387,20 +387,16 @@ export function MessageTemplateModal({
               Шаблон для: {isVk ? 'VK (ограниченный функционал)' : 'Lolka (полный функционал)'}
             </span>
             {isVk && (
-              <p className="flex items-start gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3">
+              <p className="flex items-start gap-2 text-xs text-[rgb(var(--warning))] bg-[rgb(var(--warning))]/10 border border-[rgb(var(--warning))]/25 rounded-xl px-4 py-3">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  <b>Ограничения VK.</b> ВКонтакте не поддерживает панели (Embeds) и выпадающие списки.
-                  Заголовок, описание, поля и подвал панели будут показаны обычным текстом, кнопки — как inline-клавиатура.
-                  Неподдерживаемые элементы ниже скрыты для этой платформы.
-                </span>
+                <span>VK ограничена поддержка панелей и списков. Сообщение будет показано в упрощённом виде.</span>
               </p>
             )}
           </div>
 
           <div className={`grid ${showPreview ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-0 flex-1 min-h-0`}>
             {/* Редактор */}
-            <div className="p-5 space-y-4 border-r border-[rgb(var(--border))] md:max-h-[calc(70vh-140px)] md:overflow-y-auto">
+            <div className="p-5 space-y-4 border-r border-[rgb(var(--border))] md:max-h-[calc(88vh-150px)] md:overflow-y-auto">
               {tab === 'text' && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -415,7 +411,7 @@ export function MessageTemplateModal({
                     <ToolbarBtn icon={<Code className="w-3.5 h-3.5" />} title="Код" onClick={() => wrapSelection(contentRef.current, '`', '`', draft.content, v => setDraft(d => ({ ...d, content: v })))} />
                     <ToolbarBtn icon={<Heading className="w-3.5 h-3.5" />} title="Заголовок" onClick={() => wrapSelection(contentRef.current, '### ', '', draft.content, v => setDraft(d => ({ ...d, content: v })))} />
                     <ToolbarBtn icon={<Link2 className="w-3.5 h-3.5" />} title="Ссылка" onClick={() => wrapSelection(contentRef.current, '[', '](https://)', draft.content, v => setDraft(d => ({ ...d, content: v })))} />
-                    <div className="relative ml-auto">
+                    <div className="relative">
                       <ToolbarBtn icon={<span className="text-xs font-mono">{'{}'}</span>} title="Вставить переменную" onClick={() => setVarMenuOpen(v => !v)} />
                       {varMenuOpen && <VariableMenu onPick={insertVariable} onClose={() => setVarMenuOpen(false)} />}
                     </div>
@@ -587,9 +583,9 @@ export function MessageTemplateModal({
 
                   <div className="pt-3 border-t border-[rgb(var(--border))]">
                     {isVk ? (
-                      <p className="flex items-start gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-3 py-2.5">
+                      <p className="flex items-start gap-2 text-xs text-[rgb(var(--warning))] bg-[rgb(var(--warning))]/10 border border-[rgb(var(--warning))]/25 rounded-xl px-3 py-2.5">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        Выпадающие списки недоступны в VK — редактор скрыт для этой платформы. Чтобы отредактировать select-меню, переключите платформу на «Lolka» на странице настроек уровней.
+                        VK не поддерживает выпадающие списки. Этот раздел редактора скрыт. Вы можете использовать кнопки или обычный текст.
                       </p>
                     ) : (
                     <>
@@ -644,7 +640,7 @@ export function MessageTemplateModal({
 
             {/* Превью */}
             {showPreview && (
-              <div className="p-5 bg-[rgb(var(--surface-1))] md:max-h-[calc(70vh-140px)] md:overflow-y-auto">
+              <div className="p-5 bg-[rgb(var(--surface-1))] md:max-h-[calc(88vh-150px)] md:overflow-y-auto">
                 <p className="text-xs text-[rgb(var(--text-secondary))] mb-3">Предпросмотр {isVk ? '(VK)' : '(Lolka)'}</p>
                 <div className="bg-[#111118] rounded-2xl p-4 text-sm text-white">
                   {draft.content && (
