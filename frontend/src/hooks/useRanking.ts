@@ -69,6 +69,17 @@ export function useRankingChannels(serverId: string, platform: 'vk' | 'lolka' = 
   });
 }
 
+// Автоопределение ролей сервера для наград за уровень — только Lolka (у VK нет
+// сопоставимого Bot API для чтения ролей сообщества).
+export function useRankingRoles(serverId: string, platform: 'vk' | 'lolka' = 'vk') {
+  return useQuery({
+    queryKey: ['ranking', 'roles', serverId, platform],
+    queryFn: () => api.ranking.getRoles(serverId),
+    enabled: !!serverId && platform === 'lolka',
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useSyncMembers() {
   const queryClient = useQueryClient();
 

@@ -114,6 +114,12 @@ export type RankingChannel = {
   platform: "vk" | "lolka";
 };
 
+export type RankingRole = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type LeaderboardEntry = {
   rank: number;
   user_id: string;
@@ -604,6 +610,13 @@ export const api = {
         platform === "vk"
           ? `/api/vk/channels?server_id=${serverId}`
           : `/api/lolka/channels?server_id=${serverId}`
+      ),
+
+    // ТЗ: автоподтягивание ролей сервера для наград за уровень — доступно только для Lolka
+    // (у VK нет сопоставимого Bot API для чтения ролей сообщества).
+    getRoles: (serverId: string) =>
+      apiFetch<{ roles: RankingRole[]; total: number; error?: string }>(
+        `/api/lolka/roles?server_id=${serverId}`
       ),
 
     syncMembers: (serverId: string, platform: "vk" | "lolka" = "vk") =>

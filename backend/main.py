@@ -1584,6 +1584,45 @@ def lolka_get_channels(server_id: str = Query(...)):
         return {"error": str(e), "channels": []}
 
 
+@app.get("/api/lolka/roles")
+def lolka_get_roles(server_id: str = Query(...)):
+    """Автоопределение ролей Lolka-сервера — для наград за уровень (добавление/снятие ролей)."""
+    if not os.getenv("LOLKA_BOT_TOKEN", ""):
+        return {"error": "LOLKA_BOT_TOKEN не настроен", "roles": []}
+    try:
+        resp = _lolka_bot_request("GET", f"{LOLKA_BOT_BASE_URL}/guilds/{server_id}/roles")
+        if resp is None:
+            return {"error": "Lolka API: превышен лимит запросов", "roles": []}
+        if not resp.ok:
+            detail = ""
+            try:
+                body = resp.json()
+                detail = body.get("message") or body.get("error") or ""
+            except Exception:
+                detail = (resp.text or "")[:200]
+            hint = " — бот не состоит в этом сервере или у него нет прав на просмотр ролей" if resp.status_code == 403 else ""
+            msg = f"Lolka API вернул {resp.status_code}{hint}"
+            if detail:
+                msg += f" ({detail})"
+            return {"error": msg, "roles": []}
+
+        # Discord-совместимый формат роли (см. lolka_gateway.py): id, name, color (int), managed.
+        # Служебные роли бота (managed) и @everyone пропускаем — их нельзя выдать/снять вручную.
+        roles = [
+            {
+                "id": str(r.get("id")),
+                "name": r.get("name", ""),
+                "color": f"#{r.get('color', 0):06x}" if r.get("color") else "#99AAB5",
+            }
+            for r in resp.json()
+            if not r.get("managed") and r.get("name") != "@everyone"
+        ]
+        roles.sort(key=lambda r: r["name"].lower())
+        return {"roles": roles, "total": len(roles)}
+    except Exception as e:
+        return {"error": str(e), "roles": []}
+
+
 @app.get("/api/lolka/bot/server/{server_id}/members")
 def lolka_get_server_members(server_id: str):
     if not os.getenv("LOLKA_BOT_TOKEN", ""):

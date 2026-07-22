@@ -28,6 +28,10 @@ export interface RankingReward {
   role: string;
   color: string;
   message?: string;
+  /** Роли, выдаваемые на этом уровне (только Lolka, ID ролей сервера) */
+  add_roles?: string[];
+  /** Роли, снимаемые на этом уровне (только Lolka, ID ролей сервера) */
+  remove_roles?: string[];
   /** Индивидуальный дизайн карточки для этого уровня (переопределяет глобальный, ТЗ №5 Rev.6, п.3.3.2) */
   card_design?: RewardCardDesign;
 }

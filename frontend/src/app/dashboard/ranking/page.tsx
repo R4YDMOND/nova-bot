@@ -12,11 +12,12 @@ import {
   useRankingPreview,
   useValidateFormula,
   useRankingChannels,
+  useRankingRoles,
   useSyncMembers,
 } from '@/hooks/useRanking';
 import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
 import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
-import { Hint, HexColorField } from '@/components/ranking/RankingFormControls';
+import { Hint, HexColorField, RoleMultiSelect } from '@/components/ranking/RankingFormControls';
 import { MessageTemplateModal } from '@/components/MessageTemplateModal';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -250,6 +251,10 @@ export default function RankingPage() {
   const { data: channelsData, isFetching: channelsLoading, refetch: refetchChannels } = useRankingChannels(effectiveServerId, effectivePlatform);
   const syncMembersMutation = useSyncMembers();
   const [syncResultMsg, setSyncResultMsg] = useState<string | null>(null);
+
+  // Автоопределение ролей сервера для вкладки "Награды" — доступно только для Lolka
+  const { data: rolesData, isFetching: rolesLoading } = useRankingRoles(effectiveServerId, effectivePlatform);
+  const serverRoles = rolesData?.roles ?? [];
 
   // Показываем название канала уведомлений вместо сырого ID, если он есть в списке.
   const currentNotifyChannel: string = formData.notify_channel ?? settings?.notify_channel ?? '';
@@ -550,7 +555,7 @@ export default function RankingPage() {
       )}
 
       {activeTab === 'settings' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <Card className="p-5">
             <h3 className="font-semibold mb-3">⚙️ Параметры начисления опыта</h3>
             <div className="space-y-3">
@@ -772,11 +777,14 @@ export default function RankingPage() {
               {rewards.map((reward, i) => {
                 const design = reward.card_design;
                 const isExpanded = expandedRewardIndex === i;
+                const isLolka = effectivePlatform === 'lolka';
                 return (
                   <div key={i} className="bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-xl overflow-hidden">
-                    <div className="grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr_auto_auto_auto] gap-2 items-center p-3">
+                    <div className={`grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr_auto_auto_auto] gap-2 items-center p-3 ${isLolka ? 'sm:!grid-cols-[80px_1fr_auto_auto_auto]' : ''}`}>
                       <input type="number" value={reward.level} onChange={e => updateReward(i, 'level', parseInt(e.target.value) || 1)} className="input text-center" title="Уровень" />
-                      <input type="text" value={reward.role} onChange={e => updateReward(i, 'role', e.target.value)} placeholder="Роль/название" className="input" />
+                      {!isLolka && (
+                        <input type="text" value={reward.role} onChange={e => updateReward(i, 'role', e.target.value)} placeholder="Роль/название" className="input" />
+                      )}
                       <input type="text" value={reward.message ?? ''} onChange={e => updateReward(i, 'message', e.target.value)} placeholder="Сообщение (необязательно)" className="input" />
                       <input type="color" value={reward.color} onChange={e => updateReward(i, 'color', e.target.value)} className="w-9 h-9 rounded-lg cursor-pointer" title="Цвет" />
                       <button
@@ -788,6 +796,28 @@ export default function RankingPage() {
                       </button>
                       <button onClick={() => removeReward(i)} className="px-2 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors" title="Удалить">🗑️</button>
                     </div>
+                    {isLolka && (
+                      // Автоподтягивание ролей подключенного Lolka-сервера (аналог модерации ролей в lolka.app):
+                      // выдача/снятие нескольких ролей на уровне, вместо одной текстовой "Роль/название" (VK).
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-3 pb-3">
+                        <RoleMultiSelect
+                          label="Добавить роли"
+                          roles={serverRoles}
+                          selected={reward.add_roles ?? []}
+                          onChange={next => updateReward(i, 'add_roles' as keyof RankingReward, next)}
+                          loading={rolesLoading}
+                          error={rolesData?.error}
+                        />
+                        <RoleMultiSelect
+                          label="Снять роли"
+                          roles={serverRoles}
+                          selected={reward.remove_roles ?? []}
+                          onChange={next => updateReward(i, 'remove_roles' as keyof RankingReward, next)}
+                          loading={rolesLoading}
+                          error={rolesData?.error}
+                        />
+                      </div>
+                    )}
                     {isExpanded && (
                       <RewardDesignPanel
                         level={reward.level}
