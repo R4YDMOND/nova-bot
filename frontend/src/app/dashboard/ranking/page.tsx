@@ -691,6 +691,7 @@ export default function RankingPage() {
                   onOpenChange={setTemplateModalOpen}
                   value={formData.notify_template ?? settings?.notify_template}
                   serverId={effectiveServerId}
+                  platform={effectivePlatform}
                   onSave={tpl => {
                     updateField('notify_template', tpl);
                     updateField('notify_message', tpl.content);

@@ -13,7 +13,6 @@ import {
   FolderOpen, Save, Download, Upload, Copy, AlertTriangle,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/toggle';
 import { Hint, HexColorField } from '@/components/ranking/RankingFormControls';
 import type {
@@ -113,18 +112,23 @@ export function MessageTemplateModal({
   value,
   onSave,
   serverId,
+  platform,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   value?: MessageTemplate;
   onSave: (template: MessageTemplate) => void;
   serverId?: string;
+  /** Активная платформа страницы (effectivePlatform из page.tsx). НЕ переключается внутри
+   * модалки: notify_template в БД хранится раздельно на VK и Lolka (RankingSettings —
+   * UniqueConstraint server_id+platform), это два независимых шаблона в двух разных
+   * записях. Общий переключатель внутри редактора создавал бы у пользователя ложное
+   * впечатление, что он настраивает вторую платформу, а сохранение на деле всегда идёт
+   * в текущую активную запись (ту, что выбрана на странице). */
+  platform: 'lolka' | 'vk';
 }) {
   const [draft, setDraft] = useState<MessageTemplate>(value ?? EMPTY_MESSAGE_TEMPLATE);
   const [tab, setTab] = useState<'text' | 'panel' | 'components'>('text');
-  // Переключатель платформы (ТЗ №5 Rev.7, п.1.2): VK не поддерживает Embeds и Select Menus —
-  // редактор скрывает неработающие на VK элементы, Lolka остаётся с полным функционалом без изменений.
-  const [platform, setPlatform] = useState<'lolka' | 'vk'>('lolka');
   const isVk = platform === 'vk';
   const [showPreview, setShowPreview] = useState(true);
   const [varMenuOpen, setVarMenuOpen] = useState(false);
@@ -375,14 +379,13 @@ export function MessageTemplateModal({
             </div>
           </div>
 
-          {/* Переключатель платформы (ТЗ №5 Rev.7, п.1.2) */}
+          {/* Индикатор активной платформы (ТЗ №5 Rev.7, п.1.2). Не переключаемый: шаблон
+              относится к той платформе, что выбрана на странице /dashboard/ranking —
+              у VK и Lolka в БД раздельные notify_template, редактор всегда один из двух. */}
           <div className="px-5 pt-3 flex flex-col gap-2">
-            <Tabs value={platform} onValueChange={v => setPlatform(v as 'lolka' | 'vk')}>
-              <TabsList className="h-9 p-0.5">
-                <TabsTrigger value="lolka" className="px-4 py-1.5 text-xs">Lolka (полный функционал)</TabsTrigger>
-                <TabsTrigger value="vk" className="px-4 py-1.5 text-xs">VK (ограниченный)</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <span className="self-start px-3 py-1 rounded-lg text-xs font-medium bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
+              Шаблон для: {isVk ? 'VK (ограниченный функционал)' : 'Lolka (полный функционал)'}
+            </span>
             {isVk && (
               <p className="flex items-start gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -586,7 +589,7 @@ export function MessageTemplateModal({
                     {isVk ? (
                       <p className="flex items-start gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-3 py-2.5">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        Выпадающие списки недоступны в VK — редактор скрыт для этой платформы. Переключитесь на «Lolka», чтобы отредактировать.
+                        Выпадающие списки недоступны в VK — редактор скрыт для этой платформы. Чтобы отредактировать select-меню, переключите платформу на «Lolka» на странице настроек уровней.
                       </p>
                     ) : (
                     <>
