@@ -33,6 +33,80 @@ export function Hint({ text }: { text: string }) {
   );
 }
 
+/** Мультивыбор ролей сервера с чипами и списком чекбоксов (референс — панель ролей Lolka).
+ *  Используется на вкладке "Награды" для полей add_roles/remove_roles (только платформа Lolka). */
+export function RoleMultiSelect({
+  label,
+  roles,
+  selected,
+  onChange,
+  loading,
+  error,
+}: {
+  label: string;
+  roles: { id: string; name: string; color: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  loading?: boolean;
+  error?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedRoles = selected.map(id => roles.find(r => r.id === id)).filter((r): r is { id: string; name: string; color: string } => !!r);
+
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
+
+  return (
+    <div className="relative">
+      <label className="text-[10px] uppercase tracking-wide text-[rgb(var(--text-secondary))] block mb-1">{label}</label>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="input w-full min-h-[38px] flex items-center flex-wrap gap-1.5 text-left cursor-pointer"
+      >
+        {selectedRoles.length === 0 ? (
+          <span className="text-[rgb(var(--text-secondary))] text-sm">Не выбрано</span>
+        ) : (
+          selectedRoles.map(r => (
+            <span key={r.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[rgb(var(--surface-3))]">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+              {r.name}
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={e => { e.stopPropagation(); toggle(r.id); }}
+                className="text-[rgb(var(--text-secondary))] hover:text-red-400"
+              >
+                ✕
+              </span>
+            </span>
+          ))
+        )}
+        <span className="ml-auto text-[rgb(var(--text-secondary))] text-xs shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-xl shadow-2xl p-1.5">
+          {loading ? (
+            <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Загрузка ролей...</p>
+          ) : error ? (
+            <p className="text-xs text-center py-3 text-red-400">{error}</p>
+          ) : roles.length === 0 ? (
+            <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Роли не найдены</p>
+          ) : (
+            roles.map(r => (
+              <label key={r.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[rgb(var(--surface-2))] cursor-pointer text-sm">
+                <input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} className="accent-cyan-400" />
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                <span className="truncate">{r.name}</span>
+              </label>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Текстовое HEX-поле рядом с color-пикером: держит локальный черновик ввода,
  *  чтобы промежуточные (пока невалидные) символы не затирались контролируемым value,
  *  и прокидывает наверх только валидные HEX-коды. */
