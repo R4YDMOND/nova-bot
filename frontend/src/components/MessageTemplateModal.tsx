@@ -15,7 +15,7 @@ import {
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/toggle';
-import { Hint, HexColorField } from '@/app/dashboard/ranking/page';
+import { Hint, HexColorField } from '@/components/ranking/RankingFormControls';
 import type {
   MessageTemplate, MessageEmbed, EmbedField, MessageButton, MessageSelectMenu, ButtonStyle,
 } from '@/types/ranking';
