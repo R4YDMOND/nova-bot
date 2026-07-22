@@ -43,6 +43,8 @@ export interface RankingSettings {
   rewards: RankingReward[];
   notify_channel: string;
   notify_message: string;
+  /** Структурированный шаблон (текст + embed + компоненты), заполняется редактором шаблонов (ТЗ №5 Rev.6, п.3.2). Необязателен для обратной совместимости с простым notify_message. */
+  notify_template?: MessageTemplate;
   ping_user: boolean;
   decay_enabled: boolean;
   decay_days: number;
@@ -63,6 +65,89 @@ export interface RankingSettings {
   card_bg_position: string;
 }
 
+export interface EmbedField {
+  name: string;
+  value: string;
+  inline: boolean;
+}
+
+export interface EmbedAuthor {
+  name: string;
+  url: string;
+  icon_url: string;
+}
+
+export interface EmbedFooter {
+  text: string;
+  icon_url: string;
+  timestamp: boolean;
+}
+
+export interface MessageEmbed {
+  title: string;
+  description: string;
+  url: string;
+  color: string;
+  author: EmbedAuthor;
+  image_url: string;
+  thumbnail_url: string;
+  footer: EmbedFooter;
+  fields: EmbedField[];
+}
+
+export type ButtonStyle = 'primary' | 'secondary' | 'success' | 'danger' | 'link';
+
+export interface MessageButton {
+  id: string;
+  label: string;
+  style: ButtonStyle;
+  emoji: string;
+  url: string;
+  custom_id: string;
+  row: number; // 0-4, максимум 5 кнопок в ряд (ТЗ п.3.2.2)
+}
+
+export interface SelectOption {
+  label: string;
+  value: string;
+  description: string;
+  emoji: string;
+}
+
+export interface MessageSelectMenu {
+  id: string;
+  placeholder: string;
+  min_values: number;
+  max_values: number;
+  options: SelectOption[];
+  row: number;
+}
+
+export interface MessageTemplate {
+  content: string;
+  embed_enabled: boolean;
+  embed: MessageEmbed;
+  buttons: MessageButton[];
+  select_menus: MessageSelectMenu[];
+}
+
+export const EMPTY_MESSAGE_TEMPLATE: MessageTemplate = {
+  content: '🎉 {user} достиг {level} уровня!',
+  embed_enabled: false,
+  embed: {
+    title: '',
+    description: '',
+    url: '',
+    color: '#00E5FF',
+    author: { name: '', url: '', icon_url: '' },
+    image_url: '',
+    thumbnail_url: '',
+    footer: { text: '', icon_url: '', timestamp: false },
+    fields: [],
+  },
+  buttons: [],
+  select_menus: [],
+};
 export interface LeaderboardEntry {
   rank: number;
   user_id: string;

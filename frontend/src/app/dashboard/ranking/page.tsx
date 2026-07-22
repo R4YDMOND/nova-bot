@@ -16,6 +16,7 @@ import {
 } from '@/hooks/useRanking';
 import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
 import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
+import { MessageTemplateModal } from '@/components/ranking/MessageTemplateModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
@@ -23,7 +24,7 @@ const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 /** Значок "?" со всплывающей подсказкой (ТЗ №5 Rev.5, п.3.2.2).
  *  Триггер — кнопка (фокусируемая), поэтому подсказка открывается и по наведению,
  *  и по тапу/фокусу на мобильных устройствах. */
-function Hint({ text }: { text: string }) {
+export function Hint({ text }: { text: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -43,7 +44,7 @@ function Hint({ text }: { text: string }) {
 /** Текстовое HEX-поле рядом с color-пикером: держит локальный черновик ввода,
  *  чтобы промежуточные (пока невалидные) символы не затирались контролируемым value,
  *  и прокидывает наверх только валидные HEX-коды. */
-function HexColorField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+export function HexColorField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => { setDraft(value); }, [value]);
   return (
@@ -267,6 +268,7 @@ export default function RankingPage() {
   const { servers, selectedServer, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState('settings');
   const [expandedRewardIndex, setExpandedRewardIndex] = useState<number | null>(null);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [viewPlatform, setViewPlatform] = useState<'vk' | 'lolka'>('vk');
   const [formData, setFormData] = useState<any>({});
   const [sort, setSort] = useState<'xp' | 'level' | 'messages'>('xp');
@@ -699,9 +701,20 @@ export default function RankingPage() {
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
                   Шаблон сообщения
-                  <Hint text="Доступные переменные: {user} — упоминание, {level} — новый уровень, {level_word} — склонение слова «уровень», {guild} — название сервера, {xp} — текущий опыт, {next_level_xp} — опыт для следующего уровня, {rank} — место в рейтинге." />
+                  <Hint text="Текст, панель (embed) и интерактивные кнопки сообщения о повышении уровня" />
                 </label>
-                <textarea value={formData.notify_message ?? settings?.notify_message ?? '🎉 {user} достиг {level} уровня!'} onChange={e => updateField('notify_message', e.target.value)} rows={2} className="input w-full font-mono resize-none" />
+                <div className="flex items-center gap-2 p-3 bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-xl">
+                  <p className="flex-1 min-w-0 truncate font-mono text-xs text-[rgb(var(--text-secondary))]">
+                    {formData.notify_template?.content || formData.notify_message || settings?.notify_message || '🎉 {user} достиг {level} уровня!'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTemplateModalOpen(true)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-400 text-black hover:bg-cyan-300 transition-colors whitespace-nowrap shrink-0"
+                  >
+                    ✏️ Открыть редактор шаблонов
+                  </button>
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Пинговать пользователя</span>
@@ -1081,6 +1094,16 @@ export default function RankingPage() {
           </Card>
         </div>
       )}
+
+      <MessageTemplateModal
+        open={templateModalOpen}
+        onOpenChange={setTemplateModalOpen}
+        value={formData.notify_template ?? settings?.notify_template}
+        onSave={tpl => {
+          updateField('notify_template', tpl);
+          updateField('notify_message', tpl.content);
+        }}
+      />
     </div>
     </TooltipProvider>
   );
