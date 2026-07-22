@@ -10,9 +10,10 @@ import { useRef, useState, type ReactNode, type MouseEvent, type ChangeEvent } f
 import {
   Bold, Italic, Underline, Strikethrough, Code, Link2, Heading,
   Plus, Trash2, ChevronUp, ChevronDown, Eye, EyeOff,
-  FolderOpen, Save, Download, Upload, Copy,
+  FolderOpen, Save, Download, Upload, Copy, AlertTriangle,
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/toggle';
 import { Hint, HexColorField } from '@/components/ranking/RankingFormControls';
 import type {
@@ -121,6 +122,10 @@ export function MessageTemplateModal({
 }) {
   const [draft, setDraft] = useState<MessageTemplate>(value ?? EMPTY_MESSAGE_TEMPLATE);
   const [tab, setTab] = useState<'text' | 'panel' | 'components'>('text');
+  // Переключатель платформы (ТЗ №5 Rev.7, п.1.2): VK не поддерживает Embeds и Select Menus —
+  // редактор скрывает неработающие на VK элементы, Lolka остаётся с полным функционалом без изменений.
+  const [platform, setPlatform] = useState<'lolka' | 'vk'>('lolka');
+  const isVk = platform === 'vk';
   const [showPreview, setShowPreview] = useState(true);
   const [varMenuOpen, setVarMenuOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
@@ -370,6 +375,26 @@ export function MessageTemplateModal({
             </div>
           </div>
 
+          {/* Переключатель платформы (ТЗ №5 Rev.7, п.1.2) */}
+          <div className="px-5 pt-3 flex flex-col gap-2">
+            <Tabs value={platform} onValueChange={v => setPlatform(v as 'lolka' | 'vk')}>
+              <TabsList className="h-9 p-0.5">
+                <TabsTrigger value="lolka" className="px-4 py-1.5 text-xs">Lolka (полный функционал)</TabsTrigger>
+                <TabsTrigger value="vk" className="px-4 py-1.5 text-xs">VK (ограниченный)</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {isVk && (
+              <p className="flex items-start gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <b>Ограничения VK.</b> ВКонтакте не поддерживает панели (Embeds) и выпадающие списки.
+                  Заголовок, описание, поля и подвал панели будут показаны обычным текстом, кнопки — как inline-клавиатура.
+                  Неподдерживаемые элементы ниже скрыты для этой платформы.
+                </span>
+              </p>
+            )}
+          </div>
+
           <div className={`grid ${showPreview ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-0 flex-1 min-h-0`}>
             {/* Редактор */}
             <div className="p-5 space-y-4 border-r border-[rgb(var(--border))] md:max-h-[calc(70vh-140px)] md:overflow-y-auto">
@@ -426,10 +451,12 @@ export function MessageTemplateModal({
                           onChange={e => updateEmbed({ title: e.target.value })} className="input w-full" placeholder="Заголовок панели"
                         />
                       </div>
-                      <div>
-                        <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">URL заголовка</label>
-                        <input type="url" value={draft.embed.url} onChange={e => updateEmbed({ url: e.target.value })} className="input w-full" placeholder="https://..." />
-                      </div>
+                      {!isVk && (
+                        <div>
+                          <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">URL заголовка</label>
+                          <input type="url" value={draft.embed.url} onChange={e => updateEmbed({ url: e.target.value })} className="input w-full" placeholder="https://..." />
+                        </div>
+                      )}
                       <div>
                         <div className="flex justify-between items-center mb-1">
                           <label className="text-xs text-[rgb(var(--text-secondary))]">Описание</label>
@@ -442,28 +469,34 @@ export function MessageTemplateModal({
                           rows={4} className="input w-full resize-none" placeholder="Описание панели"
                         />
                       </div>
-                      <div>
-                        <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Цвет</label>
-                        <div className="flex gap-2">
-                          <input type="color" value={draft.embed.color} onChange={e => updateEmbed({ color: e.target.value })} className="h-9 w-9 shrink-0 rounded-lg cursor-pointer" />
-                          <HexColorField value={draft.embed.color} onChange={v => updateEmbed({ color: v })} placeholder="#00E5FF" />
+                      {!isVk && (
+                        <div>
+                          <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Цвет</label>
+                          <div className="flex gap-2">
+                            <input type="color" value={draft.embed.color} onChange={e => updateEmbed({ color: e.target.value })} className="h-9 w-9 shrink-0 rounded-lg cursor-pointer" />
+                            <HexColorField value={draft.embed.color} onChange={v => updateEmbed({ color: v })} placeholder="#00E5FF" />
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      <div className="pt-2 border-t border-[rgb(var(--border))] space-y-2">
-                        <label className="text-xs font-medium text-[rgb(var(--text-secondary))]">Автор</label>
-                        <input type="text" value={draft.embed.author.name} onChange={e => updateEmbed({ author: { ...draft.embed.author, name: e.target.value } })} className="input w-full" placeholder="Имя автора" />
-                        <div className="grid grid-cols-2 gap-2">
-                          <input type="url" value={draft.embed.author.url} onChange={e => updateEmbed({ author: { ...draft.embed.author, url: e.target.value } })} className="input w-full" placeholder="URL автора" />
-                          <input type="url" value={draft.embed.author.icon_url} onChange={e => updateEmbed({ author: { ...draft.embed.author, icon_url: e.target.value } })} className="input w-full" placeholder="Иконка автора (URL)" />
+                      {!isVk && (
+                        <div className="pt-2 border-t border-[rgb(var(--border))] space-y-2">
+                          <label className="text-xs font-medium text-[rgb(var(--text-secondary))]">Автор</label>
+                          <input type="text" value={draft.embed.author.name} onChange={e => updateEmbed({ author: { ...draft.embed.author, name: e.target.value } })} className="input w-full" placeholder="Имя автора" />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input type="url" value={draft.embed.author.url} onChange={e => updateEmbed({ author: { ...draft.embed.author, url: e.target.value } })} className="input w-full" placeholder="URL автора" />
+                            <input type="url" value={draft.embed.author.icon_url} onChange={e => updateEmbed({ author: { ...draft.embed.author, icon_url: e.target.value } })} className="input w-full" placeholder="Иконка автора (URL)" />
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      <div className="pt-2 border-t border-[rgb(var(--border))] space-y-2">
-                        <label className="text-xs font-medium text-[rgb(var(--text-secondary))]">Изображение</label>
-                        <input type="url" value={draft.embed.image_url} onChange={e => updateEmbed({ image_url: e.target.value })} className="input w-full" placeholder="Большое изображение (URL)" />
-                        <input type="url" value={draft.embed.thumbnail_url} onChange={e => updateEmbed({ thumbnail_url: e.target.value })} className="input w-full" placeholder="Миниатюра (URL)" />
-                      </div>
+                      {!isVk && (
+                        <div className="pt-2 border-t border-[rgb(var(--border))] space-y-2">
+                          <label className="text-xs font-medium text-[rgb(var(--text-secondary))]">Изображение</label>
+                          <input type="url" value={draft.embed.image_url} onChange={e => updateEmbed({ image_url: e.target.value })} className="input w-full" placeholder="Большое изображение (URL)" />
+                          <input type="url" value={draft.embed.thumbnail_url} onChange={e => updateEmbed({ thumbnail_url: e.target.value })} className="input w-full" placeholder="Миниатюра (URL)" />
+                        </div>
+                      )}
 
                       <div className="pt-2 border-t border-[rgb(var(--border))] space-y-2">
                         <label className="text-xs font-medium text-[rgb(var(--text-secondary))]">Подвал</label>
@@ -471,11 +504,15 @@ export function MessageTemplateModal({
                           <CharCounter value={draft.embed.footer.text} max={LIMITS.footerText} />
                         </div>
                         <input type="text" value={draft.embed.footer.text} onChange={e => updateEmbed({ footer: { ...draft.embed.footer, text: e.target.value } })} className="input w-full" placeholder="Текст подвала" />
-                        <input type="url" value={draft.embed.footer.icon_url} onChange={e => updateEmbed({ footer: { ...draft.embed.footer, icon_url: e.target.value } })} className="input w-full" placeholder="Иконка подвала (URL)" />
-                        <div className="flex justify-between items-center pt-1">
-                          <span className="text-xs text-[rgb(var(--text-secondary))]">Показывать дату/время</span>
-                          <Switch checked={draft.embed.footer.timestamp} onCheckedChange={val => updateEmbed({ footer: { ...draft.embed.footer, timestamp: val } })} />
-                        </div>
+                        {!isVk && (
+                          <>
+                            <input type="url" value={draft.embed.footer.icon_url} onChange={e => updateEmbed({ footer: { ...draft.embed.footer, icon_url: e.target.value } })} className="input w-full" placeholder="Иконка подвала (URL)" />
+                            <div className="flex justify-between items-center pt-1">
+                              <span className="text-xs text-[rgb(var(--text-secondary))]">Показывать дату/время</span>
+                              <Switch checked={draft.embed.footer.timestamp} onCheckedChange={val => updateEmbed({ footer: { ...draft.embed.footer, timestamp: val } })} />
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       <div className="pt-2 border-t border-[rgb(var(--border))]">
@@ -546,6 +583,13 @@ export function MessageTemplateModal({
                   </div>
 
                   <div className="pt-3 border-t border-[rgb(var(--border))]">
+                    {isVk ? (
+                      <p className="flex items-start gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-3 py-2.5">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        Выпадающие списки недоступны в VK — редактор скрыт для этой платформы. Переключитесь на «Lolka», чтобы отредактировать.
+                      </p>
+                    ) : (
+                    <>
                     <div className="flex justify-between items-center mb-2">
                       <label className="text-sm font-medium">Выпадающий список</label>
                       {selectMenu ? (
@@ -588,6 +632,8 @@ export function MessageTemplateModal({
                         ))}
                       </div>
                     )}
+                    </>
+                    )}
                   </div>
                 </div>
               )}
@@ -596,11 +642,42 @@ export function MessageTemplateModal({
             {/* Превью */}
             {showPreview && (
               <div className="p-5 bg-[rgb(var(--surface-1))] md:max-h-[calc(70vh-140px)] md:overflow-y-auto">
-                <p className="text-xs text-[rgb(var(--text-secondary))] mb-3">Предпросмотр</p>
+                <p className="text-xs text-[rgb(var(--text-secondary))] mb-3">Предпросмотр {isVk ? '(VK)' : '(Lolka)'}</p>
                 <div className="bg-[#111118] rounded-2xl p-4 text-sm text-white">
                   {draft.content && (
                     <p className="mb-2 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(draft.content) }} />
                   )}
+                  {isVk ? (
+                    <>
+                      {draft.embed_enabled && (
+                        <div className="space-y-1 text-[rgb(220,220,230)]">
+                          {draft.embed.title && <p>📌 {draft.embed.title}</p>}
+                          {draft.embed.description && <p className="whitespace-pre-wrap">{draft.embed.description}</p>}
+                          {draft.embed.fields.filter(f => f.name || f.value).map((f, i) => (
+                            <p key={i}>• {f.name}: {f.value}</p>
+                          ))}
+                          {draft.embed.footer.text && <p className="text-[rgb(150,150,160)]">— {draft.embed.footer.text}</p>}
+                        </div>
+                      )}
+                      {[0, 1, 2, 3, 4].map(row => {
+                        const rowButtons = draft.buttons.filter(b => b.row === row);
+                        if (rowButtons.length === 0) return null;
+                        return (
+                          <div key={row} className="flex gap-1.5 mt-2 flex-wrap">
+                            {rowButtons.map(b => (
+                              <span key={b.id} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-white">
+                                {b.emoji ? `${b.emoji} ` : ''}{b.label || 'Кнопка'}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      {!draft.content && !draft.embed_enabled && draft.buttons.length === 0 && (
+                        <p className="text-[rgb(var(--text-secondary))] text-xs">Начните заполнять шаблон слева — превью появится здесь</p>
+                      )}
+                    </>
+                  ) : (
+                  <>
                   {draft.embed_enabled && (
                     <div className="rounded-lg overflow-hidden flex mt-2" style={{ background: '#1a1a22' }}>
                       <div className="w-1 shrink-0" style={{ background: draft.embed.color || '#00E5FF' }} />
@@ -660,6 +737,8 @@ export function MessageTemplateModal({
                   )}
                   {!draft.content && !draft.embed_enabled && draft.buttons.length === 0 && !selectMenu && (
                     <p className="text-[rgb(var(--text-secondary))] text-xs">Начните заполнять шаблон слева — превью появится здесь</p>
+                  )}
+                  </>
                   )}
                 </div>
               </div>
