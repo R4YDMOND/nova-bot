@@ -12,7 +12,6 @@ import {
   Plus, Trash2, ChevronUp, ChevronDown, Eye, EyeOff,
   FolderOpen, Save, Download, Upload, Copy,
 } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/toggle';
 import { Hint, HexColorField } from '@/components/ranking/RankingFormControls';
@@ -287,9 +286,15 @@ export function MessageTemplateModal({
   if (buttonRowWarning) errors.push('В одном ряду не может быть больше 5 кнопок');
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto p-0">
-        <div className="flex flex-col h-full">
+    // Встроенная (не модальная) панель: раскрывается вниз внутри вкладки "Настройки",
+    // не перекрывая остальные карточки настроек (Правка.jpg). Анимация — на чистом
+    // Tailwind (grid-template-rows 0fr → 1fr), без новых зависимостей, как и у Dialog.
+    <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+      <div className="overflow-hidden">
+        <div
+          className={`mt-3 rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface))] shadow-lg max-h-[70vh] overflow-y-auto transition-opacity duration-300 ${open ? 'opacity-100 delay-100' : 'opacity-0'}`}
+        >
+          <div className="flex flex-col">
           {/* Верхняя панель */}
           <div className="flex items-center justify-between border-b border-[rgb(var(--border))] px-5 py-3 sticky top-0 bg-[rgb(var(--surface))] z-10">
             <div className="flex gap-1">
@@ -367,7 +372,7 @@ export function MessageTemplateModal({
 
           <div className={`grid ${showPreview ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-0 flex-1 min-h-0`}>
             {/* Редактор */}
-            <div className="p-5 space-y-4 border-r border-[rgb(var(--border))] md:max-h-[calc(90vh-140px)] md:overflow-y-auto">
+            <div className="p-5 space-y-4 border-r border-[rgb(var(--border))] md:max-h-[calc(70vh-140px)] md:overflow-y-auto">
               {tab === 'text' && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -590,7 +595,7 @@ export function MessageTemplateModal({
 
             {/* Превью */}
             {showPreview && (
-              <div className="p-5 bg-[rgb(var(--surface-1))] md:max-h-[calc(90vh-140px)] md:overflow-y-auto">
+              <div className="p-5 bg-[rgb(var(--surface-1))] md:max-h-[calc(70vh-140px)] md:overflow-y-auto">
                 <p className="text-xs text-[rgb(var(--text-secondary))] mb-3">Предпросмотр</p>
                 <div className="bg-[#111118] rounded-2xl p-4 text-sm text-white">
                   {draft.content && (
@@ -677,9 +682,10 @@ export function MessageTemplateModal({
               </button>
             </div>
           </div>
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
 

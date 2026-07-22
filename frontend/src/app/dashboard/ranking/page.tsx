@@ -655,6 +655,13 @@ export default function RankingPage() {
                   </div>
                 )}
               </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">Пинговать пользователя</span>
+                  <Hint text="Упоминать участника в сообщении (@username)" />
+                </div>
+                <Switch checked={formData.ping_user ?? settings?.ping_user ?? true} onCheckedChange={val => updateField('ping_user', val)} />
+              </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
                   Шаблон сообщения
@@ -666,16 +673,24 @@ export default function RankingPage() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => setTemplateModalOpen(true)}
+                    onClick={() => setTemplateModalOpen(v => !v)}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-400 text-black hover:bg-cyan-300 transition-colors whitespace-nowrap shrink-0"
                   >
-                    ✏️ Открыть редактор шаблонов
+                    {templateModalOpen ? '✕ Закрыть редактор' : '✏️ Открыть редактор шаблонов'}
                   </button>
                 </div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm">Пинговать пользователя</span>
-                <Switch checked={formData.ping_user ?? settings?.ping_user ?? true} onCheckedChange={val => updateField('ping_user', val)} />
+                {/* Правка.jpg: редактор раскрывается вниз прямо во вкладке "Настройки",
+                    а не отдельным модальным окном — остальные карточки настроек остаются видны */}
+                <MessageTemplateModal
+                  open={templateModalOpen}
+                  onOpenChange={setTemplateModalOpen}
+                  value={formData.notify_template ?? settings?.notify_template}
+                  serverId={effectiveServerId}
+                  onSave={tpl => {
+                    updateField('notify_template', tpl);
+                    updateField('notify_message', tpl.content);
+                  }}
+                />
               </div>
             </div>
           </Card>
@@ -1052,16 +1067,6 @@ export default function RankingPage() {
         </div>
       )}
 
-      <MessageTemplateModal
-        open={templateModalOpen}
-        onOpenChange={setTemplateModalOpen}
-        value={formData.notify_template ?? settings?.notify_template}
-        serverId={effectiveServerId}
-        onSave={tpl => {
-          updateField('notify_template', tpl);
-          updateField('notify_message', tpl.content);
-        }}
-      />
     </div>
     </TooltipProvider>
   );
