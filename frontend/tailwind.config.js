@@ -48,6 +48,20 @@ module.exports = {
         lg: '0px 16px 32px rgba(0,0,0,0.35)',
         xl: '0px 24px 64px rgba(0,0,0,0.45)',
       },
+      // Концепция визуального оформления, "Анимации (Framer Motion) → Модальные окна":
+      // плавный scale (0.95 -> 1) вместе с fade-in backdrop. Реализовано через
+      // Tailwind keyframes (без новых зависимостей), запускается по data-state Radix Dialog.
+      keyframes: {
+        'overlay-in': { from: { opacity: '0' }, to: { opacity: '1' } },
+        'dialog-in': {
+          from: { opacity: '0', transform: 'translate(-50%, -50%) scale(0.95)' },
+          to: { opacity: '1', transform: 'translate(-50%, -50%) scale(1)' },
+        },
+      },
+      animation: {
+        'overlay-in': 'overlay-in 0.2s ease-out',
+        'dialog-in': 'dialog-in 0.2s ease-out',
+      },
     },
   },
   plugins: [],
