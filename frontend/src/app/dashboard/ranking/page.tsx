@@ -14,8 +14,8 @@ import {
   useRankingChannels,
   useSyncMembers,
 } from '@/hooks/useRanking';
-import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
-import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS } from '@/components/ranking/RankCardPreview';
+import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
+import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
@@ -109,6 +109,148 @@ const PALETTE_PRESETS: { name: string; bg: string; accent: string; gradient: str
   { name: 'Индиго', bg: '#0e0f1f', accent: '#818CF8', gradient: '#6366F1' },
 ];
 
+/** Панель индивидуальной кастомизации карточки для конкретной строки наград.
+ *  Повторяет набор контролов вкладки "Карточка", но применяется только к этому уровню (ТЗ №5 Rev.6, п.3.3.2). */
+function RewardDesignPanel({
+  level,
+  role,
+  design,
+  onToggle,
+  onChange,
+}: {
+  level: number;
+  role: string;
+  design?: RewardCardDesign;
+  onToggle: (enabled: boolean) => void;
+  onChange: (field: keyof RewardCardDesign, value: any) => void;
+}) {
+  return (
+    <div className="border-t border-[rgb(var(--border))] p-4 bg-[rgb(var(--surface-1))]">
+      <div className="flex justify-between items-center mb-3">
+        <span className="text-xs text-[rgb(var(--text-secondary))]">Собственный дизайн карточки для уровня {level}</span>
+        <Switch checked={!!design} onCheckedChange={onToggle} />
+      </div>
+      {design && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Цвет фона</label>
+              <div className="flex gap-2">
+                <input type="color" value={design.bg_color} onChange={e => onChange('bg_color', e.target.value)} className="h-9 w-9 shrink-0 rounded-lg cursor-pointer" />
+                <HexColorField value={design.bg_color} onChange={v => onChange('bg_color', v)} placeholder="#111118" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Акцентный цвет</label>
+              <div className="flex gap-2">
+                <input type="color" value={design.accent_color} onChange={e => onChange('accent_color', e.target.value)} className="h-9 w-9 shrink-0 rounded-lg cursor-pointer" />
+                <HexColorField value={design.accent_color} onChange={v => onChange('accent_color', v)} placeholder="#00E5FF" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Градиент</label>
+              <div className="flex gap-2">
+                <input type="color" value={design.gradient_color} onChange={e => onChange('gradient_color', e.target.value)} className="h-9 w-9 shrink-0 rounded-lg cursor-pointer" />
+                <HexColorField value={design.gradient_color} onChange={v => onChange('gradient_color', v)} placeholder="#7B2FBE" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Стиль</label>
+                <select value={design.style} onChange={e => onChange('style', e.target.value)} className="input w-full">
+                  {CARD_STYLES.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
+                  <label>Радиус</label>
+                  <span>{design.radius} px</span>
+                </div>
+                <input type="range" min={4} max={28} step={2} value={design.radius} onChange={e => onChange('radius', parseInt(e.target.value))} className="w-full accent-cyan-400" />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
+                <label>Интенсивность стекла</label>
+                <span>{design.glass_intensity}%</span>
+              </div>
+              <input type="range" min={0} max={100} step={5} value={design.glass_intensity} onChange={e => onChange('glass_intensity', parseInt(e.target.value))} className="w-full accent-cyan-400" disabled={design.style !== 'glass'} />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {PALETTE_PRESETS.map(p => (
+                <button
+                  key={p.name}
+                  onClick={() => { onChange('bg_color', p.bg); onChange('accent_color', p.accent); onChange('gradient_color', p.gradient); }}
+                  className="w-7 h-7 rounded-full transition-transform hover:scale-110 shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${p.accent}, ${p.gradient})` }}
+                  title={p.name}
+                />
+              ))}
+            </div>
+            <div className="pt-3 border-t border-[rgb(var(--border))]">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs text-[rgb(var(--text-secondary))]">Пользовательский фон (по ссылке)</label>
+                <Switch checked={design.bg_image_enabled} onCheckedChange={val => onChange('bg_image_enabled', val)} />
+              </div>
+              {design.bg_image_enabled && (
+                <>
+                  <input type="url" value={design.bg_image_url} onChange={e => onChange('bg_image_url', e.target.value.trim())} placeholder="https://example.com/image.png" className="input w-full" />
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Масштабирование</label>
+                      <select value={design.bg_fit} onChange={e => onChange('bg_fit', e.target.value)} className="input w-full">
+                        {CARD_BG_FIT_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Позиция</label>
+                      <select value={design.bg_position} onChange={e => onChange('bg_position', e.target.value)} className="input w-full">
+                        {CARD_BG_POSITION_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
+                      <label>Затенение фона</label>
+                      <span>{design.bg_shade}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={5} value={design.bg_shade} onChange={e => onChange('bg_shade', parseInt(e.target.value))} className="w-full accent-cyan-400" />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-[rgb(var(--text-secondary))] block mb-2">Превью</label>
+            <RankCardPreview
+              appearance={{
+                bg: design.bg_color,
+                accent: design.accent_color,
+                gradient: design.gradient_color,
+                style: design.style,
+                radius: design.radius,
+                glass: design.glass_intensity,
+                bgImageUrl: design.bg_image_url,
+                bgImageEnabled: design.bg_image_enabled,
+                bgShade: design.bg_shade,
+                bgFit: design.bg_fit,
+                bgPosition: design.bg_position,
+              }}
+              data={{ ...RANK_CARD_TEST_DATA, level, username: role || RANK_CARD_TEST_DATA.username }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 const MEDAL_COLORS: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
 
@@ -124,6 +266,7 @@ function calcLevelXp(level: number, formulaType: string): number {
 export default function RankingPage() {
   const { servers, selectedServer, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState('settings');
+  const [expandedRewardIndex, setExpandedRewardIndex] = useState<number | null>(null);
   const [viewPlatform, setViewPlatform] = useState<'vk' | 'lolka'>('vk');
   const [formData, setFormData] = useState<any>({});
   const [sort, setSort] = useState<'xp' | 'level' | 'messages'>('xp');
@@ -212,6 +355,10 @@ export default function RankingPage() {
   const updateReward = (i: number, field: keyof RankingReward, value: any) =>
     updateRewards(rewards.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
   const removeReward = (i: number) => updateRewards(rewards.filter((_, idx) => idx !== i));
+  const updateRewardDesign = (i: number, field: keyof RewardCardDesign, value: any) =>
+    updateRewards(rewards.map((r, idx) => (idx === i && r.card_design ? { ...r, card_design: { ...r.card_design, [field]: value } } : r)));
+  const toggleRewardDesign = (i: number, enabled: boolean) =>
+    updateRewards(rewards.map((r, idx) => (idx === i ? { ...r, card_design: enabled ? makeDefaultRewardDesign() : undefined } : r)));
 
   const handleSave = async () => {
     if (!effectiveServerId) return;
@@ -317,6 +464,21 @@ export default function RankingPage() {
   const cardBgShade = formData.card_bg_shade ?? settings?.card_bg_shade ?? 80;
   const cardBgFit = formData.card_bg_fit ?? settings?.card_bg_fit ?? 'cover';
   const cardBgPosition = formData.card_bg_position ?? settings?.card_bg_position ?? 'center';
+
+  /** Дизайн карточки конкретной награды при первом включении — стартует от текущего глобального дизайна (ТЗ №5 Rev.6, п.3.3.2) */
+  const makeDefaultRewardDesign = (): RewardCardDesign => ({
+    bg_color: cardBg,
+    accent_color: cardAccent,
+    gradient_color: cardGradient,
+    style: cardStyle,
+    radius: cardRadius,
+    glass_intensity: cardGlass,
+    bg_image_enabled: cardBgImageEnabled,
+    bg_image_url: cardBgImageUrl,
+    bg_fit: cardBgFit,
+    bg_position: cardBgPosition,
+    bg_shade: cardBgShade,
+  });
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -462,9 +624,9 @@ export default function RankingPage() {
                 <input type="number" value={formData.cooldown_seconds ?? settings?.cooldown_seconds ?? 60} onChange={e => updateField('cooldown_seconds', parseInt(e.target.value) || 0)} className="input w-full" />
               </div>
               <div className="flex justify-between items-center pt-1">
-                <div>
-                  <span className="text-sm block">Включить систему уровней</span>
-                  <span className="text-[10px] text-[rgb(var(--text-secondary))]">Когда включено: участники зарабатывают XP за сообщения и голосовую активность</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm">Включить систему уровней</span>
+                  <Hint text="Когда включено: участники зарабатывают XP за сообщения и голосовую активность" />
                 </div>
                 <Switch checked={formData.enabled ?? settings?.enabled ?? true} onCheckedChange={val => updateField('enabled', val)} />
               </div>
@@ -540,9 +702,6 @@ export default function RankingPage() {
                   <Hint text="Доступные переменные: {user} — упоминание, {level} — новый уровень, {level_word} — склонение слова «уровень», {guild} — название сервера, {xp} — текущий опыт, {next_level_xp} — опыт для следующего уровня, {rank} — место в рейтинге." />
                 </label>
                 <textarea value={formData.notify_message ?? settings?.notify_message ?? '🎉 {user} достиг {level} уровня!'} onChange={e => updateField('notify_message', e.target.value)} rows={2} className="input w-full font-mono resize-none" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1 font-mono">
-                  {'{user} {level} {level_word} {guild} {xp} {next_level_xp} {rank}'}
-                </p>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Пинговать пользователя</span>
@@ -557,9 +716,6 @@ export default function RankingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-5 space-y-3">
             <h3 className="font-semibold mb-1">🧮 Формула опыта</h3>
-            <p className="text-xs text-[rgb(var(--text-secondary))] -mt-2">
-              Формула расчёта: XP для следующего уровня = базовый XP × уровень² × ваш множитель
-            </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Базовый XP</label>
@@ -571,7 +727,6 @@ export default function RankingPage() {
                   <Hint text="Глобальный коэффициент. 1.5x = прокачка на 50% быстрее!" />
                 </label>
                 <input type="number" step="0.1" value={formula.multiplier} onChange={e => updateFormula('multiplier', parseFloat(e.target.value) || 0)} className="input w-full" />
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">1.5 = ускорение на 50%, 0.5 = замедление в 2 раза</p>
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Затухание</label>
@@ -629,15 +784,37 @@ export default function RankingPage() {
           </div>
           {rewards.length > 0 ? (
             <div className="space-y-3">
-              {rewards.map((reward, i) => (
-                <div key={i} className="grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr_auto_auto] gap-2 items-center p-3 bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-xl">
-                  <input type="number" value={reward.level} onChange={e => updateReward(i, 'level', parseInt(e.target.value) || 1)} className="input text-center" title="Уровень" />
-                  <input type="text" value={reward.role} onChange={e => updateReward(i, 'role', e.target.value)} placeholder="Роль/название" className="input" />
-                  <input type="text" value={reward.message ?? ''} onChange={e => updateReward(i, 'message', e.target.value)} placeholder="Сообщение (необязательно)" className="input" />
-                  <input type="color" value={reward.color} onChange={e => updateReward(i, 'color', e.target.value)} className="w-9 h-9 rounded-lg cursor-pointer" title="Цвет" />
-                  <button onClick={() => removeReward(i)} className="px-2 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors" title="Удалить">🗑️</button>
-                </div>
-              ))}
+              {rewards.map((reward, i) => {
+                const design = reward.card_design;
+                const isExpanded = expandedRewardIndex === i;
+                return (
+                  <div key={i} className="bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-xl overflow-hidden">
+                    <div className="grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr_auto_auto_auto] gap-2 items-center p-3">
+                      <input type="number" value={reward.level} onChange={e => updateReward(i, 'level', parseInt(e.target.value) || 1)} className="input text-center" title="Уровень" />
+                      <input type="text" value={reward.role} onChange={e => updateReward(i, 'role', e.target.value)} placeholder="Роль/название" className="input" />
+                      <input type="text" value={reward.message ?? ''} onChange={e => updateReward(i, 'message', e.target.value)} placeholder="Сообщение (необязательно)" className="input" />
+                      <input type="color" value={reward.color} onChange={e => updateReward(i, 'color', e.target.value)} className="w-9 h-9 rounded-lg cursor-pointer" title="Цвет" />
+                      <button
+                        onClick={() => setExpandedRewardIndex(isExpanded ? null : i)}
+                        className={`px-2 py-1.5 rounded-lg transition-colors ${design ? 'text-cyan-400 bg-cyan-400/10' : 'text-[rgb(var(--text-secondary))] hover:bg-white/5'}`}
+                        title="Дизайн карточки для этого уровня"
+                      >
+                        🎨
+                      </button>
+                      <button onClick={() => removeReward(i)} className="px-2 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors" title="Удалить">🗑️</button>
+                    </div>
+                    {isExpanded && (
+                      <RewardDesignPanel
+                        level={reward.level}
+                        role={reward.role}
+                        design={design}
+                        onToggle={enabled => toggleRewardDesign(i, enabled)}
+                        onChange={(field, value) => updateRewardDesign(i, field, value)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="text-center text-[rgb(var(--text-secondary))] py-8">📭 Наград пока нет. Добавьте первую, чтобы мотивировать участников развиваться!</p>

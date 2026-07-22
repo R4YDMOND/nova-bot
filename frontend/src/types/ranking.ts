@@ -9,11 +9,27 @@ export interface XPFormulaConfig {
   custom_expression?: string;
 }
 
+export interface RewardCardDesign {
+  bg_color: string;
+  accent_color: string;
+  gradient_color: string;
+  style: string;
+  radius: number;
+  glass_intensity: number;
+  bg_image_enabled: boolean;
+  bg_image_url: string;
+  bg_fit: string;
+  bg_position: string;
+  bg_shade: number;
+}
+
 export interface RankingReward {
   level: number;
   role: string;
   color: string;
   message?: string;
+  /** Индивидуальный дизайн карточки для этого уровня (переопределяет глобальный, ТЗ №5 Rev.6, п.3.3.2) */
+  card_design?: RewardCardDesign;
 }
 
 export interface RankingSettings {
