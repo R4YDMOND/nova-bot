@@ -1,6 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nova-bot-rpsy.onrender.com";
 
 import { getAccessToken } from '@/lib/auth';
+import type { MessageTemplate } from '@/types/ranking';
 
 export type NotificationSettings = {
   email: { enabled: boolean; address: string };
@@ -84,6 +85,8 @@ export type RankingSettings = {
   rewards: RankingReward[];
   notify_channel: string;
   notify_message: string;
+  /** Структурированный шаблон (текст+embed+компоненты), заполняется редактором шаблонов (ТЗ №5 Rev.6, п.3.2) */
+  notify_template?: MessageTemplate;
   ping_user: boolean;
   decay_enabled: boolean;
   decay_days: number;
@@ -146,6 +149,13 @@ export type RankingPreview = {
     voice_minutes: number;
     reactions: number;
   };
+};
+
+export type SavedMessageTemplate = {
+  id: number;
+  name: string;
+  data: MessageTemplate;
+  updated_at?: string | null;
 };
 
 export type FormulaValidationResult = {
@@ -642,6 +652,33 @@ export const api = {
         body: JSON.stringify(data),
       }),
   },
+
+  // ── ТЗ №5 Rev.6, п.3.2.4: сохранение/загрузка шаблонов сообщений ────────
+  templates: {
+    list: (serverId: string) =>
+      apiFetch<{ templates: SavedMessageTemplate[]; error?: string }>(
+        `/api/templates?server_id=${serverId}`
+      ),
+
+    create: (serverId: string, name: string, data: MessageTemplate) =>
+      apiFetch<{ id: number; name: string; error?: string }>(
+        `/api/templates?server_id=${serverId}`,
+        { method: "POST", body: JSON.stringify({ name, data }) }
+      ),
+
+    update: (templateId: number, patch: { name?: string; data?: MessageTemplate }) =>
+      apiFetch<{ status: string; error?: string }>(
+        `/api/templates/${templateId}`,
+        { method: "PUT", body: JSON.stringify(patch) }
+      ),
+
+    remove: (templateId: number) =>
+      apiFetch<{ status: string; error?: string }>(
+        `/api/templates/${templateId}`,
+        { method: "DELETE" }
+      ),
+  },
+
   lolkaBot: {
     getStatus: () =>
       apiFetch<{ configured: boolean; connected: boolean; bot: { username?: string; avatar?: string } | null }>(

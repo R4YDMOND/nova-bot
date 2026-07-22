@@ -80,3 +80,45 @@ export function useSyncMembers() {
     },
   });
 }
+
+// ── ТЗ №5 Rev.6, п.3.2.4: сохранённые шаблоны сообщений ─────────────────
+export function useMessageTemplates(serverId: string) {
+  return useQuery({
+    queryKey: ['ranking', 'templates', serverId],
+    queryFn: () => api.templates.list(serverId),
+    enabled: !!serverId,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useSaveMessageTemplate(serverId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, data }: { name: string; data: import('@/types/ranking').MessageTemplate }) =>
+      api.templates.create(serverId, name, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'templates', serverId] });
+    },
+  });
+}
+
+export function useUpdateMessageTemplate(serverId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: number; patch: { name?: string; data?: import('@/types/ranking').MessageTemplate } }) =>
+      api.templates.update(id, patch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'templates', serverId] });
+    },
+  });
+}
+
+export function useDeleteMessageTemplate(serverId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.templates.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'templates', serverId] });
+    },
+  });
+}

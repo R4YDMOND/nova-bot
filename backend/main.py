@@ -7,9 +7,9 @@ import logging
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal, get_db
 from sqlalchemy.orm import Session
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate
 from ranking.xp_handler import award_xp_for_message
-from ranking.template import render_notify_template
+from ranking.template import render_notify_template, render_message_template
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
 from moderation_engine import ModerationEngine
 from fastapi.responses import PlainTextResponse
@@ -73,19 +73,39 @@ async def _award_xp_and_notify_vk(
             return
 
         mention = f"[id{user_id}|{username}]" if result.get("ping_user") else username
-        template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
-        text_to_send = render_notify_template(
-            template,
-            user=mention,
-            level=result["new_level"],
-            guild=result.get("guild", ""),
-            xp=result.get("xp"),
-            next_level_xp=result.get("next_level_xp"),
-            rank=result.get("rank"),
-        )
-
         service = get_vk_service(access_token)
-        service.send_message(peer_id=target_peer_id, message=text_to_send)
+
+        structured = None
+        if result.get("notify_template"):
+            try:
+                structured = json.loads(result["notify_template"])
+            except (json.JSONDecodeError, TypeError):
+                structured = None
+
+        if structured and (structured.get("embed_enabled") or structured.get("buttons") or structured.get("select_menus")):
+            rendered = render_message_template(
+                structured,
+                platform="vk",
+                user=mention,
+                level=result["new_level"],
+                guild=result.get("guild", ""),
+                xp=result.get("xp"),
+                next_level_xp=result.get("next_level_xp"),
+                rank=result.get("rank"),
+            )
+            service.send_message(peer_id=target_peer_id, message=rendered["message"] or " ", keyboard=rendered.get("keyboard"))
+        else:
+            template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
+            text_to_send = render_notify_template(
+                template,
+                user=mention,
+                level=result["new_level"],
+                guild=result.get("guild", ""),
+                xp=result.get("xp"),
+                next_level_xp=result.get("next_level_xp"),
+                rank=result.get("rank"),
+            )
+            service.send_message(peer_id=target_peer_id, message=text_to_send)
     except Exception as e:
         logger.error(f"level-up notify (VK) error: {e}")
 
@@ -2471,6 +2491,7 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "rewards": _loads(s.rewards, []),
         "notify_channel": s.notify_channel,
         "notify_message": s.notify_message,
+        "notify_template": _loads(s.notify_template, None),
         "ping_user": s.ping_user,
         "decay_enabled": s.decay_enabled,
         "decay_days": s.decay_days,
@@ -2534,7 +2555,7 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             db.add(settings)
 
         payload = data or {}
-        json_fields = {"xp_formula", "rewards", "blacklist_channels", "boost_channels", "boost_roles"}
+        json_fields = {"xp_formula", "rewards", "blacklist_channels", "boost_channels", "boost_roles", "notify_template"}
         simple_fields = {
             "enabled", "xp_per_message", "xp_per_voice_minute", "min_message_length",
             "cooldown_seconds", "multiplier", "notify_channel", "notify_message", "ping_user",
@@ -2553,6 +2574,104 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
 
         db.commit()
         return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.get("/api/templates")
+def list_message_templates(server_id: str = Query(...)):
+    """Сохранённые пользовательские шаблоны сообщений (ТЗ №5 Rev.6, п.3.2.4)."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        rows = db.query(SavedMessageTemplate).filter(
+            SavedMessageTemplate.server_id == server.id
+        ).order_by(SavedMessageTemplate.updated_at.desc()).all()
+
+        templates = []
+        for t in rows:
+            try:
+                data = json.loads(t.data)
+            except (json.JSONDecodeError, TypeError):
+                data = {}
+            templates.append({
+                "id": t.id,
+                "name": t.name,
+                "data": data,
+                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+            })
+        return {"templates": templates}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/templates")
+def create_message_template(server_id: str = Query(...), data: dict = None):
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        payload = data or {}
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"error": "Укажите название шаблона"}
+
+        tpl = SavedMessageTemplate(
+            server_id=server.id,
+            name=name,
+            data=json.dumps(payload.get("data") or {}, ensure_ascii=False),
+        )
+        db.add(tpl)
+        db.commit()
+        db.refresh(tpl)
+        return {"id": tpl.id, "name": tpl.name, "updated_at": tpl.updated_at.isoformat() if tpl.updated_at else None}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.put("/api/templates/{template_id}")
+def update_message_template(template_id: int, data: dict = None):
+    db = SessionLocal()
+    try:
+        tpl = db.query(SavedMessageTemplate).filter(SavedMessageTemplate.id == template_id).first()
+        if not tpl:
+            return {"error": "Шаблон не найден"}
+
+        payload = data or {}
+        if payload.get("name", "").strip():
+            tpl.name = payload["name"].strip()
+        if "data" in payload:
+            tpl.data = json.dumps(payload["data"], ensure_ascii=False)
+
+        db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.delete("/api/templates/{template_id}")
+def delete_message_template(template_id: int):
+    db = SessionLocal()
+    try:
+        db.query(SavedMessageTemplate).filter(SavedMessageTemplate.id == template_id).delete()
+        db.commit()
+        return {"status": "deleted"}
     except Exception as e:
         db.rollback()
         return {"error": str(e)}

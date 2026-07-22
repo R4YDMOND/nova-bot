@@ -9,7 +9,7 @@ from typing import Optional
 import websockets
 
 from ranking.xp_handler import award_xp_for_message
-from ranking.template import render_notify_template
+from ranking.template import render_notify_template, render_message_template
 
 # Простейший набор команд бота — независим от backend/main.py,
 # чтобы не создавать циклический импорт (main.py импортирует этот модуль).
@@ -204,18 +204,41 @@ class LolkaGateway:
                 return
 
             mention = f"<@{user_id}>" if result.get("ping_user") else username
-            template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
-            text_to_send = render_notify_template(
-                template,
-                user=mention,
-                level=result["new_level"],
-                guild=result.get("guild", ""),
-                xp=result.get("xp"),
-                next_level_xp=result.get("next_level_xp"),
-                rank=result.get("rank"),
-            )
 
-            await self.send_message(target_channel_id, text_to_send)
+            structured = None
+            if result.get("notify_template"):
+                try:
+                    structured = json.loads(result["notify_template"])
+                except (json.JSONDecodeError, TypeError):
+                    structured = None
+
+            if structured and (structured.get("embed_enabled") or structured.get("buttons") or structured.get("select_menus")):
+                rendered = render_message_template(
+                    structured,
+                    platform="lolka",
+                    user=mention,
+                    level=result["new_level"],
+                    guild=result.get("guild", ""),
+                    xp=result.get("xp"),
+                    next_level_xp=result.get("next_level_xp"),
+                    rank=result.get("rank"),
+                )
+                await self.send_message(
+                    target_channel_id, rendered["content"],
+                    embeds=rendered.get("embeds"), components=rendered.get("components"),
+                )
+            else:
+                template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
+                text_to_send = render_notify_template(
+                    template,
+                    user=mention,
+                    level=result["new_level"],
+                    guild=result.get("guild", ""),
+                    xp=result.get("xp"),
+                    next_level_xp=result.get("next_level_xp"),
+                    rank=result.get("rank"),
+                )
+                await self.send_message(target_channel_id, text_to_send)
         except Exception as e:
             print(f"LOLKA GATEWAY: ошибка level-up уведомления — {e}")
 
@@ -240,14 +263,20 @@ class LolkaGateway:
         print(f"LOLKA GATEWAY: новый участник — {username}")
         # Место для приветственных сообщений/автовыдачи роли — по аналогии с on_message_create
 
-    async def send_message(self, channel_id: str, content: str):
-        """Отправка через REST (не через Gateway) — так же, как в Discord-совместимом API."""
+    async def send_message(self, channel_id: str, content: str, embeds: Optional[list] = None, components: Optional[list] = None):
+        """Отправка через REST (не через Gateway) — так же, как в Discord-совместимом API.
+        embeds/components — Discord-формат из render_message_template (ТЗ №5 Rev.6, п.3.2)."""
         import requests
+        payload: dict = {"content": content}
+        if embeds:
+            payload["embeds"] = embeds
+        if components:
+            payload["components"] = components
         try:
             requests.post(
                 f"{self.api_base_url}/channels/{channel_id}/messages",
                 headers={"Authorization": f"Bot {self.token}", "Content-Type": "application/json"},
-                json={"content": content},
+                json=payload,
                 timeout=10,
             )
         except Exception as e:

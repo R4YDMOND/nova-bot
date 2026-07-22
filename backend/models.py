@@ -284,6 +284,9 @@ class RankingSettings(Base):
 
     notify_channel = Column(String(255), default="")
     notify_message = Column(Text, default="🎉 {user} достиг {level} уровня!")
+    # Структурированный шаблон (текст+embed+компоненты) из редактора шаблонов (ТЗ №5 Rev.6, п.3.2).
+    # JSON сериализуется так же, как xp_formula/rewards. Пуст — используется notify_message как есть.
+    notify_template = Column(Text, default="")
     ping_user = Column(Boolean, default=True)
 
     decay_enabled = Column(Boolean, default=False)
@@ -312,3 +315,15 @@ class RankingSettings(Base):
     __table_args__ = (
         UniqueConstraint('server_id', 'platform', name='uq_ranking_settings'),
     )
+
+
+class SavedMessageTemplate(Base):
+    """Сохранённые пользовательские шаблоны сообщений (ТЗ №5 Rev.6, п.3.2.4)."""
+    __tablename__ = "message_templates"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    data = Column(Text, nullable=False, default="{}")  # JSON MessageTemplate (текст+embed+компоненты)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)

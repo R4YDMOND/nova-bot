@@ -6,18 +6,21 @@
  * Переиспользует Hint и HexColorField со страницы /dashboard/ranking.
  */
 
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode, type MouseEvent, type ChangeEvent } from 'react';
 import {
   Bold, Italic, Underline, Strikethrough, Code, Link2, Heading,
   Plus, Trash2, ChevronUp, ChevronDown, Eye, EyeOff,
+  FolderOpen, Save, Download, Upload, Copy,
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/toggle';
 import { Hint, HexColorField } from '@/app/dashboard/ranking/page';
 import type {
   MessageTemplate, MessageEmbed, EmbedField, MessageButton, MessageSelectMenu, ButtonStyle,
 } from '@/types/ranking';
 import { EMPTY_MESSAGE_TEMPLATE } from '@/types/ranking';
+import { useMessageTemplates, useSaveMessageTemplate, useDeleteMessageTemplate } from '@/hooks/useRanking';
 
 const LIMITS = {
   content: 2000,
@@ -109,18 +112,90 @@ export function MessageTemplateModal({
   onOpenChange,
   value,
   onSave,
+  serverId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   value?: MessageTemplate;
   onSave: (template: MessageTemplate) => void;
+  serverId?: string;
 }) {
   const [draft, setDraft] = useState<MessageTemplate>(value ?? EMPTY_MESSAGE_TEMPLATE);
   const [tab, setTab] = useState<'text' | 'panel' | 'components'>('text');
   const [showPreview, setShowPreview] = useState(true);
   const [varMenuOpen, setVarMenuOpen] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const lastFocusedRef = useRef<{ el: HTMLTextAreaElement | HTMLInputElement | null; set: (v: string) => void }>({ el: null, set: () => {} });
+
+  // Сохранённые шаблоны (ТЗ №5 Rev.6, п.3.2.4)
+  const { data: templatesData } = useMessageTemplates(serverId ?? '');
+  const saveTemplateMutation = useSaveMessageTemplate(serverId ?? '');
+  const deleteTemplateMutation = useDeleteMessageTemplate(serverId ?? '');
+  const savedTemplates = templatesData?.templates ?? [];
+
+  const flashMessage = (text: string) => {
+    setActionMessage(text);
+    setTimeout(() => setActionMessage(''), 3000);
+  };
+
+  const handleSaveAsTemplate = () => {
+    if (!serverId) return;
+    const name = window.prompt('Название шаблона:');
+    if (!name || !name.trim()) return;
+    saveTemplateMutation.mutate({ name: name.trim(), data: draft }, {
+      onSuccess: () => flashMessage('Шаблон сохранён'),
+      onError: () => flashMessage('Не удалось сохранить шаблон'),
+    });
+  };
+
+  const handleLoadTemplate = (data: MessageTemplate) => {
+    setDraft(data);
+    flashMessage('Шаблон загружен');
+  };
+
+  const handleDeleteTemplate = (id: number, e: MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Удалить сохранённый шаблон?')) return;
+    deleteTemplateMutation.mutate(id);
+  };
+
+  const handleExportJson = () => {
+    const blob = new Blob([JSON.stringify(draft, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nova-template.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportJson = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (typeof parsed !== 'object' || parsed === null || !('content' in parsed)) {
+          throw new Error('invalid shape');
+        }
+        setDraft({ ...EMPTY_MESSAGE_TEMPLATE, ...parsed });
+        flashMessage('Шаблон импортирован');
+      } catch {
+        flashMessage('Файл повреждён или это не шаблон Nova');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(JSON.stringify(draft, null, 2))
+      .then(() => flashMessage('Скопировано в буфер обмена'))
+      .catch(() => flashMessage('Не удалось скопировать'));
+  };
 
   // Синхронизация черновика при повторном открытии с новым значением
   const [lastOpen, setLastOpen] = useState(open);
@@ -232,13 +307,62 @@ export function MessageTemplateModal({
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setShowPreview(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-2))] transition-colors"
-            >
-              {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              Предпросмотр
-            </button>
+            <div className="flex items-center gap-2">
+              {actionMessage && <span className="text-xs text-cyan-400">{actionMessage}</span>}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-2))] transition-colors">
+                    <FolderOpen className="w-4 h-4" />
+                    Шаблоны
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72 p-2">
+                  {serverId && (
+                    <>
+                      <DropdownMenuItem onClick={handleSaveAsTemplate} className="gap-2 py-2">
+                        <Save className="w-3.5 h-3.5" /> Сохранить как...
+                      </DropdownMenuItem>
+                      {savedTemplates.length > 0 && (
+                        <div className="max-h-48 overflow-y-auto my-1 border-y border-[rgb(var(--border))]">
+                          {savedTemplates.map(t => (
+                            <div
+                              key={t.id}
+                              onClick={() => handleLoadTemplate(t.data)}
+                              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg cursor-pointer hover:bg-[rgb(var(--surface-2))] text-sm"
+                            >
+                              <span className="truncate">{t.name}</span>
+                              <button onClick={e => handleDeleteTemplate(t.id, e)} className="text-[rgb(var(--text-secondary))] hover:text-red-400 shrink-0">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {savedTemplates.length === 0 && (
+                        <p className="px-3 py-2 text-xs text-[rgb(var(--text-secondary))]">Нет сохранённых шаблонов</p>
+                      )}
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={handleExportJson} className="gap-2 py-2">
+                    <Download className="w-3.5 h-3.5" /> Экспорт в JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => importInputRef.current?.click()} className="gap-2 py-2">
+                    <Upload className="w-3.5 h-3.5" /> Импорт из JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyJson} className="gap-2 py-2">
+                    <Copy className="w-3.5 h-3.5" /> Копировать JSON
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <input ref={importInputRef} type="file" accept="application/json" onChange={handleImportJson} className="hidden" />
+              <button
+                onClick={() => setShowPreview(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-2))] transition-colors"
+              >
+                {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                Предпросмотр
+              </button>
+            </div>
           </div>
 
           <div className={`grid ${showPreview ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-0 flex-1 min-h-0`}>

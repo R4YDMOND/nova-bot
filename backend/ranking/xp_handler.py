@@ -104,6 +104,7 @@ async def award_xp_for_message(
             # платформенного обработчика (main.py), т.к. этот модуль платформо-независим.
             "notify_channel": settings.notify_channel,
             "notify_message": settings.notify_message,
+            "notify_template": settings.notify_template,
             "ping_user": settings.ping_user,
         }
 

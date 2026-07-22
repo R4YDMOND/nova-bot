@@ -16,7 +16,7 @@ import {
 } from '@/hooks/useRanking';
 import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
 import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
-import { MessageTemplateModal } from '@/components/ranking/MessageTemplateModal';
+import { MessageTemplateModal } from '@/components/MessageTemplateModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
@@ -1099,6 +1099,7 @@ export default function RankingPage() {
         open={templateModalOpen}
         onOpenChange={setTemplateModalOpen}
         value={formData.notify_template ?? settings?.notify_template}
+        serverId={effectiveServerId}
         onSave={tpl => {
           updateField('notify_template', tpl);
           updateField('notify_message', tpl.content);

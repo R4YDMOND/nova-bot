@@ -148,6 +148,14 @@ export const EMPTY_MESSAGE_TEMPLATE: MessageTemplate = {
   buttons: [],
   select_menus: [],
 };
+/** Сохранённый пользовательский шаблон (ТЗ №5 Rev.6, п.3.2.4) */
+export interface SavedMessageTemplate {
+  id: number;
+  name: string;
+  data: MessageTemplate;
+  updated_at?: string | null;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   user_id: string;
