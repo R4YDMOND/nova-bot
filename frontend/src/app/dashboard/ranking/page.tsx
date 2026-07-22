@@ -84,7 +84,7 @@ function RewardDesignPanel({
   onChange: (field: keyof RewardCardDesign, value: any) => void;
 }) {
   return (
-    <div className="border-t border-[rgb(var(--border))] p-4 bg-[rgb(var(--surface-1))]">
+    <div className="border-t border-[rgb(var(--border))] p-4 bg-[rgb(var(--surface-1))] rounded-b-xl">
       <div className="flex justify-between items-center mb-3">
         <span className="text-xs text-[rgb(var(--text-secondary))]">Собственный дизайн карточки для уровня {level}</span>
         <Switch checked={!!design} onCheckedChange={onToggle} />
@@ -779,7 +779,7 @@ export default function RankingPage() {
                 const isExpanded = expandedRewardIndex === i;
                 const isLolka = effectivePlatform === 'lolka';
                 return (
-                  <div key={i} className="bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-xl overflow-hidden">
+                  <div key={i} className="bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-xl">
                     <div className={`grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr_auto_auto_auto] gap-2 items-center p-3 ${isLolka ? 'sm:!grid-cols-[80px_1fr_auto_auto_auto]' : ''}`}>
                       <input type="number" value={reward.level} onChange={e => updateReward(i, 'level', parseInt(e.target.value) || 1)} className="input text-center" title="Уровень" />
                       {!isLolka && (
