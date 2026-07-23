@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Zap, Search, Plus, Pencil, Trash2, Check, Eye, Save,
   Globe, Clock, Shield as ShieldIcon,
@@ -82,20 +82,33 @@ export default function CommandsPage() {
       .finally(() => setLoading(false));
   }, [effectiveServer, effectiveServerId]);
 
-  const persist = async (next: CommandsConfig) => {
-    if (!effectiveServer) return;
-    setConfig(next);
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingConfig = useRef<CommandsConfig | null>(null);
+
+  const flushPersist = async () => {
+    if (!effectiveServer || !pendingConfig.current) return;
+    const next = pendingConfig.current;
     setSaving(true);
     try {
       const res = await api.modules.saveConfig(String(effectiveServerId), effectiveServer.platform, MODULE_NAME, next);
       if (res.error) throw new Error(res.error);
+      pendingConfig.current = null;
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      alert('❌ Не удалось сохранить изменения\n🌐 Проверьте подключение к интернету');
+      alert('❌ Не удалось сохранить изменения\n🌐 Сервер бота мог «заснуть» (free-план) — подождите немного и повторите переключение');
     } finally {
       setSaving(false);
     }
+  };
+
+  // Тумблер переключается мгновенно (оптимистичный UI), а запрос на сервер уходит
+  // одним пакетом через 800мс после последнего изменения — вместо запроса на каждый клик.
+  const persist = (next: CommandsConfig) => {
+    setConfig(next);
+    pendingConfig.current = next;
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(flushPersist, 800);
   };
 
   // ── Список команд для текущей платформы ────────────────────────────────

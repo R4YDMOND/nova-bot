@@ -221,7 +221,9 @@ function clearSessionAndRedirect() {
 
 async function apiFetch<T>(path: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
+  // 30с вместо 10с — free-план Render "засыпает" и просыпается 30-50с (см. риски в
+  // Концепции визуального оформления, раздел "Ограничения Free-плана").
+  const timeout = setTimeout(() => controller.abort(), 30_000);
 
   try {
     const token = typeof getAccessToken === "function" ? getAccessToken() : "";
