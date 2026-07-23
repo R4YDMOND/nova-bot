@@ -7,10 +7,11 @@ import logging
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal, get_db
 from sqlalchemy.orm import Session
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate, NovaPoint
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, get_profile_summary, get_leaderboard_text, resolve_action
+from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
 from moderation_engine import ModerationEngine
 from commands_engine import get_commands_engine
@@ -2596,6 +2597,10 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "card_bg_shade": s.card_bg_shade,
         "card_bg_fit": s.card_bg_fit,
         "card_bg_position": s.card_bg_position,
+        "np_enabled": s.np_enabled,
+        "np_emoji": s.np_emoji,
+        "np_cooldown_minutes": s.np_cooldown_minutes,
+        "np_daily_limit": s.np_daily_limit,
     }
 
 
@@ -2650,6 +2655,7 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             "card_radius", "card_glass_intensity",
             "card_bg_image_url", "card_bg_image_enabled", "card_bg_shade",
             "card_bg_fit", "card_bg_position",
+            "np_enabled", "np_emoji", "np_cooldown_minutes", "np_daily_limit",
         }
         for field in simple_fields:
             if field in payload:
@@ -2804,6 +2810,100 @@ def get_ranking_leaderboard(
             for i, m in enumerate(rows)
         ]
         return {"platform": platform, "total": total, "entries": entries}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.get("/api/nova-points")
+def get_nova_points(server_id: str = Query(...), platform: str = Query("vk"), user_id: str = Query(None)):
+    """NP конкретного пользователя (если передан user_id) или список всех записей сервера."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        query = db.query(NovaPoint).filter(
+            NovaPoint.server_id == str(server.id),
+            NovaPoint.platform == platform,
+        )
+        if user_id:
+            row = query.filter(NovaPoint.user_id == user_id).first()
+            if not row:
+                return {"user_id": user_id, "total_points": 0, "monthly_points": 0, "weekly_points": 0, "last_received": None}
+            return {
+                "user_id": row.user_id,
+                "total_points": row.total_points,
+                "monthly_points": row.monthly_points,
+                "weekly_points": row.weekly_points,
+                "last_received": row.last_received.isoformat() if row.last_received else None,
+            }
+
+        rows = query.order_by(NovaPoint.total_points.desc()).all()
+        return {"entries": [
+            {
+                "user_id": r.user_id,
+                "total_points": r.total_points,
+                "monthly_points": r.monthly_points,
+                "weekly_points": r.weekly_points,
+                "last_received": r.last_received.isoformat() if r.last_received else None,
+            }
+            for r in rows
+        ]}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/nova-points/give")
+def api_give_nova_point(server_id: str = Query(...), platform: str = Query("vk"), data: dict = None):
+    """
+    Выдать +1 Nova Point. Тело: {"giver_id": "...", "receiver_id": "...", "reason"?: "...", "message_id"?: "..."}.
+    Проверки (см. ranking/nova_points.py): giver != receiver, кулдаун пары, суточный лимит получателя.
+    """
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        payload = data or {}
+        giver_id = str(payload.get("giver_id") or "")
+        receiver_id = str(payload.get("receiver_id") or "")
+        if not giver_id or not receiver_id:
+            return {"error": "Укажите giver_id и receiver_id"}
+
+        result = give_nova_point(
+            db, str(server.id), platform, giver_id, receiver_id,
+            reason=payload.get("reason"), message_id=payload.get("message_id"),
+        )
+        return result
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.get("/api/nova-points/top")
+def api_get_nova_points_top(server_id: str = Query(...), platform: str = Query("vk"), period: str = Query("all"), limit: int = Query(10)):
+    """Топ участников по NP: period = all | month | week."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"platform": platform, "period": period, "entries": []}
+
+        rows = get_nova_points_top_rows(db, str(server.id), platform, period=period, limit=limit)
+        points_field = {"week": "weekly_points", "month": "monthly_points"}.get(period, "total_points")
+        entries = [
+            {"rank": i + 1, "user_id": r.user_id, "points": getattr(r, points_field)}
+            for i, r in enumerate(rows)
+        ]
+        return {"platform": platform, "period": period, "entries": entries}
     except Exception as e:
         return {"error": str(e)}
     finally:

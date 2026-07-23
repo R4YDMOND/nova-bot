@@ -14,6 +14,7 @@ import {
   useRankingChannels,
   useRankingRoles,
   useSyncMembers,
+  useNovaPointsTop,
 } from '@/hooks/useRanking';
 import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
 import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
@@ -26,6 +27,7 @@ const TABS = [
   { id: 'formula', label: '🧮 Формула XP' },
   { id: 'rewards', label: '🎁 Награды' },
   { id: 'leaderboard', label: '🏆 Лидерборд' },
+  { id: 'nova-points', label: '🌟 Nova Points' },
   { id: 'card', label: '🪪 Карточка' },
 ];
 
@@ -306,6 +308,12 @@ export default function RankingPage() {
   );
 
   const validateMutation = useValidateFormula();
+
+  const [npPeriod, setNpPeriod] = useState<'all' | 'month' | 'week'>('all');
+  const { data: npTopData, isLoading: npTopLoading } = useNovaPointsTop(
+    effectiveServerId, effectivePlatform, npPeriod, activeTab === 'nova-points'
+  );
+  const npEntries = npTopData?.entries ?? [];
 
   const updateField = (field: string, value: any) => setFormData((prev: any) => ({ ...prev, [field]: value }));
 
@@ -924,6 +932,101 @@ export default function RankingPage() {
               </div>
             ) : (
               <p className="text-center text-[rgb(var(--text-secondary))] py-12">👥 Нет данных в лидерборде</p>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'nova-points' && (
+        <div className="space-y-6">
+          <p className="text-sm text-[rgb(var(--text-secondary))] -mt-1">
+            Независимая от XP система репутации — участники отмечают ценный вклад друг друга (ТЗ №5 Rev.7, п.3.1)
+          </p>
+
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold">🌟 Включить Nova Points</h3>
+                <p className="text-xs text-[rgb(var(--text-secondary))] mt-0.5">Без включения выдача NP отклоняется API (см. проверку на бэкенде)</p>
+              </div>
+              <Switch checked={formData.np_enabled ?? settings?.np_enabled ?? false} onCheckedChange={val => updateField('np_enabled', val)} />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Emoji для выдачи</label>
+                <input
+                  type="text"
+                  maxLength={8}
+                  value={formData.np_emoji ?? settings?.np_emoji ?? '🌟'}
+                  onChange={e => updateField('np_emoji', e.target.value)}
+                  className="input w-full text-center text-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">
+                  Кулдаун между парой участников: {formData.np_cooldown_minutes ?? settings?.np_cooldown_minutes ?? 10} мин
+                </label>
+                <input
+                  type="range"
+                  min={5}
+                  max={60}
+                  value={formData.np_cooldown_minutes ?? settings?.np_cooldown_minutes ?? 10}
+                  onChange={e => updateField('np_cooldown_minutes', parseInt(e.target.value) || 10)}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Суточный лимит получения NP</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={formData.np_daily_limit ?? settings?.np_daily_limit ?? 50}
+                  onChange={e => updateField('np_daily_limit', parseInt(e.target.value) || 50)}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+          </Card>
+
+          <div className="flex gap-2">
+            {(['all', 'month', 'week'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setNpPeriod(p)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${npPeriod === p ? 'bg-cyan-400 text-black' : 'bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))]'}`}
+              >
+                {p === 'all' ? 'За всё время' : p === 'month' ? 'За месяц' : 'За неделю'}
+              </button>
+            ))}
+          </div>
+
+          <Card>
+            {npTopLoading ? (
+              <p className="text-center py-12 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</p>
+            ) : npEntries.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-[rgb(var(--surface-2))]">
+                    <tr>
+                      {['#', 'Участник', 'Nova Points'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[rgb(var(--text-secondary))] uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[rgb(var(--border))]">
+                    {npEntries.map(entry => (
+                      <tr key={entry.user_id} className="hover:bg-[rgb(var(--surface-2))] transition-colors">
+                        <td className="px-4 py-3 font-bold">{MEDALS[entry.rank] || `#${entry.rank}`}</td>
+                        <td className="px-4 py-3 font-medium">{entry.user_id}</td>
+                        <td className="px-4 py-3 text-[rgb(var(--text-secondary))]">🌟 {entry.points}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-center text-[rgb(var(--text-secondary))] py-12">🌟 Пока никто не получил Nova Points</p>
             )}
           </Card>
         </div>

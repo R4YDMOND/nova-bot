@@ -133,3 +133,14 @@ export function useDeleteMessageTemplate(serverId: string) {
     },
   });
 }
+
+// ── ТЗ №5 Rev.7, п.3.1: Nova Points ──────────────────────────────────────
+export function useNovaPointsTop(serverId: string, platform: 'vk' | 'lolka' = 'vk', period: 'all' | 'month' | 'week' = 'all', enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['ranking', 'nova-points', 'top', serverId, platform, period],
+    queryFn: () => api.novaPoints.getTop(serverId, platform, period),
+    enabled: !!serverId && enabled,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}

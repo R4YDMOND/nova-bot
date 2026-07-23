@@ -105,6 +105,24 @@ export type RankingSettings = {
   card_bg_shade: number;
   card_bg_fit: string;
   card_bg_position: string;
+  np_enabled: boolean;
+  np_emoji: string;
+  np_cooldown_minutes: number;
+  np_daily_limit: number;
+};
+
+export type NovaPointEntry = {
+  user_id: string;
+  total_points: number;
+  monthly_points: number;
+  weekly_points: number;
+  last_received: string | null;
+};
+
+export type NovaPointTopEntry = {
+  rank: number;
+  user_id: string;
+  points: number;
 };
 
 export type RankingChannel = {
@@ -625,6 +643,25 @@ export const api = {
       apiFetch<{ status?: string; synced?: number; error?: string }>(
         `/api/ranking/sync-members?server_id=${serverId}&platform=${platform}`,
         { method: "POST" }
+      ),
+  },
+
+  // ── ТЗ №5 Rev.7, п.3.1: Nova Points (независимая система репутации) ────
+  novaPoints: {
+    getTop: (serverId: string, platform: "vk" | "lolka" = "vk", period: "all" | "month" | "week" = "all", limit: number = 10) =>
+      apiFetch<{ platform: string; period: string; entries: NovaPointTopEntry[]; error?: string }>(
+        `/api/nova-points/top?server_id=${serverId}&platform=${platform}&period=${period}&limit=${limit}`
+      ),
+
+    getUser: (serverId: string, platform: "vk" | "lolka", userId: string) =>
+      apiFetch<NovaPointEntry>(
+        `/api/nova-points?server_id=${serverId}&platform=${platform}&user_id=${userId}`
+      ),
+
+    give: (serverId: string, platform: "vk" | "lolka", giverId: string, receiverId: string, reason?: string) =>
+      apiFetch<{ status: string; total_points?: number; error?: string }>(
+        `/api/nova-points/give?server_id=${serverId}&platform=${platform}`,
+        { method: "POST", body: JSON.stringify({ giver_id: giverId, receiver_id: receiverId, reason }) }
       ),
   },
 

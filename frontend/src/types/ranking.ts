@@ -67,6 +67,25 @@ export interface RankingSettings {
   card_bg_shade: number;
   card_bg_fit: string;
   card_bg_position: string;
+  /** Nova Points (ТЗ №5 Rev.7, п.3.1) — независимая от XP система репутации. */
+  np_enabled: boolean;
+  np_emoji: string;
+  np_cooldown_minutes: number;
+  np_daily_limit: number;
+}
+
+export interface NovaPointEntry {
+  user_id: string;
+  total_points: number;
+  monthly_points: number;
+  weekly_points: number;
+  last_received: string | null;
+}
+
+export interface NovaPointTopEntry {
+  rank: number;
+  user_id: string;
+  points: number;
 }
 
 export interface EmbedField {

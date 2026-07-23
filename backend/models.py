@@ -309,6 +309,12 @@ class RankingSettings(Base):
     card_bg_fit = Column(String(20), default="cover")       # 'cover' | 'contain' | 'stretch'
     card_bg_position = Column(String(20), default="center")  # 'center' | 'top' | 'bottom' | 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
+    # Nova Points (ТЗ №5 Rev.7, п.3.1) — независимая от XP система репутации.
+    np_enabled = Column(Boolean, default=False)
+    np_emoji = Column(String(16), default="🌟")
+    np_cooldown_minutes = Column(Integer, default=10)   # кулдаун между парой giver→receiver
+    np_daily_limit = Column(Integer, default=50)        # макс. NP в сутки на одного получателя
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
 
@@ -327,3 +333,40 @@ class SavedMessageTemplate(Base):
     data = Column(Text, nullable=False, default="{}")  # JSON MessageTemplate (текст+embed+компоненты)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
+
+
+class NovaPoint(Base):
+    """Агрегированные Nova Points участника (ТЗ №5 Rev.7, п.3.1).
+    server_id/platform/user_id — как в Member: server_id хранит str(Server.id),
+    platform различает VK/Lolka, user_id — внешний id пользователя платформы."""
+    __tablename__ = "nova_points"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    platform = Column(String(20), default="vk", index=True)
+    user_id = Column(String(255), nullable=False)
+    total_points = Column(Integer, default=0)
+    monthly_points = Column(Integer, default=0)
+    weekly_points = Column(Integer, default=0)
+    last_received = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('server_id', 'platform', 'user_id', name='uq_nova_points_member'),
+    )
+
+
+class NovaPointTransaction(Base):
+    """История начислений NP — источник для проверки кулдауна/суточного лимита и аудита."""
+    __tablename__ = "nova_points_transactions"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    platform = Column(String(20), default="vk", index=True)
+    giver_id = Column(String(255), nullable=False)
+    receiver_id = Column(String(255), nullable=False)
+    points = Column(Integer, nullable=False, default=1)
+    reason = Column(Text, nullable=True)
+    message_id = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
