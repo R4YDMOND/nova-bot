@@ -147,20 +147,23 @@ class LolkaGateway:
         if author.get("bot"):
             return
 
-        if content and channel_id and guild_id:
-            server_id = self._resolve_server_id(guild_id)
-            if server_id:
-                member = data.get("member") or {}
-                reply = _commands_engine.execute(
-                    text=content,
-                    platform="lolka",
-                    server_id=server_id,
-                    user_id=author.get("id"),
-                    commands_config=self._load_commands_config(server_id),
-                    member_permissions=member.get("permissions"),
-                )
-                if reply:
-                    await self.send_message(channel_id, reply)
+        if content and channel_id:
+            # server_id может быть None, если гильдия ещё не синхронизирована в дашборде
+            # (/dashboard/servers → «Sync Lolka») — в этом случае встроенные /ping и /help
+            # всё равно должны отвечать (как и до ТЗ №7), а пользовательские команды и
+            # переопределения builtin просто недоступны без конфига (commands_config={}).
+            server_id = self._resolve_server_id(guild_id) if guild_id else None
+            member = data.get("member") or {}
+            reply = _commands_engine.execute(
+                text=content,
+                platform="lolka",
+                server_id=server_id,
+                user_id=author.get("id"),
+                commands_config=self._load_commands_config(server_id) if server_id else {},
+                member_permissions=member.get("permissions"),
+            )
+            if reply:
+                await self.send_message(channel_id, reply)
 
         # Начисление XP за сообщение + level-up уведомление (по аналогии с VK, см. main.py)
         user_id = author.get("id")
