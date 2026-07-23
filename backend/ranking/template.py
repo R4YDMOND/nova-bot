@@ -212,7 +212,10 @@ def render_message_template(
             if b.get("style") == "link" and b.get("url"):
                 action = {"type": "open_link", "link": b["url"], "label": label}
             else:
-                action = {"type": "text", "label": label, "payload": json.dumps({"custom_id": b.get("custom_id") or b.get("id", "")})}
+                # callback (а не text) — клик придёт как message_event, который
+                # реально обрабатывается ботом (см. ranking/actions.py); "text"
+                # просто отправил бы payload как обычное сообщение от пользователя.
+                action = {"type": "callback", "label": label, "payload": json.dumps({"nova_action": b.get("custom_id") or "nova_profile"})}
             vk_rows.setdefault(int(b.get("row", 0)), []).append({
                 "action": action,
                 "color": _VK_BUTTON_COLOR.get(b.get("style", "primary"), "primary"),

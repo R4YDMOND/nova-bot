@@ -101,13 +101,24 @@ export interface MessageEmbed {
 
 export type ButtonStyle = 'primary' | 'secondary' | 'success' | 'danger' | 'link';
 
+// Предустановленные действия кнопки (не-Link стили) — единственное, что реально
+// обрабатывается ботом на VK/Lolka. Свободный custom_id убран умышленно: бот не
+// выполняет произвольный код по нажатию, только эти три безопасных действия.
+export type ButtonAction = 'nova_profile' | 'nova_leaderboard' | 'nova_close';
+
+export const BUTTON_ACTIONS: { value: ButtonAction; label: string }[] = [
+  { value: 'nova_profile', label: '👤 Профиль' },
+  { value: 'nova_leaderboard', label: '🏆 Топ участников' },
+  { value: 'nova_close', label: '✕ Закрыть сообщение' },
+];
+
 export interface MessageButton {
   id: string;
   label: string;
   style: ButtonStyle;
   emoji: string;
   url: string;
-  custom_id: string;
+  custom_id: string; // для style !== 'link' — одно из значений ButtonAction (см. BUTTON_ACTIONS)
   row: number; // 0-4, максимум 5 кнопок в ряд (ТЗ п.3.2.2)
 }
 

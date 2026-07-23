@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
+from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, get_profile_summary, get_leaderboard_text, resolve_action
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
 from moderation_engine import ModerationEngine
 from commands_engine import get_commands_engine
@@ -109,6 +110,50 @@ async def _award_xp_and_notify_vk(
             service.send_message(peer_id=target_peer_id, message=text_to_send)
     except Exception as e:
         logger.error(f"level-up notify (VK) error: {e}")
+
+
+async def _handle_vk_message_event(
+    access_token: str,
+    server_id: str,
+    event_id: Optional[str],
+    user_id: Optional[int],
+    peer_id: Optional[int],
+    conversation_message_id: Optional[int],
+    payload: Any,
+) -> None:
+    """
+    Обрабатывает клик по callback-кнопке (событие message_event) — предустановленные
+    действия редактора шаблонов (вкладка «Компоненты»): Профиль/Топ/Закрыть.
+    Ответить нужно в течение 3 секунд (см. VK - Документация.md), иначе кнопка
+    «зависает» с индикатором загрузки на стороне клиента.
+    """
+    if not event_id or not user_id or not peer_id:
+        return
+    try:
+        action = resolve_action(payload)
+        service = get_vk_service(access_token)
+
+        if action == ACTION_PROFILE:
+            text = get_profile_summary(server_id, "vk", str(user_id))
+            service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
+
+        elif action == ACTION_LEADERBOARD:
+            service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "📊 Топ участников"})
+            service.send_message(peer_id=peer_id, message=get_leaderboard_text(server_id, "vk"))
+
+        elif action == ACTION_CLOSE:
+            if conversation_message_id:
+                service.delete_by_cmid(peer_id, conversation_message_id)
+                service.answer_message_event(event_id, user_id, peer_id)
+            else:
+                # VK не передаёт conversation_message_id для клавиатур беседы —
+                # без него не определить, какое сообщение удалять (см. VK - Документация.md).
+                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить сообщение для удаления"})
+
+        else:
+            service.answer_message_event(event_id, user_id, peer_id)
+    except Exception as e:
+        logger.error(f"VK message_event handling error: {e}")
 
 # Временное хранилище PKCE code_verifier (ключ = state)
 vk_pkce_store: dict = {}
@@ -3437,6 +3482,20 @@ async def vk_callback(request: Request):
             )
             db.add(log_event)
             db.commit()
+            return JSONResponse(content={"status": "ok"})
+
+        # ── Message event (клик по callback-кнопке — Профиль/Топ/Закрыть) ──
+        if event_type == "message_event":
+            obj = body.get("object", {})
+            asyncio.create_task(_handle_vk_message_event(
+                access_token=conn.access_token,
+                server_id=str(conn.server_id),
+                event_id=obj.get("event_id"),
+                user_id=obj.get("user_id"),
+                peer_id=obj.get("peer_id"),
+                conversation_message_id=obj.get("conversation_message_id"),
+                payload=obj.get("payload"),
+            ))
             return JSONResponse(content={"status": "ok"})
 
         # Для всех остальных типов — просто ок

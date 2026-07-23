@@ -10,6 +10,7 @@ import websockets
 
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
+from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, get_profile_summary, get_leaderboard_text
 from commands_engine import get_commands_engine
 
 _commands_engine = get_commands_engine()
@@ -136,6 +137,8 @@ class LolkaGateway:
                 await self.on_message_create(d or {})
             elif t == "GUILD_MEMBER_ADD":
                 await self.on_member_join(d or {})
+            elif t == "INTERACTION_CREATE":
+                await self.on_interaction_create(d or {})
 
     async def on_message_create(self, data: dict):
         content = (data.get("content") or "").strip()
@@ -286,6 +289,81 @@ class LolkaGateway:
         username = (data.get("user") or {}).get("username", "участник")
         print(f"LOLKA GATEWAY: новый участник — {username}")
         # Место для приветственных сообщений/автовыдачи роли — по аналогии с on_message_create
+
+    async def on_interaction_create(self, data: dict):
+        """
+        Обрабатывает клик по кнопке (type: 3 = MESSAGE_COMPONENT) — предустановленные
+        действия редактора шаблонов (вкладка «Компоненты»): Профиль/Топ/Закрыть.
+        Ответить нужно в течение 3 секунд (см. Документация по ботам в Lolka.md).
+        """
+        if data.get("type") != 3:
+            return
+
+        interaction_id = data.get("id")
+        interaction_token = data.get("token")
+        if not interaction_id or not interaction_token:
+            return
+
+        custom_id = ((data.get("data") or {}).get("custom_id")) or ""
+        guild_id = data.get("guild_id")
+        member = data.get("member") or {}
+        user = member.get("user") or data.get("user") or {}
+        user_id = user.get("id")
+
+        server_id = self._resolve_server_id(str(guild_id)) if guild_id else None
+
+        try:
+            if custom_id == ACTION_PROFILE and server_id and user_id:
+                text = get_profile_summary(server_id, "lolka", str(user_id))
+                # flags: 64 = ephemeral — сообщение видит только нажавший (аналог VK show_snackbar)
+                await self._interaction_callback(interaction_id, interaction_token, 4, {"content": text, "flags": 64})
+
+            elif custom_id == ACTION_LEADERBOARD and server_id:
+                text = get_leaderboard_text(server_id, "lolka")
+                await self._interaction_callback(interaction_id, interaction_token, 4, {"content": text})
+
+            elif custom_id == ACTION_CLOSE:
+                await self._interaction_callback(interaction_id, interaction_token, 6, {})  # тихий ack
+                message = data.get("message") or {}
+                channel_id = data.get("channel_id") or message.get("channel_id")
+                message_id = message.get("id")
+                if channel_id and message_id:
+                    await self._delete_message(channel_id, message_id)
+
+            else:
+                await self._interaction_callback(interaction_id, interaction_token, 6, {})
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка обработки интеракции — {e}")
+
+    async def _interaction_callback(self, interaction_id: str, interaction_token: str, cb_type: int, data: dict):
+        """POST /interactions/{id}/{token}/callback — авторизация самим interaction_token в URL."""
+        import requests
+        payload: dict = {"type": cb_type}
+        if data:
+            payload["data"] = data
+        try:
+            requests.post(
+                f"{self.api_base_url}/interactions/{interaction_id}/{interaction_token}/callback",
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка callback интеракции — {e}")
+
+    async def _delete_message(self, channel_id: str, message_id: str):
+        """DELETE /channels/{channel_id}/messages/{message_id} — обычным bot-токеном,
+        не через interaction (сообщение с кнопками отправлено проактивно ботом,
+        а не как ответ на интеракцию)."""
+        import requests
+        try:
+            requests.delete(
+                f"{self.api_base_url}/channels/{channel_id}/messages/{message_id}",
+                headers={"Authorization": f"Bot {self.token}"},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка удаления сообщения — {e}")
 
     async def send_message(self, channel_id: str, content: str, embeds: Optional[list] = None, components: Optional[list] = None):
         """Отправка через REST (не через Gateway) — так же, как в Discord-совместимом API.

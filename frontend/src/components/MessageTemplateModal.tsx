@@ -18,7 +18,7 @@ import { Hint, HexColorField } from '@/components/ranking/RankingFormControls';
 import type {
   MessageTemplate, MessageEmbed, EmbedField, MessageButton, MessageSelectMenu, ButtonStyle,
 } from '@/types/ranking';
-import { EMPTY_MESSAGE_TEMPLATE } from '@/types/ranking';
+import { EMPTY_MESSAGE_TEMPLATE, BUTTON_ACTIONS } from '@/types/ranking';
 import { useMessageTemplates, useSaveMessageTemplate, useDeleteMessageTemplate } from '@/hooks/useRanking';
 
 const LIMITS = {
@@ -255,7 +255,7 @@ export function MessageTemplateModal({
     const rowCounts = [0, 0, 0, 0, 0];
     draft.buttons.forEach(b => { rowCounts[b.row] = (rowCounts[b.row] ?? 0) + 1; });
     const row = rowCounts.findIndex(c => c < LIMITS.maxButtonsPerRow);
-    setDraft(d => ({ ...d, buttons: [...d.buttons, { id: uid(), label: 'Кнопка', style: 'primary', emoji: '', url: '', custom_id: '', row: row === -1 ? 0 : row }] }));
+    setDraft(d => ({ ...d, buttons: [...d.buttons, { id: uid(), label: 'Кнопка', style: 'primary', emoji: '', url: '', custom_id: 'nova_profile', row: row === -1 ? 0 : row }] }));
   };
   const updateButton = (i: number, patch: Partial<MessageButton>) =>
     setDraft(d => ({ ...d, buttons: d.buttons.map((b, idx) => (idx === i ? { ...b, ...patch } : b)) }));
@@ -550,7 +550,7 @@ export function MessageTemplateModal({
                     <div className="flex justify-between items-center mb-2">
                       <label className="text-sm font-medium flex items-center gap-1.5">
                         Кнопки
-                        <Hint text="До 5 кнопок в ряд. Тип Link открывает URL, остальные — отправляют custom_id боту" />
+                        <Hint text="До 5 кнопок в ряд. Тип Link открывает URL, остальные выполняют предустановленное действие: показать профиль, топ участников или закрыть сообщение" />
                       </label>
                       <button onClick={addButton} disabled={draft.buttons.length >= 25} className="flex items-center gap-1 text-xs font-medium text-cyan-400 hover:text-cyan-300 disabled:opacity-40 transition-colors">
                         <Plus className="w-3.5 h-3.5" /> Добавить кнопку
@@ -571,7 +571,9 @@ export function MessageTemplateModal({
                           {b.style === 'link' ? (
                             <input type="url" value={b.url} onChange={e => updateButton(i, { url: e.target.value })} placeholder="URL" className="input text-sm col-span-2" />
                           ) : (
-                            <input type="text" value={b.custom_id} onChange={e => updateButton(i, { custom_id: e.target.value })} placeholder="Custom ID" className="input text-sm col-span-2" />
+                            <select value={b.custom_id || 'nova_profile'} onChange={e => updateButton(i, { custom_id: e.target.value })} className="input text-sm col-span-2">
+                              {BUTTON_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                            </select>
                           )}
                           <button onClick={() => removeButton(i)} className="col-span-2 flex items-center justify-center gap-1 text-xs text-red-400 hover:bg-red-500/10 rounded-lg py-1 transition-colors">
                             <Trash2 className="w-3.5 h-3.5" /> Удалить
