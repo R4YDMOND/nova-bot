@@ -12,6 +12,7 @@ from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
 from moderation_engine import ModerationEngine
+from commands_engine import get_commands_engine
 from fastapi.responses import PlainTextResponse
 from typing import Optional
 from auth_utils import (
@@ -193,6 +194,7 @@ app.add_middleware(
 
 # ── Moderation engine (ТЗ №5) ───────────────────────────────────────────────
 _moderation_engine = ModerationEngine()
+_commands_engine = get_commands_engine()
 
 
 @app.exception_handler(Exception)
@@ -3368,7 +3370,33 @@ async def vk_callback(request: Request):
                 db.add(action_event)
                 db.commit()
 
-            # 4. Начисляем XP за сообщение и уведомляем о level-up (асинхронно, чтобы не блокировать ответ VK)
+            # 4. Диспетчеризация текстовых команд (страница «Команды», ТЗ №7).
+            # Выполняется только если сообщение не было удалено автомодерацией выше.
+            if not result and from_id and text:
+                cmd_config_row = db.query(ModuleConfig).filter(
+                    ModuleConfig.server_id == conn.server_id,
+                    ModuleConfig.module_name == "commands",
+                ).first()
+                cmd_config = {}
+                if cmd_config_row and cmd_config_row.config:
+                    try:
+                        cmd_config = json.loads(cmd_config_row.config)
+                    except (json.JSONDecodeError, TypeError):
+                        cmd_config = {}
+                reply = _commands_engine.execute(
+                    text=text,
+                    platform="vk",
+                    server_id=conn.server_id,
+                    user_id=from_id,
+                    commands_config=cmd_config,
+                )
+                if reply:
+                    try:
+                        get_vk_service(conn.access_token).send_message(peer_id=peer_id, message=reply)
+                    except VKAPIError as e:
+                        print(f"❌ VK Callback: ошибка отправки ответа команды — {e}")
+
+            # 5. Начисляем XP за сообщение и уведомляем о level-up (асинхронно, чтобы не блокировать ответ VK)
             if from_id:
                 asyncio.create_task(_award_xp_and_notify_vk(
                     access_token=conn.access_token,
@@ -3379,7 +3407,7 @@ async def vk_callback(request: Request):
                     peer_id=peer_id,
                 ))
 
-            # 5. Возвращаем OK ВКонтакте
+            # 6. Возвращаем OK ВКонтакте
             return JSONResponse(content={"status": "ok"})
 
         # ── Group join / leave ────────────────────────────────────────

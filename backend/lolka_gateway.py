@@ -10,19 +10,9 @@ import websockets
 
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
+from commands_engine import get_commands_engine
 
-# Простейший набор команд бота — независим от backend/main.py,
-# чтобы не создавать циклический импорт (main.py импортирует этот модуль).
-COMMAND_RESPONSES = {
-    "/ping": "🏓 Понг!",
-    "/help": (
-        "**🤖 Команды Нова:**\n"
-        "📊 `/stats` — статистика сервера\n"
-        "🎵 `/play` — включить музыку\n"
-        "🛡️ `/mod` — модерация\n"
-        "❓ `/help` — список команд"
-    ),
-}
+_commands_engine = get_commands_engine()
 
 
 # Discord-совместимые биты интентов Gateway (см. документацию Lolka — протокол идентичен discord.py).
@@ -157,10 +147,20 @@ class LolkaGateway:
         if author.get("bot"):
             return
 
-        command = content.split(" ")[0].lower()
-        reply = COMMAND_RESPONSES.get(command)
-        if reply and channel_id:
-            await self.send_message(channel_id, reply)
+        if content and channel_id and guild_id:
+            server_id = self._resolve_server_id(guild_id)
+            if server_id:
+                member = data.get("member") or {}
+                reply = _commands_engine.execute(
+                    text=content,
+                    platform="lolka",
+                    server_id=server_id,
+                    user_id=author.get("id"),
+                    commands_config=self._load_commands_config(server_id),
+                    member_permissions=member.get("permissions"),
+                )
+                if reply:
+                    await self.send_message(channel_id, reply)
 
         # Начисление XP за сообщение + level-up уведомление (по аналогии с VK, см. main.py)
         user_id = author.get("id")
@@ -255,6 +255,27 @@ class LolkaGateway:
                 Server.platform == "lolka",
             ).first()
             return str(server.id) if server else None
+        finally:
+            db.close()
+
+    @staticmethod
+    def _load_commands_config(server_id: str) -> dict:
+        """Читает конфиг модуля 'commands' (страница «Команды») для сервера."""
+        from database import SessionLocal
+        from models import ModuleConfig
+
+        db = SessionLocal()
+        try:
+            row = db.query(ModuleConfig).filter(
+                ModuleConfig.server_id == int(server_id),
+                ModuleConfig.module_name == "commands",
+            ).first()
+            if not row or not row.config:
+                return {}
+            try:
+                return json.loads(row.config)
+            except (json.JSONDecodeError, TypeError):
+                return {}
         finally:
             db.close()
 
