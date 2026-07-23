@@ -394,7 +394,7 @@ export function MessageTemplateModal({
             )}
           </div>
 
-          <div className={`grid ${showPreview ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-0 flex-1 min-h-0`}>
+          <div className={`grid ${showPreview ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-0 flex-1 min-h-0 md:min-h-[560px]`}>
             {/* Редактор */}
             <div className="p-5 space-y-4 border-r border-[rgb(var(--border))] md:max-h-[calc(88vh-150px)] md:overflow-y-auto">
               {tab === 'text' && (
