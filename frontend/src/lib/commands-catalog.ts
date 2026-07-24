@@ -5,7 +5,7 @@
 // исключены из конструктора команд.
 
 export type Platform = 'vk' | 'lolka';
-export type Category = 'info' | 'moderation' | 'levels' | 'music' | 'utility' | 'ai';
+export type Category = 'info' | 'moderation' | 'levels' | 'music' | 'utility' | 'ai' | 'entertainment' | 'economy' | 'other';
 // VK: реальные 5 уровней руководителей сообщества (groups.getMembers, filter=managers,
 // поле role) — 'owner' соответствует полю role="creator". Lolka permission не использует —
 // доступ на Lolka теперь определяется ролями/каналами (allowedRoles/ignoredRoles/
@@ -26,6 +26,9 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   music: 'Музыка',
   utility: 'Утилиты',
   ai: 'AI',
+  entertainment: 'Развлечения',
+  economy: 'Экономика',
+  other: 'Другое',
 };
 
 // Только для VK — на Lolka доступ определяется ролями/каналами, см. ChannelMultiSelect/RoleMultiSelect в UI.
