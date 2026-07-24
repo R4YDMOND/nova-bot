@@ -1,11 +1,14 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Sparkles } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/toggle';
 import { api } from '@/lib/api';
 import { useServer } from '@/context/ServerProvider';
 import { NoServerSelected } from '@/components/NoServerSelected';
+import { AIPlaygroundModal } from '@/components/AIPlaygroundModal';
+import { PROVIDERS, PROMPT_VARIABLES, type AIProvider, type AIUsage } from '@/types/ai';
 
 interface AISettings {
   botName: string;
@@ -27,6 +30,13 @@ interface AISettings {
   platform: string;
   avatarStyle: string;
   avatarUrl: string;
+  // ── ТЗ №9: LLM-роутер, RAG, кэш, модерация, function calling ──
+  provider: AIProvider;
+  contextSize: number;
+  cacheEnabled: boolean;
+  moderationEnabled: boolean;
+  moderationThreshold: number;
+  toolGrantRoles: boolean;
 }
 
 const DEFAULT: AISettings = {
@@ -35,6 +45,8 @@ const DEFAULT: AISettings = {
   deepseekEnabled: true, deepseekTemperature: 0.7, deepseekStyle: 'creative', deepseekCustomPrompt: '',
   useContext: true, contextMessages: 10, systemPrompt: 'Ты — дружелюбный AI-помощник. Отвечай на русском языке. 🤖',
   autoModeration: false, serverName: '', platform: 'VK', avatarStyle: 'nova', avatarUrl: '',
+  provider: 'gigachat', contextSize: 5, cacheEnabled: true,
+  moderationEnabled: false, moderationThreshold: 70, toolGrantRoles: false,
 };
 
 const GEMINI_STYLES = [
@@ -58,6 +70,7 @@ const AVATARS = [
 
 const TABS = [
   { id: 'general', label: '⚙️ Общие' },
+  { id: 'provider', label: '🔌 Провайдер и RAG' },
   { id: 'gemini', label: '🔥 Gemini' },
   { id: 'deepseek', label: '🧠 DeepSeek' },
   { id: 'server', label: '🌐 Сервер' },
@@ -70,6 +83,8 @@ export default function AIPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
+  const [playgroundOpen, setPlaygroundOpen] = useState(false);
+  const [usage, setUsage] = useState<AIUsage | null>(null);
 
   useEffect(() => {
     if (!selectedServer) { setSettingsLoading(false); return; }
@@ -83,12 +98,27 @@ export default function AIPage() {
           activeModel: (s.personality as AISettings['activeModel']) || prev.activeModel,
           geminiTemperature: (s.temperature as number) ?? prev.geminiTemperature,
           systemPrompt: (s.systemPrompt as string) || prev.systemPrompt,
+          provider: (s.provider as AIProvider) || prev.provider,
+          contextSize: (s.contextSize as number) ?? prev.contextSize,
+          cacheEnabled: (s.cacheEnabled as boolean) ?? prev.cacheEnabled,
+          moderationEnabled: (s.moderationEnabled as boolean) ?? prev.moderationEnabled,
+          moderationThreshold: (s.moderationThreshold as number) ?? prev.moderationThreshold,
+          toolGrantRoles: (s.toolGrantRoles as boolean) ?? prev.toolGrantRoles,
         }));
       } else {
         setSettings(DEFAULT);
       }
     }).catch(() => {}).finally(() => setSettingsLoading(false));
   }, [selectedServer, selectedServerId]);
+
+  const refreshUsage = useCallback(() => {
+    if (!selectedServer) return;
+    api.ai.getUsage(selectedServerId).then((data) => {
+      if (!data.error) setUsage({ used: data.used, limit: data.limit });
+    }).catch(() => {});
+  }, [selectedServer, selectedServerId]);
+
+  useEffect(() => { refreshUsage(); }, [refreshUsage]);
 
   const update = <K extends keyof AISettings>(key: K, value: AISettings[K]) =>
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -107,6 +137,12 @@ export default function AIPage() {
         personality: settings.activeModel,
         temperature: settings.geminiTemperature,
         systemPrompt: settings.systemPrompt,
+        provider: settings.provider,
+        contextSize: settings.contextSize,
+        cacheEnabled: settings.cacheEnabled,
+        moderationEnabled: settings.moderationEnabled,
+        moderationThreshold: settings.moderationThreshold,
+        toolGrantRoles: settings.toolGrantRoles,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -129,10 +165,30 @@ export default function AIPage() {
           <h1 className="text-3xl font-bold">✨ AI-Настройки</h1>
           <p className="text-[rgb(var(--text-secondary))] text-sm mt-1">Гибкая настройка моделей и стилей общения 🤖</p>
         </div>
-        <Button onClick={save} disabled={saving}>
-          {saving ? 'Сохранение...' : saved ? '✅ Сохранено!' : '💾 Сохранить'}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setPlaygroundOpen(true)}>
+            <Sparkles className="h-4 w-4 mr-1.5" /> Playground
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? 'Сохранение...' : saved ? '✅ Сохранено!' : '💾 Сохранить'}
+          </Button>
+        </div>
       </div>
+
+      {usage && (
+        <Card className="p-4">
+          <div className="flex justify-between items-center mb-2 text-sm">
+            <span className="font-medium">📊 Лимиты API (сегодня)</span>
+            <span className="text-[rgb(var(--text-secondary))]">{usage.used} / {usage.limit}</span>
+          </div>
+          <div className="h-2 rounded-full bg-[rgb(var(--surface-2))] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all"
+              style={{ width: `${Math.min(100, (usage.used / Math.max(1, usage.limit)) * 100)}%` }}
+            />
+          </div>
+        </Card>
+      )}
 
       <div className="flex gap-1.5 flex-wrap">
         {TABS.map(tab => (
@@ -192,6 +248,15 @@ export default function AIPage() {
             <textarea value={settings.systemPrompt}
               onChange={e => update('systemPrompt', e.target.value)}
               rows={3} className="input w-full font-mono text-sm resize-y" />
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {PROMPT_VARIABLES.map(v => (
+                <button key={v.token} type="button" title={v.desc}
+                  onClick={() => update('systemPrompt', `${settings.systemPrompt} ${v.token}`.trim())}
+                  className="text-xs font-mono px-2 py-1 rounded-lg bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-indigo-400 hover:border-indigo-400/60 transition-colors">
+                  {v.token}
+                </button>
+              ))}
+            </div>
           </Card>
 
           <Card className="p-6 space-y-4">
@@ -217,6 +282,81 @@ export default function AIPage() {
                   min={1} max={50} className="input w-32" />
               </div>
             )}
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'provider' && (
+        <div className="space-y-4">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">🔌 LLM-провайдер</h3>
+            <p className="text-sm text-[rgb(var(--text-secondary))] mb-4">
+              При достижении лимита (429) или блокировке (403) бот автоматически переключится на следующий доступный провайдер.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {PROVIDERS.map(p => (
+                <button key={p.value} onClick={() => update('provider', p.value)}
+                  className={`p-4 rounded-2xl text-left border-2 transition-all ${
+                    settings.provider === p.value
+                      ? 'border-indigo-500 bg-indigo-500/10'
+                      : 'border-[rgb(var(--border))] bg-[rgb(var(--surface-2))] hover:border-indigo-400/50'
+                  }`}>
+                  <div className="font-semibold">{p.label}</div>
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-6 space-y-4">
+            <h3 className="text-lg font-semibold">🧠 Контекстная память (RAG)</h3>
+            <div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-[rgb(var(--text-secondary))]">Размер контекста</span>
+                <span className="text-indigo-400 font-semibold">{settings.contextSize} сообщений</span>
+              </div>
+              <input type="range" min={0} max={20} step={1} value={settings.contextSize}
+                onChange={e => update('contextSize', parseInt(e.target.value))}
+                className="w-full accent-indigo-500" />
+            </div>
+            <div className="flex justify-between items-center py-3 border-t border-[rgb(var(--border))]">
+              <div>
+                <div className="font-medium">⚡ Умный кэш ответов</div>
+                <div className="text-sm text-[rgb(var(--text-secondary))]">Повторяющиеся вопросы (&gt;90% совпадения) отвечаются мгновенно, без запроса к LLM</div>
+              </div>
+              <Switch checked={settings.cacheEnabled} onCheckedChange={() => toggle('cacheEnabled')} />
+            </div>
+          </Card>
+
+          <Card className="p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">🛡️ AI Модерация</h3>
+              <Switch checked={settings.moderationEnabled} onCheckedChange={() => toggle('moderationEnabled')} />
+            </div>
+            {settings.moderationEnabled && (
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-[rgb(var(--text-secondary))]">Порог уверенности токсичности</span>
+                  <span className="text-indigo-400 font-semibold">{settings.moderationThreshold}%</span>
+                </div>
+                <input type="range" min={0} max={100} step={5} value={settings.moderationThreshold}
+                  onChange={e => update('moderationThreshold', parseInt(e.target.value))}
+                  className="w-full accent-indigo-500" />
+                <p className="text-xs text-[rgb(var(--text-secondary))] mt-2">
+                  Если локальный фильтр находит подозрительное сообщение, AI оценивает токсичность (0-100%).
+                  При превышении порога сообщение удаляется.
+                </p>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-3">🧰 Инструменты (Function Calling)</h3>
+            <label className="flex items-center gap-3 py-2 cursor-pointer">
+              <input type="checkbox" checked={settings.toolGrantRoles}
+                onChange={() => toggle('toolGrantRoles')}
+                className="w-4 h-4 accent-indigo-500" />
+              <span className="text-sm">Выдавать роли (только Lolka)</span>
+            </label>
           </Card>
         </div>
       )}

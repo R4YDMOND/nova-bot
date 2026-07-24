@@ -34,6 +34,14 @@ _BAD_WORDS_RE = re.compile(
     re.IGNORECASE
 )
 
+# Список "мягких" маркеров возможной токсичности — ТЗ №9, этап 4: если сработал хотя бы один,
+# сообщение считается "подозрительным" и эскалируется на AI-проверку (moderation_engine сам
+# ничего не удаляет по этому списку — только сигнализирует необходимость Level 2).
+_SUSPICION_RE = re.compile(
+    r'идиот|дура[кч]|тупиц|тупой|дебил|урод|сдохни|убью|ненавиж|конч[ае]н|заткнись',
+    re.IGNORECASE
+)
+
 
 class ModerationResult:
     """Результат проверки движком."""
@@ -166,6 +174,10 @@ class ModerationEngine:
                 "antiRaid"
             )
         return None
+
+    def is_suspicious(self, text: str) -> bool:
+        """ТЗ №9, этап 4 (Level 1): лёгкая эвристика для эскалации на AI-проверку токсичности."""
+        return bool(text) and bool(_SUSPICION_RE.search(text))
 
     # ── Public API ──────────────────────────────────────────────────────────
 

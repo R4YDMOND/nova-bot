@@ -459,6 +459,18 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    getUsage: (serverId = "default") =>
+      apiFetch<{ used: number; limit: number; error?: string }>(`/api/ai/usage?server_id=${serverId}`),
+    testPlayground: (data: object) =>
+      apiFetch<{ reply?: string; provider?: string; systemPrompt?: string; error?: string }>(
+        "/api/ai/playground",
+        { method: "POST", body: JSON.stringify(data) }
+      ),
+    translateUrl: (data: object) =>
+      apiFetch<{ result?: string; error?: string }>("/api/ai/process-url", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
   },
   notifications: {
     get: (serverId = "default") =>

@@ -1,6 +1,20 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, UniqueConstraint, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, UniqueConstraint, ForeignKey, Date
 from datetime import datetime
-from database import Base
+from database import Base, DATABASE_URL
+
+# ai_memory.message_embedding / ai_semantic_cache.prompt_embedding хранят эмбеддинг (1536, OpenRouter
+# "openai/text-embedding-3-small"). На Postgres/Supabase используем родной тип pgvector (поддержка
+# оператора косинусного расстояния "<=>"), на SQLite (локальная БД по умолчанию) — TEXT c JSON-массивом
+# и ручным подсчётом cosine similarity в ai_engine.py (см. AI_EMBEDDINGS_BACKEND в ai_engine.py).
+_IS_POSTGRES = DATABASE_URL.startswith("postgresql")
+if _IS_POSTGRES:
+    try:
+        from pgvector.sqlalchemy import Vector
+        _EmbeddingType = Vector(1536)
+    except ImportError:
+        _EmbeddingType = Text
+else:
+    _EmbeddingType = Text
 
 
 class Server(Base):
@@ -37,6 +51,52 @@ class AISettings(Base):
     personality = Column(String, default="friendly")
     temperature = Column(Float, default=0.7)
     system_prompt = Column(Text, default="")
+    # ── ТЗ №9: LLM-роутер, RAG, кэш, модерация, function calling ──
+    provider = Column(String, default="gigachat")          # gigachat | yandexgpt | deepseek | openrouter
+    context_size = Column(Integer, default=5)               # размер контекста RAG (0-20 сообщений)
+    cache_enabled = Column(Boolean, default=True)            # семантический кэш ответов
+    moderation_enabled = Column(Boolean, default=False)      # AI AutoMod (уровень 2)
+    moderation_threshold = Column(Integer, default=70)       # порог уверенности токсичности (0-100)
+    tool_grant_roles = Column(Boolean, default=False)        # разрешённый инструмент: выдача ролей
+
+
+class AIMemory(Base):
+    """Контекстная память диалога (RAG) — ТЗ №9, этап 2. Cron удаляет записи старше 7 дней."""
+    __tablename__ = "ai_memory"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String, index=True)
+    channel_id = Column(String, index=True)
+    user_id = Column(String, index=True)
+    role = Column(String, default="user")   # "user" | "assistant"
+    message_text = Column(Text, default="")
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AISemanticCache(Base):
+    """Семантический кэш ответов LLM — ТЗ №9, этап 2/3. Совпадение по cosine similarity > 90%."""
+    __tablename__ = "ai_semantic_cache"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String, index=True)
+    prompt_text = Column(Text, default="")
+    prompt_embedding = Column(_EmbeddingType)
+    response_text = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AIUsageLimits(Base):
+    """Трекинг дневных лимитов запросов к LLM — ТЗ №9, этап 2."""
+    __tablename__ = "ai_usage_limits"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String, index=True)
+    date = Column(Date, default=lambda: datetime.utcnow().date(), index=True)
+    requests_count = Column(Integer, default=0)
+
+    __table_args__ = (
+        UniqueConstraint('server_id', 'date', name='uq_ai_usage_server_date'),
+    )
 
 
 class Member(Base):

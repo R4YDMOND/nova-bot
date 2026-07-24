@@ -14,8 +14,9 @@ from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, AC
 from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows
 from ranking.cache import cache as _shared_cache
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
-from moderation_engine import ModerationEngine
+from moderation_engine import ModerationEngine, ModerationResult
 from commands_engine import get_commands_engine
+import ai_engine
 from fastapi.responses import PlainTextResponse
 from typing import Optional
 from auth_utils import (
@@ -174,6 +175,7 @@ async def _handle_vk_message_event(
 # Временное хранилище PKCE code_verifier (ключ = state)
 vk_pkce_store: dict = {}
 LOLKA_BOT_BASE_URL = "https://lolka.app/api/bot/v10"
+AI_DAILY_LIMIT = int(os.getenv("AI_DAILY_LIMIT", "200"))  # ТЗ №9: лимит запросов к LLM/сутки для виджета
 LOLKA_GATEWAY_URL = "wss://lolka.app/ws/bot"
 
 lolka_gateway_instance = None
@@ -689,12 +691,17 @@ def get_ai_settings(server_id: str = Query("default")):
             return {"settings": {
                 "botName": "Нова", "personality": "friendly",
                 "temperature": 0.7, "maxLength": 500,
-                "useEmoji": True, "systemPrompt": "Ты — дружелюбный AI-помощник."
+                "useEmoji": True, "systemPrompt": "Ты — дружелюбный AI-помощник.",
+                "provider": "gigachat", "contextSize": 5, "cacheEnabled": True,
+                "moderationEnabled": False, "moderationThreshold": 70, "toolGrantRoles": False,
             }}
-        
+
         return {"settings": {
             "botName": ai.bot_name, "personality": ai.personality,
-            "temperature": ai.temperature, "systemPrompt": ai.system_prompt or ""
+            "temperature": ai.temperature, "systemPrompt": ai.system_prompt or "",
+            "provider": ai.provider or "gigachat", "contextSize": ai.context_size,
+            "cacheEnabled": ai.cache_enabled, "moderationEnabled": ai.moderation_enabled,
+            "moderationThreshold": ai.moderation_threshold, "toolGrantRoles": ai.tool_grant_roles,
         }}
     except Exception as e:
         return {"error": str(e)}
@@ -716,16 +723,115 @@ def save_ai_settings(data: dict):
         if not ai:
             ai = AISettings(server_id=server.id)
             db.add(ai)
-        
+
         ai.bot_name = data.get("botName", "Нова")
         ai.personality = data.get("personality", "friendly")
         ai.temperature = data.get("temperature", 0.7)
         ai.system_prompt = data.get("systemPrompt", "")
-        
+        # ── ТЗ №9 ──
+        if data.get("provider") in ai_engine.PROVIDERS:
+            ai.provider = data.get("provider")
+        ai.context_size = max(0, min(20, int(data.get("contextSize", ai.context_size or 5))))
+        ai.cache_enabled = bool(data.get("cacheEnabled", ai.cache_enabled))
+        ai.moderation_enabled = bool(data.get("moderationEnabled", ai.moderation_enabled))
+        ai.moderation_threshold = max(0, min(100, int(data.get("moderationThreshold", ai.moderation_threshold or 70))))
+        ai.tool_grant_roles = bool(data.get("toolGrantRoles", ai.tool_grant_roles))
+
         db.commit()
         return {"status": "saved"}
     except Exception as e:
         db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.get("/api/ai/usage")
+def get_ai_usage(server_id: str = Query("default")):
+    """Виджет "Лимиты API" (ТЗ №9, этап 5.4)."""
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        if not server:
+            return {"used": 0, "limit": AI_DAILY_LIMIT}
+        used = ai_engine.get_usage_today(db, server_id)
+        return {"used": used, "limit": AI_DAILY_LIMIT}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/ai/playground")
+def ai_playground(data: dict):
+    """Тестирование промпта админом (ТЗ №9, этап 5.3 / п.10.3)."""
+    server_id = data.get("server_id", "default")
+    message = (data.get("message") or "").strip()
+    if not message:
+        return {"error": "Пустое сообщение"}
+
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        ai = db.query(AISettings).filter(AISettings.server_id == server.id).first() if server else None
+
+        provider = data.get("provider") or (ai.provider if ai else "gigachat")
+        temperature = data.get("temperature", ai.temperature if ai else 0.7)
+        system_prompt = data.get("systemPrompt", ai.system_prompt if ai else "") or ""
+
+        rendered_system = ai_engine.build_system_prompt(
+            system_prompt,
+            user_name=data.get("userName", "Тестовый пользователь"),
+            server_name=server.name if server else "",
+            channel_name=data.get("channelName", "playground"),
+        )
+        router = ai_engine.LLMRouter(provider)
+        try:
+            reply, used_provider = router.chat(
+                [{"role": "system", "content": rendered_system}, {"role": "user", "content": message}],
+                temperature=float(temperature),
+            )
+        except ai_engine.LLMError as e:
+            return {"error": f"Все провайдеры недоступны: {e}"}
+
+        if server:
+            ai_engine.increment_usage(db, server_id)
+
+        return {"reply": reply, "provider": used_provider, "systemPrompt": rendered_system}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/ai/process-url")
+def ai_process_url(data: dict):
+    """Парсинг и перевод/пересказ контента по URL (ТЗ №9, этап 3.5 / п.10.3)."""
+    url = (data.get("url") or "").strip()
+    server_id = data.get("server_id", "default")
+    if not url or not re.match(r'^https?://', url):
+        return {"error": "Некорректный URL"}
+
+    page_text = ai_engine.fetch_page_text(url)
+    if not page_text:
+        return {"result": "Не удалось прочитать содержимое страницы"}
+
+    if ai_engine.contains_forbidden_topics(page_text):
+        return {"error": "Содержимое страницы затрагивает запрещённую тематику"}
+
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == server_id).first()
+        ai = db.query(AISettings).filter(AISettings.server_id == server.id).first() if server else None
+        provider = data.get("provider") or (ai.provider if ai else "gigachat")
+        try:
+            result = ai_engine.translate_or_summarize(page_text, provider)
+        except ai_engine.LLMError as e:
+            return {"error": f"Все провайдеры недоступны: {e}"}
+        if server:
+            ai_engine.increment_usage(db, server_id)
+        return {"result": result}
+    except Exception as e:
         return {"error": str(e)}
     finally:
         db.close()
@@ -3527,8 +3633,22 @@ async def vk_callback(request: Request):
                 except Exception:
                     pass
 
-            # 3. Проверяем движком
+            # 3. Проверяем движком (Level 1 — локальные правила)
             result = _moderation_engine.check_message(from_id, text, config)
+
+            # 3.1 Level 2 (AI) — ТЗ №9, этап 4: если Level 1 не сработал, но текст "подозрителен",
+            # и в настройках AI включена AI-модерация — оцениваем токсичность через LLMRouter.
+            if not result and text and _moderation_engine.is_suspicious(text):
+                ai_settings_row = db.query(AISettings).filter(AISettings.server_id == conn.server_id).first()
+                if ai_settings_row and ai_settings_row.moderation_enabled:
+                    toxicity = ai_engine.check_toxicity(text, ai_settings_row.provider or "gigachat")
+                    if toxicity["score"] >= ai_settings_row.moderation_threshold:
+                        result = ModerationResult(
+                            "delete",
+                            f"AI-модерация: токсичность {toxicity['score']}% (тематики: {', '.join(toxicity['topics']) or '—'})",
+                            "aiModeration",
+                        )
+
             if result:
                 service = get_vk_service(conn.access_token)
                 action_result = service.moderate_message(
