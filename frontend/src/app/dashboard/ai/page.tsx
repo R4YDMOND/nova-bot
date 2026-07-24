@@ -45,7 +45,7 @@ const DEFAULT: AISettings = {
   deepseekEnabled: true, deepseekTemperature: 0.7, deepseekStyle: 'creative', deepseekCustomPrompt: '',
   useContext: true, contextMessages: 10, systemPrompt: 'Ты — дружелюбный AI-помощник. Отвечай на русском языке. 🤖',
   autoModeration: false, serverName: '', platform: 'VK', avatarStyle: 'nova', avatarUrl: '',
-  provider: 'gigachat', contextSize: 5, cacheEnabled: true,
+  provider: 'yandexgpt', contextSize: 5, cacheEnabled: true,
   moderationEnabled: false, moderationThreshold: 70, toolGrantRoles: false,
 };
 

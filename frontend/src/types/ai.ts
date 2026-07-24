@@ -1,6 +1,6 @@
 // ТЗ №9: Доработка страницы AI — типы для мультипровайдерных настроек, RAG, кэша, модерации.
 
-export type AIProvider = 'gigachat' | 'yandexgpt' | 'deepseek' | 'openrouter';
+export type AIProvider = 'yandexgpt' | 'deepseek' | 'openrouter';
 
 export interface AISettings {
   botName: string;
@@ -16,7 +16,6 @@ export interface AISettings {
 }
 
 export const PROVIDERS: { value: AIProvider; label: string }[] = [
-  { value: 'gigachat', label: '🇷🇺 GigaChat' },
   { value: 'yandexgpt', label: '☁️ YandexGPT' },
   { value: 'deepseek', label: '🧠 DeepSeek' },
   { value: 'openrouter', label: '🔀 OpenRouter' },

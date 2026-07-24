@@ -1,7 +1,7 @@
 """
 backend/ai_engine.py — ТЗ №9: Доработка страницы AI.
 
-Ядро: мультипровайдерный LLM-роутер с failover (GigaChat / YandexGPT / DeepSeek / OpenRouter),
+Ядро: мультипровайдерный LLM-роутер с failover (YandexGPT / DeepSeek / OpenRouter),
 контекстная память (RAG), семантический кэш (эмбеддинги через OpenRouter), Function Calling
 (выдача ролей), AI-оценка токсичности (для двухуровневой автомодерации), парсинг и перевод
 контента по URL.
@@ -14,7 +14,6 @@ backend/ai_engine.py — ТЗ №9: Доработка страницы AI.
 import os
 import re
 import json
-import time
 import math
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
@@ -43,7 +42,7 @@ _FORBIDDEN_TOPICS_RE = re.compile(
     re.IGNORECASE
 )
 
-PROVIDERS = ["gigachat", "yandexgpt", "deepseek", "openrouter"]
+PROVIDERS = ["yandexgpt", "deepseek", "openrouter"]
 
 
 class LLMError(Exception):
@@ -72,46 +71,6 @@ def build_system_prompt(user_system_prompt: str, **variables) -> str:
 
 
 # ==================== Адаптеры провайдеров (интерфейс AIProvider: chat / generate_json) ====================
-
-_gigachat_token_cache: Dict[str, Any] = {"token": None, "expires_at": 0}
-
-
-def _call_gigachat(messages: List[Dict[str, str]], temperature: float, max_tokens: int) -> str:
-    auth_key = os.getenv("GIGACHAT_AUTH_KEY", "")
-    if not auth_key:
-        raise LLMError("GIGACHAT_AUTH_KEY не настроен", status_code=None)
-
-    now = time.time()
-    if not _gigachat_token_cache["token"] or now >= _gigachat_token_cache["expires_at"]:
-        try:
-            resp = requests.post(
-                "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
-                headers={
-                    "Authorization": f"Basic {auth_key}",
-                    "RqUID": os.urandom(16).hex(),
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                data={"scope": os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")},
-                verify=False, timeout=10,
-            )
-            if not resp.ok:
-                raise LLMError(f"GigaChat OAuth error: {resp.status_code}", status_code=resp.status_code)
-            data = resp.json()
-            _gigachat_token_cache["token"] = data.get("access_token")
-            _gigachat_token_cache["expires_at"] = now + 25 * 60  # токен живёт 30 мин, обновляем раньше
-        except requests.RequestException as e:
-            raise LLMError(f"GigaChat OAuth network error: {e}")
-
-    resp = requests.post(
-        "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
-        headers={"Authorization": f"Bearer {_gigachat_token_cache['token']}", "Content-Type": "application/json"},
-        json={"model": "GigaChat", "messages": messages, "temperature": temperature, "max_tokens": max_tokens},
-        verify=False, timeout=20,
-    )
-    if not resp.ok:
-        raise LLMError(f"GigaChat error: {resp.status_code}", status_code=resp.status_code)
-    return resp.json()["choices"][0]["message"]["content"].strip()
-
 
 def _call_yandexgpt(messages: List[Dict[str, str]], temperature: float, max_tokens: int) -> str:
     api_key = os.getenv("YANDEXGPT_API_KEY", "")
@@ -167,7 +126,6 @@ def _call_openrouter(messages: List[Dict[str, str]], temperature: float, max_tok
 
 
 _ADAPTERS = {
-    "gigachat": _call_gigachat,
     "yandexgpt": _call_yandexgpt,
     "deepseek": _call_deepseek,
     "openrouter": _call_openrouter,
@@ -177,9 +135,9 @@ _ADAPTERS = {
 class LLMRouter:
     """Маршрутизатор с автопереключением: при 429/403 (или недоступности ключа) — следующий провайдер."""
 
-    def __init__(self, preferred_provider: str = "gigachat"):
+    def __init__(self, preferred_provider: str = "yandexgpt"):
         if preferred_provider not in PROVIDERS:
-            preferred_provider = "gigachat"
+            preferred_provider = "yandexgpt"
         self.pool = [preferred_provider] + [p for p in PROVIDERS if p != preferred_provider]
 
     def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7,
@@ -354,7 +312,7 @@ def increment_usage(db: Session, server_id: str) -> int:
 
 # ==================== Оценка токсичности (для двухуровневой автомодерации) ====================
 
-def check_toxicity(text: str, provider: str = "gigachat") -> Dict[str, Any]:
+def check_toxicity(text: str, provider: str = "yandexgpt") -> Dict[str, Any]:
     """Возвращает {"score": 0-100, "topics": [...]}. При ошибке провайдера — score=0 (не блокируем)."""
     router = LLMRouter(provider)
     prompt = (
@@ -402,7 +360,7 @@ def contains_forbidden_topics(text: str) -> bool:
     return bool(_FORBIDDEN_TOPICS_RE.search(text or ""))
 
 
-def translate_or_summarize(page_text: str, provider: str = "gigachat") -> str:
+def translate_or_summarize(page_text: str, provider: str = "yandexgpt") -> str:
     router = LLMRouter(provider)
     prompt = (
         "Переведи на русский язык (если текст не на русском) и кратко перескажи содержимое "

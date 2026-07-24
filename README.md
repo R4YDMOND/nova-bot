@@ -22,13 +22,14 @@ npm run dev
 ## AI-ассистент: настройка LLM-провайдеров
 
 Раздел `/dashboard/ai` использует мультипровайдерный роутер (`backend/ai_engine.py`) с автоматическим
-переключением между GigaChat, YandexGPT, DeepSeek и OpenRouter при достижении лимитов (`429`) или
-блокировке (`403`). Активный провайдер выбирается в UI, резервные — заполняются по мере доступности
-ключей в `.env`.
+переключением между YandexGPT, DeepSeek и OpenRouter при достижении лимитов (`429`) или блокировке
+(`403`). Активный провайдер выбирается в UI, резервные — заполняются по мере доступности ключей в
+`.env`. GigaChat в пул намеренно не включён: его API требует отключения проверки TLS-сертификата
+(сертификат НУЦ Минцифры не входит в системные доверенные корни) — риск MITM и нестабильности на
+хостинге вне РФ перевешивает выгоду ещё одного бесплатного провайдера.
 
 | Провайдер | Переменные | Где получить |
 |---|---|---|
-| GigaChat | `GIGACHAT_AUTH_KEY`, `GIGACHAT_SCOPE` | [developers.sber.ru/portal/products/gigachat-api](https://developers.sber.ru/portal/products/gigachat-api) — создать проект, скопировать Authorization key (Base64) из личного кабинета |
 | YandexGPT | `YANDEXGPT_API_KEY`, `YANDEXGPT_FOLDER_ID` | [Yandex Cloud Console](https://console.cloud.yandex.ru/) → сервисный аккаунт с ролью `ai.languageModels.user` → API-ключ; `folder_id` — из настроек каталога |
 | DeepSeek | `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
 | OpenRouter | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | [openrouter.ai/keys](https://openrouter.ai/keys). Используется также для эмбеддингов (семантический кэш) — модель `openai/text-embedding-3-small` (1536 dim), отдельного ключа для этого не нужно |
@@ -80,10 +81,12 @@ Community-токен сообщества (`VK_ACCESS_TOKEN` для форвар
 
 ### Семантический кэш и RAG (pgvector)
 
-На проде (Supabase) перед первым запуском нужно один раз включить расширение `pgvector` —
-см. `backend/migrations/001_ai_rag_pgvector.sql`. Таблицы `ai_memory`, `ai_semantic_cache`,
-`ai_usage_limits` создаются автоматически при старте backend'а. На локальной SQLite-БД эти
-функции тоже работают (эмбеддинги хранятся как TEXT, cosine similarity считается в Python).
+На проде (Supabase) расширение `pgvector` включается автоматически при старте backend'а
+(`_ensure_pgvector_extension()` в `backend/database.py`); ручной шаг из
+`backend/migrations/001_ai_rag_pgvector.sql` больше не обязателен. Таблицы `ai_memory`,
+`ai_semantic_cache`, `ai_usage_limits` тоже создаются автоматически. На локальной SQLite-БД
+эти функции работают в упрощённом режиме (эмбеддинги хранятся как TEXT, cosine similarity
+считается в Python).
 
 ## Nova Points: пассивный фарм, ежедневный бонус, магазин ролей
 

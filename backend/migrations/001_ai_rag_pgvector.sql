@@ -1,9 +1,13 @@
 -- ТЗ №9: Доработка страницы AI — RAG / семантический кэш / лимиты API.
--- Выполнить вручную один раз в Supabase SQL Editor ДО первого запуска бэкенда с новой версией.
+--
+-- ⚠️ Начиная с backend/database.py::_ensure_pgvector_extension() (см. коммит "fix: автосоздание
+-- расширения pgvector на старте"), расширение включается автоматически при каждом старте backend'а.
+-- Этот файл больше не обязателен к ручному запуску — оставлен как справочный/аварийный вариант
+-- (например, если у роли БД в Supabase нет прав на CREATE EXTENSION и нужно попросить это сделать
+-- администратора вручную через SQL Editor).
 --
 -- Таблицы ai_memory / ai_semantic_cache / ai_usage_limits создаются автоматически
--- backend'ом при старте (SQLAlchemy Base.metadata.create_all в database.py), но
--- расширение pgvector Supabase не создаёт сам — это нужно сделать здесь.
+-- backend'ом при старте (SQLAlchemy Base.metadata.create_all в database.py).
 
 CREATE EXTENSION IF NOT EXISTS vector;
 

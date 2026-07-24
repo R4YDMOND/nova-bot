@@ -52,7 +52,7 @@ class AISettings(Base):
     temperature = Column(Float, default=0.7)
     system_prompt = Column(Text, default="")
     # ── ТЗ №9: LLM-роутер, RAG, кэш, модерация, function calling ──
-    provider = Column(String, default="gigachat")          # gigachat | yandexgpt | deepseek | openrouter
+    provider = Column(String, default="yandexgpt")          # yandexgpt | deepseek | openrouter
     context_size = Column(Integer, default=5)               # размер контекста RAG (0-20 сообщений)
     cache_enabled = Column(Boolean, default=True)            # семантический кэш ответов
     moderation_enabled = Column(Boolean, default=False)      # AI AutoMod (уровень 2)

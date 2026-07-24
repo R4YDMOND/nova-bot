@@ -270,7 +270,7 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
             if not result and text and _moderation_engine.is_suspicious(text):
                 ai_settings_row = db.query(AISettings).filter(AISettings.server_id == conn.server_id).first()
                 if ai_settings_row and ai_settings_row.moderation_enabled:
-                    toxicity = ai_engine.check_toxicity(text, ai_settings_row.provider or "gigachat")
+                    toxicity = ai_engine.check_toxicity(text, ai_settings_row.provider or "yandexgpt")
                     if toxicity["score"] >= ai_settings_row.moderation_threshold:
                         result = ModerationResult(
                             "delete",
@@ -1023,14 +1023,14 @@ def get_ai_settings(server_id: str = Query("default")):
                 "botName": "Нова", "personality": "friendly",
                 "temperature": 0.7, "maxLength": 500,
                 "useEmoji": True, "systemPrompt": "Ты — дружелюбный AI-помощник.",
-                "provider": "gigachat", "contextSize": 5, "cacheEnabled": True,
+                "provider": "yandexgpt", "contextSize": 5, "cacheEnabled": True,
                 "moderationEnabled": False, "moderationThreshold": 70, "toolGrantRoles": False,
             }}
 
         return {"settings": {
             "botName": ai.bot_name, "personality": ai.personality,
             "temperature": ai.temperature, "systemPrompt": ai.system_prompt or "",
-            "provider": ai.provider or "gigachat", "contextSize": ai.context_size,
+            "provider": ai.provider or "yandexgpt", "contextSize": ai.context_size,
             "cacheEnabled": ai.cache_enabled, "moderationEnabled": ai.moderation_enabled,
             "moderationThreshold": ai.moderation_threshold, "toolGrantRoles": ai.tool_grant_roles,
         }}
@@ -1106,7 +1106,7 @@ def ai_playground(data: dict):
         server = db.query(Server).filter(Server.server_id == server_id).first()
         ai = db.query(AISettings).filter(AISettings.server_id == server.id).first() if server else None
 
-        provider = data.get("provider") or (ai.provider if ai else "gigachat")
+        provider = data.get("provider") or (ai.provider if ai else "yandexgpt")
         temperature = data.get("temperature", ai.temperature if ai else 0.7)
         system_prompt = data.get("systemPrompt", ai.system_prompt if ai else "") or ""
 
@@ -1154,7 +1154,7 @@ def ai_process_url(data: dict):
     try:
         server = db.query(Server).filter(Server.server_id == server_id).first()
         ai = db.query(AISettings).filter(AISettings.server_id == server.id).first() if server else None
-        provider = data.get("provider") or (ai.provider if ai else "gigachat")
+        provider = data.get("provider") or (ai.provider if ai else "yandexgpt")
         try:
             result = ai_engine.translate_or_summarize(page_text, provider)
         except ai_engine.LLMError as e:
