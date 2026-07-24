@@ -3565,6 +3565,34 @@ async def vk_callback(request: Request):
                         cmd_config = json.loads(cmd_config_row.config)
                     except (json.JSONDecodeError, TypeError):
                         cmd_config = {}
+
+                def _bump_command_usage(name: str) -> None:
+                    """usageCount в том же JSON ModuleConfig 'commands' — без новой таблицы
+                    (см. lolka_gateway._increment_command_usage, идентичная логика для VK)."""
+                    nonlocal cmd_config_row
+                    builtin = cmd_config.get("builtin") or []
+                    custom = cmd_config.get("custom") or []
+                    found = False
+                    for entry in builtin + custom:
+                        if entry.get("name") == name:
+                            entry["usageCount"] = int(entry.get("usageCount") or 0) + 1
+                            found = True
+                            break
+                    if not found:
+                        builtin.append({"name": name, "usageCount": 1})
+                    cmd_config["builtin"] = builtin
+                    cmd_config["custom"] = custom
+                    try:
+                        if cmd_config_row:
+                            cmd_config_row.config = json.dumps(cmd_config)
+                        else:
+                            cmd_config_row = ModuleConfig(server_id=conn.server_id, module_name="commands", is_enabled=True, config=json.dumps(cmd_config))
+                            db.add(cmd_config_row)
+                        db.commit()
+                    except Exception as e:
+                        print(f"⚠️ VK: не удалось залогировать использование команды '{name}': {e}")
+                        db.rollback()
+
                 reply = _commands_engine.execute(
                     text=text,
                     platform="vk",
@@ -3572,6 +3600,7 @@ async def vk_callback(request: Request):
                     user_id=from_id,
                     commands_config=cmd_config,
                     vk_managers=_get_vk_managers_cached(conn.access_token, conn.group_id),
+                    on_usage=_bump_command_usage,
                 )
                 if reply:
                     try:

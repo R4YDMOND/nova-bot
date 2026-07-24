@@ -77,6 +77,7 @@ export interface BuiltinOverride {
   ignoredRoles: string[];
   allowedChannels: string[];
   ignoredChannels: string[];
+  usageCount?: number;            // пишет backend при выполнении (log_usage), UI только читает
 }
 
 export interface CustomCommand {
@@ -97,6 +98,7 @@ export interface CustomCommand {
   response: string;
   enabled: boolean;
   logUsage: boolean;
+  usageCount?: number;            // пишет backend при выполнении (log_usage), UI только читает
   showInHelp: boolean;
   createdAt: string;
 }

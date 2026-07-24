@@ -237,11 +237,14 @@ function clearSessionAndRedirect() {
   }
 }
 
-async function apiFetch<T>(path: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
+async function apiFetch<T>(path: string, options: RequestInit = {}, _isRetry = false, _wakeRetry = false): Promise<T> {
   const controller = new AbortController();
-  // 30с вместо 10с — free-план Render "засыпает" и просыпается 30-50с (см. риски в
-  // Концепции визуального оформления, раздел "Ограничения Free-плана").
-  const timeout = setTimeout(() => controller.abort(), 30_000);
+  // Free-план Render "засыпает" и просыпается 30-50с (см. риски в Концепции визуального
+  // оформления, раздел "Ограничения Free-плана"). Первая попытка — 45с, при таймауте/сетевой
+  // ошибке — один тихий автоповтор с 60с (см. catch ниже), чтобы пользователь не видел alert
+  // на каждое случайное "заснувший сервер".
+  const timeoutMs = _wakeRetry ? 60_000 : 45_000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const token = typeof getAccessToken === "function" ? getAccessToken() : "";
@@ -278,6 +281,13 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, _isRetry = f
 
     return (await res.json()) as T;
   } catch (error) {
+    const isTimeoutOrNetwork = (error as Error).name === "AbortError" || (error as Error).message === "Failed to fetch";
+    // Тихий автоповтор только на таймаут/обрыв сети (типично — холодный старт), не на реальные
+    // ошибки валидации/сервера (4xx/5xx с телом) — те должны сразу дойти до пользователя.
+    if (isTimeoutOrNetwork && !_wakeRetry) {
+      clearTimeout(timeout);
+      return apiFetch<T>(path, options, _isRetry, true);
+    }
     if ((error as Error).name === "AbortError") {
       throw new Error("Превышено время ожидания");
     }

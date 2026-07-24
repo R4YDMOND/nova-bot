@@ -14,6 +14,7 @@ import { PlatformIcon } from '@/components/PlatformIcon';
 import { cn } from '@/lib/utils';
 import { CommandModal } from './CommandModal';
 import { RoleMultiSelect, ChannelMultiSelect } from '@/components/ranking/RankingFormControls';
+import { useToast } from '@/hooks/use-toast';
 import {
   BUILTIN_COMMANDS, BuiltinOverride, CATEGORY_LABELS, Category, CommandsConfig,
   CustomCommand, EMPTY_CONFIG, PERMISSION_LABELS, Permission, Platform,
@@ -27,7 +28,7 @@ const VK_PERMISSION_OPTIONS: Permission[] = ['all', 'moderator', 'editor', 'admi
 
 const MODULE_NAME = 'commands';
 type Server = DashboardServer;
-type SortKey = 'name_asc' | 'name_desc' | 'created';
+type SortKey = 'name_asc' | 'name_desc' | 'created' | 'popularity';
 
 // Единая карточка для рендера — и встроенная, и пользовательская команда.
 interface ViewCommand {
@@ -46,6 +47,7 @@ interface ViewCommand {
   ignoredChannels: string[];
   enabled: boolean;
   createdAt?: string;
+  usageCount: number;
   custom?: CustomCommand;
   builtinOverride?: BuiltinOverride;
 }
@@ -58,6 +60,7 @@ function hasAccessRestriction(c: ViewCommand, platform: Platform): boolean {
 
 export default function CommandsPage() {
   const { servers, selectedServer, selectedServerId, selectServer, loading: serverLoading } = useServer();
+  const { toast, ToastContainer } = useToast();
   const [platformFilter, setPlatformFilter] = useState<Platform>('vk');
   const [config, setConfig] = useState<CommandsConfig>(EMPTY_CONFIG);
   const [loading, setLoading] = useState(true);
@@ -140,7 +143,7 @@ export default function CommandsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      alert('❌ Не удалось сохранить изменения\n🌐 Сервер бота мог «заснуть» (free-план) — подождите немного и повторите переключение');
+      toast('Не удалось сохранить изменения — сервер бота не отвечает (уже после повторной попытки), попробуйте через минуту', 'error');
     } finally {
       setSaving(false);
     }
@@ -169,6 +172,7 @@ export default function CommandsPage() {
           allowedRoles: override?.allowedRoles ?? [], ignoredRoles: override?.ignoredRoles ?? [],
           allowedChannels: override?.allowedChannels ?? [], ignoredChannels: override?.ignoredChannels ?? [],
           enabled: override?.enabled ?? true,
+          usageCount: override?.usageCount ?? 0,
           builtinOverride: override,
         };
       });
@@ -179,7 +183,7 @@ export default function CommandsPage() {
         category: c.category, platforms: c.platforms, cooldown: c.cooldown, permission: c.permission,
         allowedRoles: c.allowedRoles, ignoredRoles: c.ignoredRoles,
         allowedChannels: c.allowedChannels, ignoredChannels: c.ignoredChannels,
-        enabled: c.enabled, createdAt: c.createdAt, custom: c,
+        enabled: c.enabled, createdAt: c.createdAt, usageCount: c.usageCount ?? 0, custom: c,
       }));
     return [...builtins, ...customs];
   }, [config, platformFilter]);
@@ -193,6 +197,7 @@ export default function CommandsPage() {
     list = [...list].sort((a, b) => {
       if (sortKey === 'name_asc') return a.name.localeCompare(b.name);
       if (sortKey === 'name_desc') return b.name.localeCompare(a.name);
+      if (sortKey === 'popularity') return b.usageCount - a.usageCount;
       return (b.createdAt || '').localeCompare(a.createdAt || '');
     });
     return list;
@@ -344,6 +349,7 @@ export default function CommandsPage() {
             <select value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)} className="input cursor-pointer text-sm">
               <option value="name_asc">По имени (А-Я)</option>
               <option value="name_desc">По имени (Я-А)</option>
+              <option value="popularity">По популярности</option>
               <option value="created">По дате создания</option>
             </select>
           </div>
@@ -459,6 +465,9 @@ export default function CommandsPage() {
                   <div className="flex items-center gap-1.5 text-[rgb(var(--text-secondary))]">
                     <Globe className="w-3.5 h-3.5" /> Платформы: {previewCmd.platforms.map(p => p === 'vk' ? 'VK' : 'Lolka').join(', ')}
                   </div>
+                  {previewCmd.usageCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-[rgb(var(--text-secondary))]">📊 Использований: {previewCmd.usageCount}</div>
+                  )}
                 </div>
 
                 {previewCmd.custom?.params && (
@@ -574,6 +583,7 @@ export default function CommandsPage() {
           <Save className="w-4 h-4 animate-pulse" /> Сохранение...
         </div>
       )}
+      <ToastContainer />
     </div>
   );
 }

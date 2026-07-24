@@ -43,7 +43,7 @@ In-memory кэш кулдаунов (без Redis — free-план), TTL сбр
 
 import time
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 # Единственные встроенные команды с реальным текстовым ответом
 # (совпадает с тем, что уже было в lolka_gateway.COMMAND_RESPONSES).
@@ -245,8 +245,17 @@ class CommandsEngine:
         channel_id: Any = None,
         member_roles: Optional[List[str]] = None,
         vk_managers: Optional[Dict[str, Dict[str, Any]]] = None,
+        on_usage: Optional[Callable[[str], None]] = None,
     ) -> Optional[str]:
-        """Возвращает текст ответа бота или None (команда не найдена/недоступна)."""
+        """
+        Возвращает текст ответа бота или None (команда не найдена/недоступна).
+        on_usage(name) вызывается синхронно при УСПЕШНОМ выполнении команды с
+        включённым log_usage (флаг "Логировать использование" в конструкторе/встроенных
+        командах) — движок сам не пишет в БД (остаётся без знания о SQLAlchemy/сессиях),
+        решение о том, как и куда логировать, остаётся за вызывающей стороной
+        (main.py/lolka_gateway.py). Исключения из on_usage проглатываются — сбой логирования
+        не должен ломать ответ пользователю.
+        """
         m = self.match(text, platform, commands_config)
         if not m:
             return None
@@ -263,6 +272,12 @@ class CommandsEngine:
 
         if not self._check_cooldown(server_id, platform, user_id, m.name, m.cooldown):
             return None
+
+        if m.log_usage and on_usage:
+            try:
+                on_usage(m.name)
+            except Exception:
+                pass
 
         return m.response
 

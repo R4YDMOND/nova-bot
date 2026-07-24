@@ -167,6 +167,7 @@ class LolkaGateway:
                 commands_config=self._load_commands_config(server_id) if server_id else {},
                 channel_id=channel_id,
                 member_roles=member.get("roles"),
+                on_usage=(lambda name: self._increment_command_usage(server_id, name)) if server_id else None,
             )
             if reply:
                 await self.send_message(channel_id, reply)
@@ -286,6 +287,61 @@ class LolkaGateway:
                 return json.loads(row.config)
             except (json.JSONDecodeError, TypeError):
                 return {}
+        finally:
+            db.close()
+
+    @staticmethod
+    def _increment_command_usage(server_id: str, name: str) -> None:
+        """
+        Логирование использования команды (ТЗ №7, критерий 9.3) — без новой таблицы
+        (см. обоснование отказа от BotCommand/CommandUsage в «Выполненные действия»):
+        счётчик usageCount хранится в том же JSON ModuleConfig 'commands', что и остальные
+        настройки страницы. Read-modify-write без блокировок — при редких одновременных
+        вызовах одной команды возможна погрешность в 1 (некритично для счётчика в UI).
+        """
+        from database import SessionLocal
+        from models import ModuleConfig
+
+        db = SessionLocal()
+        try:
+            row = db.query(ModuleConfig).filter(
+                ModuleConfig.server_id == int(server_id),
+                ModuleConfig.module_name == "commands",
+            ).first()
+            try:
+                config = json.loads(row.config) if row and row.config else {}
+            except (json.JSONDecodeError, TypeError):
+                config = {}
+            builtin = config.get("builtin") or []
+            custom = config.get("custom") or []
+
+            found = False
+            for entry in builtin:
+                if entry.get("name") == name:
+                    entry["usageCount"] = int(entry.get("usageCount") or 0) + 1
+                    found = True
+                    break
+            if not found:
+                for entry in custom:
+                    if entry.get("name") == name:
+                        entry["usageCount"] = int(entry.get("usageCount") or 0) + 1
+                        found = True
+                        break
+            if not found:
+                # Встроенная команда без override — создаём запись только со счётчиком
+                builtin.append({"name": name, "usageCount": 1})
+
+            config["builtin"] = builtin
+            config["custom"] = custom
+            if row:
+                row.config = json.dumps(config)
+            else:
+                row = ModuleConfig(server_id=int(server_id), module_name="commands", is_enabled=True, config=json.dumps(config))
+                db.add(row)
+            db.commit()
+        except Exception as e:
+            print(f"⚠️ LOLKA: не удалось залогировать использование команды '{name}': {e}")
+            db.rollback()
         finally:
             db.close()
 
