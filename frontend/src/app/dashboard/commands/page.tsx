@@ -109,17 +109,22 @@ export default function CommandsPage() {
 
   useEffect(() => {
     if (!effectiveServer || effectiveServer.platform !== 'lolka') return;
+    // ВАЖНО: сюда нужен внешний guild_id Lolka (effectiveServer.server_id), а не внутренний
+    // ID сервера в БД (effectiveServerId/effectiveServer.id) — /api/lolka/roles и
+    // /api/lolka/channels пересылают server_id напрямую в реальный Lolka API как ID гильдии,
+    // без резолва через БД (в отличие от /api/settings/modules).
+    const guildId = effectiveServer.server_id;
     setLolkaRolesLoading(true);
-    api.ranking.getRoles(String(effectiveServerId))
+    api.ranking.getRoles(guildId)
       .then(res => { if (res.error) setLolkaRolesError(res.error); else setLolkaRoles(res.roles || []); })
       .catch(() => setLolkaRolesError('Не удалось загрузить роли'))
       .finally(() => setLolkaRolesLoading(false));
     setLolkaChannelsLoading(true);
-    api.ranking.getChannels(String(effectiveServerId), 'lolka')
+    api.ranking.getChannels(guildId, 'lolka')
       .then(res => { if (res.error) setLolkaChannelsError(res.error); else setLolkaChannels(res.channels || []); })
       .catch(() => setLolkaChannelsError('Не удалось загрузить каналы'))
       .finally(() => setLolkaChannelsLoading(false));
-  }, [effectiveServer, effectiveServerId]);
+  }, [effectiveServer]);
 
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingConfig = useRef<CommandsConfig | null>(null);
