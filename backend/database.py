@@ -61,7 +61,28 @@ def _run_light_migrations():
                     print(f"MIGRATE WARNING: {table.name}.{column.name} — {e}")
 
 
+def _ensure_pgvector_extension():
+    """
+    ТЗ №9 (AI RAG/семантический кэш): столбцы ai_memory.message_embedding и
+    ai_semantic_cache.prompt_embedding используют тип pgvector VECTOR(1536).
+    Supabase не включает расширение pgvector по умолчанию — раньше это требовало
+    ручного 'CREATE EXTENSION vector;' в Supabase SQL Editor ДО деплоя (см.
+    migrations/001_ai_rag_pgvector.sql), из-за чего Base.metadata.create_all() ниже
+    падал с (psycopg2.errors.UndefinedObject) type "vector" does not exist и бэкенд
+    не запускался вообще. Теперь создаём расширение автоматически при каждом старте.
+    """
+    if not DATABASE_URL.startswith("postgresql"):
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        print("OK: pgvector extension готово")
+    except Exception as e:
+        print(f"MIGRATE WARNING: не удалось создать расширение pgvector — {e}")
+
+
 def init_db():
+    _ensure_pgvector_extension()
     Base.metadata.create_all(bind=engine)
     _run_light_migrations()
     db_type = "PostgreSQL" if DATABASE_URL.startswith("postgresql") else "SQLite"
