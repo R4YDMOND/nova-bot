@@ -940,14 +940,16 @@ export default function RankingPage() {
       {activeTab === 'nova-points' && (
         <div className="space-y-6">
           <p className="text-sm text-[rgb(var(--text-secondary))] -mt-1">
-            Независимая от XP система репутации — участники отмечают ценный вклад друг друга (ТЗ №5 Rev.7, п.3.1)
+            Отдельная система репутации. Nova Points позволяют участникам отмечать ценный вклад друг друга независимо от уровня и XP.
           </p>
 
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold">🌟 Включить Nova Points</h3>
-                <p className="text-xs text-[rgb(var(--text-secondary))] mt-0.5">Без включения выдача NP отклоняется API (см. проверку на бэкенде)</p>
+                <h3 className="font-semibold flex items-center gap-1.5">
+                  🌟 Включить Nova Points
+                  <Hint text="Выдача Nova Points невозможна, если система выключена" />
+                </h3>
               </div>
               <Switch checked={formData.np_enabled ?? settings?.np_enabled ?? false} onCheckedChange={val => updateField('np_enabled', val)} />
             </div>

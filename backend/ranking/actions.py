@@ -14,6 +14,7 @@ from models import Member
 ACTION_PROFILE = "nova_profile"
 ACTION_LEADERBOARD = "nova_leaderboard"
 ACTION_CLOSE = "nova_close"
+ACTION_NP_GIVE = "nova_points_give"
 
 
 def get_profile_summary(server_id: str, platform: str, user_id: str) -> str:
@@ -74,6 +75,21 @@ def resolve_action(payload) -> Optional[str]:
     if isinstance(payload, str):
         try:
             return (json.loads(payload) or {}).get("nova_action")
+        except (json.JSONDecodeError, AttributeError):
+            return None
+    return None
+
+
+def resolve_receiver_id(payload) -> Optional[str]:
+    """Достаёт receiver_id (кому выдаётся Nova Point), встроенный в payload кнопки
+    при рендере шаблона для конкретного участника (см. ranking/template.py,
+    render_message_template, параметр target_user_id) — только для ACTION_NP_GIVE."""
+    import json
+    if isinstance(payload, dict):
+        return payload.get("receiver_id")
+    if isinstance(payload, str):
+        try:
+            return (json.loads(payload) or {}).get("receiver_id")
         except (json.JSONDecodeError, AttributeError):
             return None
     return None

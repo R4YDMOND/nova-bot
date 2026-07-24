@@ -10,7 +10,9 @@ import websockets
 
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
-from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, get_profile_summary, get_leaderboard_text
+from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text
+from ranking.nova_points import give_nova_point
+from database import SessionLocal
 from commands_engine import get_commands_engine
 
 _commands_engine = get_commands_engine()
@@ -229,6 +231,7 @@ class LolkaGateway:
                     xp=result.get("xp"),
                     next_level_xp=result.get("next_level_xp"),
                     rank=result.get("rank"),
+                    target_user_id=str(user_id),
                 )
                 await self.send_message(
                     target_channel_id, rendered["content"],
@@ -294,7 +297,9 @@ class LolkaGateway:
     async def on_interaction_create(self, data: dict):
         """
         Обрабатывает клик по кнопке (type: 3 = MESSAGE_COMPONENT) — предустановленные
-        действия редактора шаблонов (вкладка «Компоненты»): Профиль/Топ/Закрыть.
+        действия редактора шаблонов (вкладка «Компоненты»): Профиль/Топ/Закрыть/Дать Nova
+        Point. Для select-меню (component_type == 3) действие берётся из выбранного
+        значения опции (values[0]), а не из custom_id самого селекта.
         Ответить нужно в течение 3 секунд (см. Документация по ботам в Lolka.md).
         """
         if data.get("type") != 3:
@@ -306,6 +311,15 @@ class LolkaGateway:
             return
 
         custom_id = ((data.get("data") or {}).get("custom_id")) or ""
+        component_type = (data.get("data") or {}).get("component_type")
+        if component_type == 3:
+            # Select Menu (выпадающий список, ТЗ №5 Rev.9, Этап 2.1): значение выбранной
+            # опции — то же действие, что и у кнопок (см. BUTTON_ACTIONS во frontend), а не
+            # сам custom_id селекта. Обрабатываем как effective_id вместо custom_id кнопки.
+            values = (data.get("data") or {}).get("values") or []
+            effective_id = values[0] if values else ""
+        else:
+            effective_id = custom_id
         guild_id = data.get("guild_id")
         member = data.get("member") or {}
         user = member.get("user") or data.get("user") or {}
@@ -314,22 +328,32 @@ class LolkaGateway:
         server_id = self._resolve_server_id(str(guild_id)) if guild_id else None
 
         try:
-            if custom_id == ACTION_PROFILE and server_id and user_id:
+            if effective_id == ACTION_PROFILE and server_id and user_id:
                 text = get_profile_summary(server_id, "lolka", str(user_id))
                 # flags: 64 = ephemeral — сообщение видит только нажавший (аналог VK show_snackbar)
                 await self._interaction_callback(interaction_id, interaction_token, 4, {"content": text, "flags": 64})
 
-            elif custom_id == ACTION_LEADERBOARD and server_id:
+            elif effective_id == ACTION_LEADERBOARD and server_id:
                 text = get_leaderboard_text(server_id, "lolka")
                 await self._interaction_callback(interaction_id, interaction_token, 4, {"content": text})
 
-            elif custom_id == ACTION_CLOSE:
+            elif effective_id == ACTION_CLOSE:
                 await self._interaction_callback(interaction_id, interaction_token, 6, {})  # тихий ack
                 message = data.get("message") or {}
                 channel_id = data.get("channel_id") or message.get("channel_id")
                 message_id = message.get("id")
                 if channel_id and message_id:
                     await self._delete_message(channel_id, message_id)
+
+            elif effective_id.startswith(f"{ACTION_NP_GIVE}:") and server_id and user_id:
+                receiver_id = effective_id.split(":", 1)[1]
+                db = SessionLocal()
+                try:
+                    np_result = give_nova_point(db, server_id, "lolka", str(user_id), receiver_id)
+                finally:
+                    db.close()
+                text = "⭐ +1 Nova Point!" if np_result.get("status") == "ok" else np_result.get("error", "Не удалось выдать Nova Point")
+                await self._interaction_callback(interaction_id, interaction_token, 4, {"content": text, "flags": 64})
 
             else:
                 await self._interaction_callback(interaction_id, interaction_token, 6, {})

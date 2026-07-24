@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate, NovaPoint
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
-from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, get_profile_summary, get_leaderboard_text, resolve_action
+from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text, resolve_action, resolve_receiver_id
 from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows
 from ranking.cache import cache as _shared_cache
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
@@ -96,6 +96,7 @@ async def _award_xp_and_notify_vk(
                 xp=result.get("xp"),
                 next_level_xp=result.get("next_level_xp"),
                 rank=result.get("rank"),
+                target_user_id=str(user_id),
             )
             service.send_message(peer_id=target_peer_id, message=rendered["message"] or " ", keyboard=rendered.get("keyboard"))
         else:
@@ -151,6 +152,19 @@ async def _handle_vk_message_event(
                 # VK не передаёт conversation_message_id для клавиатур беседы —
                 # без него не определить, какое сообщение удалять (см. VK - Документация.md).
                 service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить сообщение для удаления"})
+
+        elif action == ACTION_NP_GIVE:
+            receiver_id = resolve_receiver_id(payload)
+            if not receiver_id:
+                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить получателя"})
+            else:
+                db = SessionLocal()
+                try:
+                    np_result = give_nova_point(db, server_id, "vk", str(user_id), receiver_id)
+                finally:
+                    db.close()
+                text = "⭐ +1 Nova Point!" if np_result.get("status") == "ok" else np_result.get("error", "Не удалось выдать Nova Point")
+                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
 
         else:
             service.answer_message_event(event_id, user_id, peer_id)

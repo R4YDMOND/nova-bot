@@ -67,6 +67,10 @@ def render_notify_template(
 _LOLKA_BUTTON_STYLE = {"primary": 1, "secondary": 2, "success": 3, "danger": 4, "link": 5}
 _VK_BUTTON_COLOR = {"primary": "primary", "secondary": "secondary", "success": "positive", "danger": "negative", "link": "primary"}
 
+# Действие "Выдать Nova Point" (frontend/src/types/ranking.ts, BUTTON_ACTIONS) — единственное
+# действие кнопки/select-опции, которому нужен получатель (см. ranking/actions.py, ACTION_NP_GIVE).
+_ACTION_NP_GIVE = "nova_points_give"
+
 
 def render_message_template(
     template: Dict[str, Any],
@@ -78,6 +82,7 @@ def render_message_template(
     xp: Optional[int] = None,
     next_level_xp: Optional[int] = None,
     rank: Optional[int] = None,
+    target_user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Рендерит структурированный MessageTemplate (см. frontend/src/types/ranking.ts)
     под конкретную платформу.
@@ -160,7 +165,10 @@ def render_message_template(
             if b.get("style") == "link" and b.get("url"):
                 btn["url"] = b["url"]
             else:
-                btn["custom_id"] = b.get("custom_id") or b.get("id", "")
+                custom_id = b.get("custom_id") or b.get("id", "")
+                if custom_id == _ACTION_NP_GIVE and target_user_id:
+                    custom_id = f"{_ACTION_NP_GIVE}:{target_user_id}"
+                btn["custom_id"] = custom_id
             rows.setdefault(int(b.get("row", 0)), []).append(btn)
         for row_key in sorted(rows):
             result["components"].append({"type": 1, "components": rows[row_key]})
@@ -180,7 +188,11 @@ def render_message_template(
                     "options": [
                         {
                             "label": sub(o.get("label", "")),
-                            "value": o.get("value", ""),
+                            "value": (
+                                f"{_ACTION_NP_GIVE}:{target_user_id}"
+                                if o.get("value") == _ACTION_NP_GIVE and target_user_id
+                                else o.get("value", "")
+                            ),
                             "description": sub(o.get("description", "")) or None,
                         }
                         for o in options
@@ -215,7 +227,11 @@ def render_message_template(
                 # callback (а не text) — клик придёт как message_event, который
                 # реально обрабатывается ботом (см. ranking/actions.py); "text"
                 # просто отправил бы payload как обычное сообщение от пользователя.
-                action = {"type": "callback", "label": label, "payload": json.dumps({"nova_action": b.get("custom_id") or "nova_profile"})}
+                custom_id = b.get("custom_id") or "nova_profile"
+                vk_payload: Dict[str, Any] = {"nova_action": custom_id}
+                if custom_id == _ACTION_NP_GIVE and target_user_id:
+                    vk_payload["receiver_id"] = target_user_id
+                action = {"type": "callback", "label": label, "payload": json.dumps(vk_payload)}
             vk_rows.setdefault(int(b.get("row", 0)), []).append({
                 "action": action,
                 "color": _VK_BUTTON_COLOR.get(b.get("style", "primary"), "primary"),

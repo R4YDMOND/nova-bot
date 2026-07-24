@@ -123,12 +123,13 @@ export type ButtonStyle = 'primary' | 'secondary' | 'success' | 'danger' | 'link
 // Предустановленные действия кнопки (не-Link стили) — единственное, что реально
 // обрабатывается ботом на VK/Lolka. Свободный custom_id убран умышленно: бот не
 // выполняет произвольный код по нажатию, только эти три безопасных действия.
-export type ButtonAction = 'nova_profile' | 'nova_leaderboard' | 'nova_close';
+export type ButtonAction = 'nova_profile' | 'nova_leaderboard' | 'nova_close' | 'nova_points_give';
 
 export const BUTTON_ACTIONS: { value: ButtonAction; label: string }[] = [
   { value: 'nova_profile', label: '👤 Профиль' },
   { value: 'nova_leaderboard', label: '🏆 Топ участников' },
   { value: 'nova_close', label: '✕ Закрыть сообщение' },
+  { value: 'nova_points_give', label: '🌟 Дать Nova Point' },
 ];
 
 export interface MessageButton {

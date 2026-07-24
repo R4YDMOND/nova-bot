@@ -77,6 +77,19 @@ const BUTTON_STYLES: { value: ButtonStyle; label: string; className: string }[] 
   { value: 'link', label: 'Link', className: 'bg-transparent border border-[rgb(var(--border))] text-[rgb(var(--text))]' },
 ];
 
+/** Цвета превью для платформы VK — те же категории стилей (Primary/Secondary/Success/
+ * Danger), что и в Lolka, но собственная палитра VK-клавиатур (см. _VK_BUTTON_COLOR
+ * в backend/ranking/template.py: primary/secondary/positive/negative). Раньше превью
+ * VK всегда рисовалось одним нейтральным классом независимо от b.style — кнопка
+ * визуально «залипала» на один цвет при смене стиля. */
+const VK_BUTTON_STYLES: Record<ButtonStyle, string> = {
+  primary: 'bg-blue-500 text-white',
+  secondary: 'bg-[rgb(var(--surface-3))] text-[rgb(var(--text))] border border-[rgb(var(--border))]',
+  success: 'bg-emerald-500 text-white',
+  danger: 'bg-red-500 text-white',
+  link: 'bg-blue-500 text-white',
+};
+
 let uidCounter = 0;
 const uid = () => `${Date.now().toString(36)}${(uidCounter++).toString(36)}`;
 
@@ -267,7 +280,7 @@ export function MessageTemplateModal({
   const addSelectMenu = () => setSelectMenu({ id: uid(), placeholder: 'Выберите вариант', min_values: 1, max_values: 1, options: [], row: 0 });
   const addSelectOption = () => {
     if (!selectMenu || selectMenu.options.length >= LIMITS.maxSelectOptions) return;
-    setSelectMenu({ ...selectMenu, options: [...selectMenu.options, { label: '', value: '', description: '', emoji: '' }] });
+    setSelectMenu({ ...selectMenu, options: [...selectMenu.options, { label: '', value: 'nova_profile', description: '', emoji: '' }] });
   };
   const updateSelectOption = (i: number, patch: Partial<{ label: string; value: string; description: string; emoji: string }>) => {
     if (!selectMenu) return;
@@ -592,7 +605,10 @@ export function MessageTemplateModal({
                     ) : (
                     <>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-sm font-medium">Выпадающий список</label>
+                      <label className="text-sm font-medium flex items-center gap-1.5">
+                        Выпадающий список
+                        <Hint text="Выбор опции участником выполняет то же предустановленное действие, что и у кнопок: показать профиль, топ участников, закрыть сообщение или выдать Nova Point" />
+                      </label>
                       {selectMenu ? (
                         <button onClick={() => setSelectMenu(undefined)} className="text-xs text-red-400 hover:text-red-300">Удалить</button>
                       ) : (
@@ -623,7 +639,9 @@ export function MessageTemplateModal({
                         {selectMenu.options.map((o, i) => (
                           <div key={i} className="p-2 bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-lg grid grid-cols-2 gap-1.5">
                             <input type="text" value={o.label} onChange={e => updateSelectOption(i, { label: e.target.value })} placeholder="Label" className="input text-sm" />
-                            <input type="text" value={o.value} onChange={e => updateSelectOption(i, { value: e.target.value })} placeholder="Value" className="input text-sm" />
+                            <select value={o.value || 'nova_profile'} onChange={e => updateSelectOption(i, { value: e.target.value })} className="input text-sm">
+                              {BUTTON_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                            </select>
                             <input type="text" value={o.description} onChange={e => updateSelectOption(i, { description: e.target.value })} placeholder="Описание" className="input text-sm" />
                             <div className="flex gap-1.5">
                               <input type="text" value={o.emoji} onChange={e => updateSelectOption(i, { emoji: e.target.value })} placeholder="Emoji" className="input text-sm flex-1" />
@@ -664,9 +682,9 @@ export function MessageTemplateModal({
                         const rowButtons = draft.buttons.filter(b => b.row === row);
                         if (rowButtons.length === 0) return null;
                         return (
-                          <div key={row} className="flex gap-1.5 mt-2 flex-wrap">
+                          <div key={`vk-row-${row}`} className="flex gap-1.5 mt-2 flex-wrap">
                             {rowButtons.map(b => (
-                              <span key={b.id} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-white">
+                              <span key={`vk-${b.id}-${b.style}`} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${VK_BUTTON_STYLES[b.style]}`}>
                                 {b.emoji ? `${b.emoji} ` : ''}{b.label || 'Кнопка'}
                               </span>
                             ))}
@@ -723,7 +741,7 @@ export function MessageTemplateModal({
                         {rowButtons.map(b => {
                           const style = BUTTON_STYLES.find(s => s.value === b.style)!;
                           return (
-                            <span key={b.id} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${style.className}`}>
+                            <span key={`lolka-${b.id}-${b.style}`} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${style.className}`}>
                               {b.emoji ? `${b.emoji} ` : ''}{b.label || 'Кнопка'}
                             </span>
                           );
