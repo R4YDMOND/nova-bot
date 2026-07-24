@@ -7,13 +7,14 @@ import logging
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal, get_db
 from sqlalchemy.orm import Session
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate, NovaPoint
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate, NovaPoint, ShopItem
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text, resolve_action, resolve_receiver_id
-from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows
+from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows, claim_daily, list_shop_items, buy_shop_item
 from ranking.cache import cache as _shared_cache
-from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
+from ranking import np_farm_cache
+from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service, VKLongPollListener
 from moderation_engine import ModerationEngine, ModerationResult
 from commands_engine import get_commands_engine
 import ai_engine
@@ -167,10 +168,291 @@ async def _handle_vk_message_event(
                 text = "⭐ +1 Nova Point!" if np_result.get("status") == "ok" else np_result.get("error", "Не удалось выдать Nova Point")
                 service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
 
+        elif action == "shop_buy":
+            item_id = _resolve_shop_item_id(payload)
+            if not item_id:
+                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить товар"})
+            else:
+                db = SessionLocal()
+                try:
+                    buy_result = buy_shop_item(db, server_id, "vk", str(user_id), item_id)
+                finally:
+                    db.close()
+                if buy_result.get("status") == "ok":
+                    text = f"✅ Куплено: {buy_result.get('role_name') or buy_result.get('role_id')} (-{buy_result.get('price')} NP). На VK роль выдаётся вручную — API сообщества не поддерживает назначение ролей участникам."
+                else:
+                    text = buy_result.get("error", "Не удалось купить товар")
+                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
+
         else:
             service.answer_message_event(event_id, user_id, peer_id)
     except Exception as e:
         logger.error(f"VK message_event handling error: {e}")
+
+
+def _resolve_shop_item_id(payload) -> Optional[int]:
+    """Достаёт item_id из payload кнопки магазина (см. _vk_build_shop_keyboard)."""
+    if isinstance(payload, dict):
+        raw = payload.get("item_id")
+    elif isinstance(payload, str):
+        try:
+            raw = (json.loads(payload) or {}).get("item_id")
+        except (json.JSONDecodeError, AttributeError):
+            raw = None
+    else:
+        raw = None
+    try:
+        return int(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _vk_build_shop_keyboard(items) -> str:
+    """Инлайн-клавиатура VK для /shop — по одной кнопке-товару в ряд (см. VK - Документация.md,
+    формат callback-кнопок; тот же payload-паттерн, что и nova_action в template.py)."""
+    buttons = []
+    for it in items:
+        label = f"{(it.role_name or it.role_id)} — {it.price} NP"[:40]
+        payload = json.dumps({"nova_action": "shop_buy", "item_id": it.id}, ensure_ascii=False)
+        buttons.append([{"action": {"type": "callback", "label": label, "payload": payload}, "color": "primary"}])
+    return json.dumps({"inline": True, "buttons": buttons}, ensure_ascii=False)
+
+async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, Any]) -> None:
+    """
+    Общая обработка события VK (message_new / message_event / group_join / group_leave).
+    Структура событий Bots Long Poll API идентична Callback API (см. VK - Документация.md),
+    поэтому эта функция вызывается и из вебхука /api/vk/callback, и из VKLongPollListener
+    (см. startup(), vk_bot_service.py) — единая точка логики модерации/AI-модерации/команд/
+    XP/Nova Points для обоих способов доставки событий VK.
+    Открывает собственную сессию БД, т.к. может вызываться вне HTTP-запроса (Long Poll).
+    """
+    db = SessionLocal()
+    try:
+        # ── Message new (автомодерация + XP) ─────────────────────────────
+        if event_type == "message_new":
+            message = obj.get("message", {})
+
+            msg_id = message.get("id")
+            peer_id = message.get("peer_id")
+            from_id = message.get("from_id")
+            text = message.get("text", "")
+
+            # 1. Логируем получение
+            log_event = ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="message_received",
+                title=f"Сообщение от {from_id}",
+                description=text[:200],
+                target_user_id=str(from_id) if from_id else "",
+                target_message_id=str(msg_id) if msg_id else "",
+            )
+            db.add(log_event)
+            db.commit()
+
+            # 2. Загружаем конфиг автомодерации
+            mod_config_row = db.query(ModuleConfig).filter(
+                ModuleConfig.server_id == conn.server_id,
+                ModuleConfig.module_name == "moderation"
+            ).first()
+            config = {}
+            if mod_config_row and mod_config_row.config:
+                try:
+                    config = json.loads(mod_config_row.config)
+                except Exception:
+                    pass
+
+            # 3. Проверяем движком (Level 1 — локальные правила)
+            result = _moderation_engine.check_message(from_id, text, config)
+
+            # 3.1 Level 2 (AI) — ТЗ №9, этап 4: если Level 1 не сработал, но текст "подозрителен",
+            # и в настройках AI включена AI-модерация — оцениваем токсичность через LLMRouter.
+            if not result and text and _moderation_engine.is_suspicious(text):
+                ai_settings_row = db.query(AISettings).filter(AISettings.server_id == conn.server_id).first()
+                if ai_settings_row and ai_settings_row.moderation_enabled:
+                    toxicity = ai_engine.check_toxicity(text, ai_settings_row.provider or "gigachat")
+                    if toxicity["score"] >= ai_settings_row.moderation_threshold:
+                        result = ModerationResult(
+                            "delete",
+                            f"AI-модерация: токсичность {toxicity['score']}% (тематики: {', '.join(toxicity['topics']) or '—'})",
+                            "aiModeration",
+                        )
+
+            if result:
+                get_vk_service(conn.access_token).moderate_message(
+                    group_id=conn.group_id,
+                    message_id=msg_id,
+                    action=result.action,
+                    user_id=from_id,
+                    reason=result.reason,
+                )
+
+                # Логируем действие модерации
+                action_event = ModerationEvent(
+                    server_id=conn.server_id,
+                    platform="vk",
+                    type=f"{result.action}_message",
+                    title=result.reason,
+                    description=f"Правило: {result.rule}",
+                    target_user_id=str(from_id) if from_id else "",
+                    target_message_id=str(msg_id) if msg_id else "",
+                )
+                db.add(action_event)
+                db.commit()
+
+            # 4. Диспетчеризация текстовых команд (страница «Команды», ТЗ №7).
+            # Выполняется только если сообщение не было удалено автомодерацией выше.
+            if not result and from_id and text:
+                cmd_config_row = db.query(ModuleConfig).filter(
+                    ModuleConfig.server_id == conn.server_id,
+                    ModuleConfig.module_name == "commands",
+                ).first()
+                cmd_config = {}
+                if cmd_config_row and cmd_config_row.config:
+                    try:
+                        cmd_config = json.loads(cmd_config_row.config)
+                    except (json.JSONDecodeError, TypeError):
+                        cmd_config = {}
+
+                def _bump_command_usage(name: str) -> None:
+                    """usageCount в том же JSON ModuleConfig 'commands' — без новой таблицы
+                    (см. lolka_gateway._increment_command_usage, идентичная логика для VK)."""
+                    nonlocal cmd_config_row
+                    builtin = cmd_config.get("builtin") or []
+                    custom = cmd_config.get("custom") or []
+                    found = False
+                    for entry in builtin + custom:
+                        if entry.get("name") == name:
+                            entry["usageCount"] = int(entry.get("usageCount") or 0) + 1
+                            found = True
+                            break
+                    if not found:
+                        builtin.append({"name": name, "usageCount": 1})
+                    cmd_config["builtin"] = builtin
+                    cmd_config["custom"] = custom
+                    try:
+                        if cmd_config_row:
+                            cmd_config_row.config = json.dumps(cmd_config)
+                        else:
+                            cmd_config_row = ModuleConfig(server_id=conn.server_id, module_name="commands", is_enabled=True, config=json.dumps(cmd_config))
+                            db.add(cmd_config_row)
+                        db.commit()
+                    except Exception as e:
+                        print(f"⚠️ VK: не удалось залогировать использование команды '{name}': {e}")
+                        db.rollback()
+
+                reply = _commands_engine.execute(
+                    text=text,
+                    platform="vk",
+                    server_id=conn.server_id,
+                    user_id=from_id,
+                    commands_config=cmd_config,
+                    vk_managers=_get_vk_managers_cached(conn.access_token, conn.group_id),
+                    on_usage=_bump_command_usage,
+                )
+                if reply:
+                    try:
+                        get_vk_service(conn.access_token).send_message(peer_id=peer_id, message=reply)
+                    except VKAPIError as e:
+                        print(f"❌ VK event: ошибка отправки ответа команды — {e}")
+
+            # 5. Начисляем XP за сообщение и уведомляем о level-up (асинхронно)
+            if from_id:
+                asyncio.create_task(_award_xp_and_notify_vk(
+                    access_token=conn.access_token,
+                    server_id=str(conn.server_id),
+                    user_id=from_id,
+                    username=f"id{from_id}",
+                    message_text=text,
+                    peer_id=peer_id,
+                ))
+
+            # 6. Nova Points: пассивный фарм за сообщение (write-behind) + команды
+            # "ежедневный бонус" и "/shop" (ТЗ №5 Rev.9, п.11-12).
+            if from_id and text:
+                lower_text = text.strip().lower()
+                farm_settings = np_farm_cache.get_farm_settings(db, str(conn.server_id), "vk")
+                if farm_settings and farm_settings.np_enabled:
+                    if farm_settings.np_farm_enabled:
+                        np_farm_cache.register_message(
+                            str(conn.server_id), "vk", str(from_id),
+                            farm_settings.np_farm_min, farm_settings.np_farm_max,
+                        )
+                    if lower_text in ("ежедневный бонус", "/daily"):
+                        daily_result = claim_daily(db, str(conn.server_id), "vk", str(from_id))
+                        if daily_result.get("status") == "ok":
+                            reply_text = f"🎁 Ежедневный бонус: +{daily_result['amount']} Nova Points!"
+                            if daily_result.get("jackpot"):
+                                reply_text += " 🎉 ДЖЕКПОТ!"
+                        else:
+                            reply_text = daily_result.get("error", "Не удалось получить бонус")
+                        try:
+                            get_vk_service(conn.access_token).send_message(peer_id=peer_id, message=reply_text)
+                        except VKAPIError as e:
+                            print(f"❌ VK event: ошибка ответа на ежедневный бонус — {e}")
+                    elif lower_text == "/shop":
+                        items = list_shop_items(db, str(conn.server_id), "vk")
+                        try:
+                            if not items:
+                                get_vk_service(conn.access_token).send_message(
+                                    peer_id=peer_id,
+                                    message="🛒 Магазин пуст — администратор ещё не добавил роли на продажу",
+                                )
+                            else:
+                                lines = ["🛒 Магазин ролей:"] + [
+                                    f"• {it.role_name or it.role_id} — {it.price} NP" for it in items
+                                ]
+                                get_vk_service(conn.access_token).send_message(
+                                    peer_id=peer_id,
+                                    message="\n".join(lines),
+                                    keyboard=_vk_build_shop_keyboard(items),
+                                )
+                        except VKAPIError as e:
+                            print(f"❌ VK event: ошибка отправки /shop — {e}")
+
+        # ── Group join / leave ────────────────────────────────────────
+        elif event_type == "group_join":
+            user_id = obj.get("user_id")
+            db.add(ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="user_joined",
+                title=f"Пользователь {user_id} вступил в группу",
+                description="",
+                target_user_id=str(user_id) if user_id else "",
+            ))
+            db.commit()
+
+        elif event_type == "group_leave":
+            user_id = obj.get("user_id")
+            db.add(ModerationEvent(
+                server_id=conn.server_id,
+                platform="vk",
+                type="user_left",
+                title=f"Пользователь {user_id} покинул группу",
+                description="",
+                target_user_id=str(user_id) if user_id else "",
+            ))
+            db.commit()
+
+        # ── Message event (клик по callback-кнопке) ─────────────────────
+        elif event_type == "message_event":
+            asyncio.create_task(_handle_vk_message_event(
+                access_token=conn.access_token,
+                server_id=str(conn.server_id),
+                event_id=obj.get("event_id"),
+                user_id=obj.get("user_id"),
+                peer_id=obj.get("peer_id"),
+                conversation_message_id=obj.get("conversation_message_id"),
+                payload=obj.get("payload"),
+            ))
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"VK event processing error ({event_type}): {e}")
+    finally:
+        db.close()
+
 
 # Временное хранилище PKCE code_verifier (ключ = state)
 vk_pkce_store: dict = {}
@@ -305,11 +587,60 @@ async def startup():
     token = os.getenv("LOLKA_BOT_TOKEN", "")
     if token:
         from lolka_gateway import LolkaGateway
-        lolka_gateway_instance = LolkaGateway(token, LOLKA_GATEWAY_URL, LOLKA_BOT_BASE_URL)
+        lolka_gateway_instance = LolkaGateway(
+            token, LOLKA_GATEWAY_URL, LOLKA_BOT_BASE_URL,
+            client_id=os.getenv("LOLKA_CLIENT_ID", ""),
+        )
         asyncio.create_task(lolka_gateway_instance.run_forever())
         print("OK: Lolka Gateway task запущена")
     else:
         print("INFO: LOLKA_BOT_TOKEN не задан — Gateway не подключается")
+
+    _start_vk_long_poll_listeners()
+    asyncio.create_task(np_farm_cache.flush_loop())
+    print("OK: NP farm flush task запущена")
+
+
+def _start_vk_long_poll_listeners():
+    """
+    Запускает VKLongPollListener для каждого активного VK-подключения, у которого
+    не настроен Callback API (webhook_secret не задан) — Long Poll используется как
+    альтернативный способ доставки событий, не требующий публичного HTTPS URL
+    (удобно для тестового сообщества nova_bot_official и локальной разработки).
+    Подключения с уже настроенным Callback API webhook не трогаем, чтобы события
+    не обрабатывались дважды (ТЗ №5 Rev.9, п.10.1 "VK API Setup").
+    """
+    db = SessionLocal()
+    try:
+        connections = db.query(VKConnection).filter(VKConnection.is_active == True).all()
+    finally:
+        db.close()
+
+    started = 0
+    for conn in connections:
+        if conn.webhook_secret:
+            continue  # Callback API уже настроен для этого сообщества — Long Poll не запускаем
+
+        access_token = conn.access_token
+        group_id = conn.group_id
+        conn_id = conn.id
+
+        async def _on_event(event_type: str, obj: Dict[str, Any], _conn_id: int = conn_id) -> None:
+            db2 = SessionLocal()
+            try:
+                fresh_conn = db2.query(VKConnection).get(_conn_id)
+            finally:
+                db2.close()
+            if fresh_conn and fresh_conn.is_active:
+                await _process_vk_event(fresh_conn, event_type, obj)
+
+        listener = VKLongPollListener(get_vk_service(access_token), group_id, _on_event)
+        asyncio.create_task(listener.run_forever())
+        started += 1
+        print(f"OK: VK Long Poll task запущена для group_id={group_id}")
+
+    if started == 0:
+        print("INFO: активных VK-подключений без Callback API не найдено — Long Poll не запускается")
 
 @app.head("/")
 @app.get("/")
@@ -3053,6 +3384,77 @@ def api_get_nova_points_top(server_id: str = Query(...), platform: str = Query("
         db.close()
 
 
+@app.get("/api/nova-points/shop")
+def api_list_shop_items(server_id: str = Query(...), platform: str = Query("lolka")):
+    """Список товаров магазина ролей (ТЗ №5 Rev.9, п.12)."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+        items = list_shop_items(db, str(server.id), platform)
+        return {"items": [
+            {"id": it.id, "role_id": it.role_id, "role_name": it.role_name, "price": it.price}
+            for it in items
+        ]}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/nova-points/shop")
+def api_create_shop_item(server_id: str = Query(...), platform: str = Query("lolka"), data: dict = None):
+    """Добавить роль в магазин. Тело: {"role_id": "...", "role_name"?: "...", "price": 100}."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        payload = data or {}
+        role_id = str(payload.get("role_id") or "")
+        price = int(payload.get("price") or 0)
+        if not role_id or price <= 0:
+            return {"error": "Укажите role_id и цену больше 0"}
+
+        item = ShopItem(
+            server_id=str(server.id), platform=platform,
+            role_id=role_id, role_name=str(payload.get("role_name") or ""), price=price,
+        )
+        db.add(item)
+        db.commit()
+        return {"status": "ok", "id": item.id}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.delete("/api/nova-points/shop/{item_id}")
+def api_delete_shop_item(item_id: int, server_id: str = Query(...), platform: str = Query("lolka")):
+    """Удалить товар магазина."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+        item = db.query(ShopItem).filter(
+            ShopItem.id == item_id, ShopItem.server_id == str(server.id), ShopItem.platform == platform,
+        ).first()
+        if not item:
+            return {"error": "Товар не найден"}
+        db.delete(item)
+        db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
 @app.post("/api/ranking/sync-members")
 def sync_ranking_members(server_id: str = Query(...), platform: str = Query("vk")):
     """
@@ -3597,195 +3999,9 @@ async def vk_callback(request: Request):
         if event_type == "confirmation":
             return PlainTextResponse(conn.confirmation_code or "ok")
 
-        # ── Message new (автомодерация + XP) ─────────────────────────────
-        if event_type == "message_new":
-            obj = body.get("object", {})
-            message = obj.get("message", {})
-
-            msg_id = message.get("id")
-            peer_id = message.get("peer_id")
-            from_id = message.get("from_id")
-            text = message.get("text", "")
-
-            # 1. Логируем получение
-            log_event = ModerationEvent(
-                server_id=conn.server_id,
-                platform="vk",
-                type="message_received",
-                title=f"Сообщение от {from_id}",
-                description=text[:200],
-                target_user_id=str(from_id) if from_id else "",
-                target_message_id=str(msg_id) if msg_id else "",
-            )
-            db.add(log_event)
-            db.commit()
-
-            # 2. Загружаем конфиг автомодерации
-            import json
-            mod_config_row = db.query(ModuleConfig).filter(
-                ModuleConfig.server_id == conn.server_id,
-                ModuleConfig.module_name == "moderation"
-            ).first()
-            config = {}
-            if mod_config_row and mod_config_row.config:
-                try:
-                    config = json.loads(mod_config_row.config)
-                except Exception:
-                    pass
-
-            # 3. Проверяем движком (Level 1 — локальные правила)
-            result = _moderation_engine.check_message(from_id, text, config)
-
-            # 3.1 Level 2 (AI) — ТЗ №9, этап 4: если Level 1 не сработал, но текст "подозрителен",
-            # и в настройках AI включена AI-модерация — оцениваем токсичность через LLMRouter.
-            if not result and text and _moderation_engine.is_suspicious(text):
-                ai_settings_row = db.query(AISettings).filter(AISettings.server_id == conn.server_id).first()
-                if ai_settings_row and ai_settings_row.moderation_enabled:
-                    toxicity = ai_engine.check_toxicity(text, ai_settings_row.provider or "gigachat")
-                    if toxicity["score"] >= ai_settings_row.moderation_threshold:
-                        result = ModerationResult(
-                            "delete",
-                            f"AI-модерация: токсичность {toxicity['score']}% (тематики: {', '.join(toxicity['topics']) or '—'})",
-                            "aiModeration",
-                        )
-
-            if result:
-                service = get_vk_service(conn.access_token)
-                action_result = service.moderate_message(
-                    group_id=conn.group_id,
-                    message_id=msg_id,
-                    action=result.action,
-                    user_id=from_id,
-                    reason=result.reason,
-                )
-
-                # Логируем действие модерации
-                action_event = ModerationEvent(
-                    server_id=conn.server_id,
-                    platform="vk",
-                    type=f"{result.action}_message",
-                    title=result.reason,
-                    description=f"Правило: {result.rule}",
-                    target_user_id=str(from_id) if from_id else "",
-                    target_message_id=str(msg_id) if msg_id else "",
-                )
-                db.add(action_event)
-                db.commit()
-
-            # 4. Диспетчеризация текстовых команд (страница «Команды», ТЗ №7).
-            # Выполняется только если сообщение не было удалено автомодерацией выше.
-            if not result and from_id and text:
-                cmd_config_row = db.query(ModuleConfig).filter(
-                    ModuleConfig.server_id == conn.server_id,
-                    ModuleConfig.module_name == "commands",
-                ).first()
-                cmd_config = {}
-                if cmd_config_row and cmd_config_row.config:
-                    try:
-                        cmd_config = json.loads(cmd_config_row.config)
-                    except (json.JSONDecodeError, TypeError):
-                        cmd_config = {}
-
-                def _bump_command_usage(name: str) -> None:
-                    """usageCount в том же JSON ModuleConfig 'commands' — без новой таблицы
-                    (см. lolka_gateway._increment_command_usage, идентичная логика для VK)."""
-                    nonlocal cmd_config_row
-                    builtin = cmd_config.get("builtin") or []
-                    custom = cmd_config.get("custom") or []
-                    found = False
-                    for entry in builtin + custom:
-                        if entry.get("name") == name:
-                            entry["usageCount"] = int(entry.get("usageCount") or 0) + 1
-                            found = True
-                            break
-                    if not found:
-                        builtin.append({"name": name, "usageCount": 1})
-                    cmd_config["builtin"] = builtin
-                    cmd_config["custom"] = custom
-                    try:
-                        if cmd_config_row:
-                            cmd_config_row.config = json.dumps(cmd_config)
-                        else:
-                            cmd_config_row = ModuleConfig(server_id=conn.server_id, module_name="commands", is_enabled=True, config=json.dumps(cmd_config))
-                            db.add(cmd_config_row)
-                        db.commit()
-                    except Exception as e:
-                        print(f"⚠️ VK: не удалось залогировать использование команды '{name}': {e}")
-                        db.rollback()
-
-                reply = _commands_engine.execute(
-                    text=text,
-                    platform="vk",
-                    server_id=conn.server_id,
-                    user_id=from_id,
-                    commands_config=cmd_config,
-                    vk_managers=_get_vk_managers_cached(conn.access_token, conn.group_id),
-                    on_usage=_bump_command_usage,
-                )
-                if reply:
-                    try:
-                        get_vk_service(conn.access_token).send_message(peer_id=peer_id, message=reply)
-                    except VKAPIError as e:
-                        print(f"❌ VK Callback: ошибка отправки ответа команды — {e}")
-
-            # 5. Начисляем XP за сообщение и уведомляем о level-up (асинхронно, чтобы не блокировать ответ VK)
-            if from_id:
-                asyncio.create_task(_award_xp_and_notify_vk(
-                    access_token=conn.access_token,
-                    server_id=str(conn.server_id),
-                    user_id=from_id,
-                    username=f"id{from_id}",
-                    message_text=text,
-                    peer_id=peer_id,
-                ))
-
-            # 6. Возвращаем OK ВКонтакте
-            return JSONResponse(content={"status": "ok"})
-
-        # ── Group join / leave ────────────────────────────────────────
-        if event_type == "group_join":
-            user_id = body.get("object", {}).get("user_id")
-            log_event = ModerationEvent(
-                server_id=conn.server_id,
-                platform="vk",
-                type="user_joined",
-                title=f"Пользователь {user_id} вступил в группу",
-                description="",
-                target_user_id=str(user_id) if user_id else "",
-            )
-            db.add(log_event)
-            db.commit()
-            return JSONResponse(content={"status": "ok"})
-
-        if event_type == "group_leave":
-            user_id = body.get("object", {}).get("user_id")
-            log_event = ModerationEvent(
-                server_id=conn.server_id,
-                platform="vk",
-                type="user_left",
-                title=f"Пользователь {user_id} покинул группу",
-                description="",
-                target_user_id=str(user_id) if user_id else "",
-            )
-            db.add(log_event)
-            db.commit()
-            return JSONResponse(content={"status": "ok"})
-
-        # ── Message event (клик по callback-кнопке — Профиль/Топ/Закрыть) ──
-        if event_type == "message_event":
-            obj = body.get("object", {})
-            asyncio.create_task(_handle_vk_message_event(
-                access_token=conn.access_token,
-                server_id=str(conn.server_id),
-                event_id=obj.get("event_id"),
-                user_id=obj.get("user_id"),
-                peer_id=obj.get("peer_id"),
-                conversation_message_id=obj.get("conversation_message_id"),
-                payload=obj.get("payload"),
-            ))
-            return JSONResponse(content={"status": "ok"})
-
-        # Для всех остальных типов — просто ок
+        # Единая обработка события — общая с VK Long Poll листенером (_process_vk_event),
+        # чтобы не дублировать логику модерации/AI/команд/XP/NP для двух способов доставки.
+        await _process_vk_event(conn, event_type, body.get("object", {}))
         return JSONResponse(content={"status": "ok"})
 
     except Exception as e:

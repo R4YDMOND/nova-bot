@@ -4,6 +4,7 @@ Gateway-клиент для собственного бота Nova в Lolka.
 """
 import asyncio
 import json
+import os
 import random
 from typing import Optional
 import websockets
@@ -11,7 +12,8 @@ import websockets
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text
-from ranking.nova_points import give_nova_point
+from ranking.nova_points import give_nova_point, claim_daily, list_shop_items, buy_shop_item
+from ranking import np_farm_cache
 from database import SessionLocal
 from commands_engine import get_commands_engine
 
@@ -55,10 +57,14 @@ BOT_INTENTS = (
 
 
 class LolkaGateway:
-    def __init__(self, token: str, gateway_url: str, api_base_url: str):
+    def __init__(self, token: str, gateway_url: str, api_base_url: str, client_id: str = ""):
         self.token = token
         self.gateway_url = gateway_url
         self.api_base_url = api_base_url
+        # application_id для followup-эндпоинтов /webhooks/{app.id}/{interaction.token}
+        # (см. "Документация по ботам в Lolka.md", раздел "Исходный ответ (@original)").
+        # Читается из LOLKA_CLIENT_ID (main.py:startup) или переопределяется из READY, если он есть в d.application.id.
+        self.application_id = client_id or os.getenv("LOLKA_CLIENT_ID", "")
         self.ws = None
         self.sequence = None
         self.session_id = None
@@ -134,6 +140,9 @@ class LolkaGateway:
         if op == 0:  # Dispatch
             if t == "READY":
                 self.session_id = (d or {}).get("session_id")
+                app_id = ((d or {}).get("application") or {}).get("id")
+                if app_id:
+                    self.application_id = str(app_id)
                 print("LOLKA GATEWAY: READY, session_id =", self.session_id)
             elif t == "MESSAGE_CREATE":
                 await self.on_message_create(d or {})
@@ -172,11 +181,68 @@ class LolkaGateway:
             if reply:
                 await self.send_message(channel_id, reply)
 
+            # Nova Points: ежедневный бонус /daily и магазин ролей /shop (ТЗ №5 Rev.9, п.11-12).
+            # Отдельно от commands_engine — эти команды требуют динамического ответа
+            # (случайная сумма, кнопки), а не фиксированного текста.
+            if server_id and author.get("id"):
+                lower = content.strip().lower()
+                if lower == "/daily":
+                    await self._handle_daily(channel_id, server_id, str(author["id"]))
+                elif lower == "/shop":
+                    await self._handle_shop(channel_id, server_id)
+
         # Начисление XP за сообщение + level-up уведомление (по аналогии с VK, см. main.py)
         user_id = author.get("id")
         if guild_id and user_id:
             username = author.get("global_name") or author.get("username") or str(user_id)
             await self._award_xp_and_notify(str(guild_id), str(user_id), username, content, channel_id)
+
+            # Пассивный фарм NP за сообщение (write-behind, ТЗ №5 Rev.9, п.11+15).
+            server_id_for_farm = self._resolve_server_id(str(guild_id))
+            if server_id_for_farm and content:
+                db = SessionLocal()
+                try:
+                    settings = np_farm_cache.get_farm_settings(db, server_id_for_farm, "lolka")
+                finally:
+                    db.close()
+                if settings and settings.np_enabled and settings.np_farm_enabled:
+                    np_farm_cache.register_message(
+                        server_id_for_farm, "lolka", str(user_id),
+                        settings.np_farm_min, settings.np_farm_max,
+                    )
+
+    async def _handle_daily(self, channel_id: str, server_id: str, user_id: str) -> None:
+        db = SessionLocal()
+        try:
+            result = claim_daily(db, server_id, "lolka", user_id)
+        finally:
+            db.close()
+        if result.get("status") == "ok":
+            text = f"🎁 Ежедневный бонус: +{result['amount']} Nova Points!"
+            if result.get("jackpot"):
+                text += " 🎉 ДЖЕКПОТ!"
+        else:
+            text = result.get("error", "Не удалось получить бонус")
+        await self.send_message(channel_id, text)
+
+    async def _handle_shop(self, channel_id: str, server_id: str) -> None:
+        db = SessionLocal()
+        try:
+            items = list_shop_items(db, server_id, "lolka")
+        finally:
+            db.close()
+        if not items:
+            await self.send_message(channel_id, "🛒 Магазин пуст — администратор ещё не добавил роли на продажу")
+            return
+        components = [{
+            "type": 1,
+            "components": [{
+                "type": 2, "style": 1,
+                "label": f"{(it.role_name or it.role_id)} — {it.price} NP"[:80],
+                "custom_id": f"shop_buy:{it.id}",
+            }],
+        } for it in items]
+        await self.send_message(channel_id, "🛒 Магазин ролей — выберите товар:", components=components)
 
     async def _award_xp_and_notify(
         self,
@@ -383,15 +449,22 @@ class LolkaGateway:
 
         server_id = self._resolve_server_id(str(guild_id)) if guild_id else None
 
+        # Действия, требующие обращения к БД (Профиль/Топ/NP/Магазин), сначала отвечают
+        # DEFERRED (type 5 — «бот думает…»), чтобы гарантированно уложиться в 3-секундный
+        # бюджет интеракции, а реальный текст досылается через PATCH @original (см.
+        # "Документация по ботам в Lolka.md", раздел "Исходный ответ (@original)"; ТЗ №5
+        # Rev.9, риск "Таймауты интеракций Lolka"). ACTION_CLOSE — мгновенное действие
+        # без содержимого, defer ему не нужен.
         try:
             if effective_id == ACTION_PROFILE and server_id and user_id:
+                await self._interaction_callback(interaction_id, interaction_token, 5, {"flags": 64})
                 text = get_profile_summary(server_id, "lolka", str(user_id))
-                # flags: 64 = ephemeral — сообщение видит только нажавший (аналог VK show_snackbar)
-                await self._interaction_callback(interaction_id, interaction_token, 4, {"content": text, "flags": 64})
+                await self._followup_edit_original(interaction_token, {"content": text})
 
             elif effective_id == ACTION_LEADERBOARD and server_id:
+                await self._interaction_callback(interaction_id, interaction_token, 5, {})
                 text = get_leaderboard_text(server_id, "lolka")
-                await self._interaction_callback(interaction_id, interaction_token, 4, {"content": text})
+                await self._followup_edit_original(interaction_token, {"content": text})
 
             elif effective_id == ACTION_CLOSE:
                 await self._interaction_callback(interaction_id, interaction_token, 6, {})  # тихий ack
@@ -402,6 +475,7 @@ class LolkaGateway:
                     await self._delete_message(channel_id, message_id)
 
             elif effective_id.startswith(f"{ACTION_NP_GIVE}:") and server_id and user_id:
+                await self._interaction_callback(interaction_id, interaction_token, 5, {"flags": 64})
                 receiver_id = effective_id.split(":", 1)[1]
                 db = SessionLocal()
                 try:
@@ -409,12 +483,68 @@ class LolkaGateway:
                 finally:
                     db.close()
                 text = "⭐ +1 Nova Point!" if np_result.get("status") == "ok" else np_result.get("error", "Не удалось выдать Nova Point")
-                await self._interaction_callback(interaction_id, interaction_token, 4, {"content": text, "flags": 64})
+                await self._followup_edit_original(interaction_token, {"content": text})
+
+            elif effective_id.startswith("shop_buy:") and server_id and user_id:
+                await self._interaction_callback(interaction_id, interaction_token, 5, {"flags": 64})
+                item_id_raw = effective_id.split(":", 1)[1]
+                try:
+                    item_id = int(item_id_raw)
+                except ValueError:
+                    item_id = None
+                if item_id is None:
+                    await self._followup_edit_original(interaction_token, {"content": "Не удалось определить товар"})
+                else:
+                    db = SessionLocal()
+                    try:
+                        buy_result = buy_shop_item(db, server_id, "lolka", str(user_id), item_id)
+                    finally:
+                        db.close()
+                    if buy_result.get("status") == "ok":
+                        await self._grant_role(guild_id, str(user_id), buy_result["role_id"])
+                        text = f"✅ Куплено: {buy_result.get('role_name') or buy_result.get('role_id')} (-{buy_result.get('price')} NP)"
+                    else:
+                        text = buy_result.get("error", "Не удалось купить товар")
+                    await self._followup_edit_original(interaction_token, {"content": text})
 
             else:
                 await self._interaction_callback(interaction_id, interaction_token, 6, {})
         except Exception as e:
             print(f"LOLKA GATEWAY: ошибка обработки интеракции — {e}")
+
+    async def _followup_edit_original(self, interaction_token: str, data: dict):
+        """
+        PATCH /webhooks/{app.id}/{interaction.token}/messages/@original — второй этап
+        ответа после DEFERRED (type 5): подставляет реальный контент вместо «бот думает…».
+        Авторизация — тем же interaction_token в URL, заголовок Authorization не нужен.
+        """
+        import requests
+        if not self.application_id:
+            print("LOLKA GATEWAY: не задан application_id (LOLKA_CLIENT_ID) — followup @original невозможен")
+            return
+        try:
+            requests.patch(
+                f"{self.api_base_url}/webhooks/{self.application_id}/{interaction_token}/messages/@original",
+                headers={"Content-Type": "application/json"},
+                json=data,
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка followup @original — {e}")
+
+    async def _grant_role(self, guild_id: Optional[str], user_id: str, role_id: str) -> None:
+        """PUT /guilds/{guild}/members/{user}/roles/{role} — выдача купленной в /shop роли (ТЗ №5 Rev.9, п.12)."""
+        if not guild_id:
+            return
+        import requests
+        try:
+            requests.put(
+                f"{self.api_base_url}/guilds/{guild_id}/members/{user_id}/roles/{role_id}",
+                headers={"Authorization": f"Bot {self.token}"},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка выдачи роли {role_id} участнику {user_id} — {e}")
 
     async def _interaction_callback(self, interaction_id: str, interaction_token: str, cb_type: int, data: dict):
         """POST /interactions/{id}/{token}/callback — авторизация самим interaction_token в URL."""

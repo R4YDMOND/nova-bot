@@ -13,11 +13,12 @@ VK Bot API Service — ТЗ №5
 Rate limit: 20 запросов в секунду на один токен (VK ограничение).
 """
 
+import asyncio
 import time
 import json
 import threading
 import requests
-from typing import Optional, List, Dict, Any
+from typing import Awaitable, Callable, Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
 VK_API_VERSION = "5.199"
@@ -300,6 +301,14 @@ class VKBotService:
         items = resp.get("items", [])
         return items[0] if items else {}
 
+    def get_long_poll_server(self, group_id: str) -> Dict[str, Any]:
+        """
+        groups.getLongPollServer — данные сессии Bots Long Poll API (server, key, ts).
+        Требует включённый Bots Long Poll API в настройках сообщества
+        (Управление → Дополнительно → Работа с API → Long Poll API → Включено).
+        """
+        return self._call("groups.getLongPollServer", {"group_id": group_id})
+
     def is_messages_allowed(self, group_id: str, user_id: int) -> bool:
         """Проверить, может ли бот писать пользователю."""
         resp = self._call("messages.isMessagesFromGroupAllowed", {
@@ -345,6 +354,100 @@ class VKBotService:
                 result["success"] = bool(self.ban_user(group_id, user_id, end_date=end, comment=reason))
 
         return result
+
+
+# ── Bots Long Poll API listener ─────────────────────────────────────────
+
+class VKLongPollListener:
+    """
+    Асинхронный цикл опроса Bots Long Poll API для одного сообщества
+    (см. VK - Документация.md, раздел "Bots Long Poll API").
+
+    Структура событий Long Poll идентична Callback API, поэтому события
+    ("message_new", "message_event", "group_join", "group_leave" и т.д.)
+    передаются в тот же обработчик, что и вебхук /api/vk/callback —
+    см. on_event (main.py: _process_vk_event), чтобы не дублировать логику
+    начисления XP, автомодерации и команд для двух способов доставки событий.
+
+    Используется как альтернатива Callback API — не требует публичного
+    HTTPS URL, поэтому удобна для тестового сообщества (nova_bot_official)
+    и локальной разработки. Запускается per-подключение в main.py:startup().
+    """
+
+    def __init__(
+        self,
+        service: "VKBotService",
+        group_id: str,
+        on_event: Callable[[str, Dict[str, Any]], Awaitable[None]],
+    ):
+        self.service = service
+        self.group_id = group_id
+        self.on_event = on_event
+        self._server: Optional[str] = None
+        self._key: Optional[str] = None
+        self._ts: Optional[str] = None
+
+    async def run_forever(self):
+        """Автопереподключение при обрыве связи (экспоненциальный backoff) — по аналогии с LolkaGateway."""
+        backoff = 5
+        while True:
+            try:
+                await self._init_session()
+                backoff = 5
+                await self._poll_loop()
+            except Exception as e:
+                print(f"VK LONG POLL [{self.group_id}]: ошибка сессии — {e}")
+            print(f"VK LONG POLL [{self.group_id}]: переподключение через {backoff} сек")
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 60)
+
+    async def _init_session(self):
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, self.service.get_long_poll_server, self.group_id)
+        self._server = data["server"]
+        self._key = data["key"]
+        self._ts = data["ts"]
+        print(f"VK LONG POLL [{self.group_id}]: сессия инициализирована (ts={self._ts})")
+
+    async def _poll_loop(self):
+        loop = asyncio.get_event_loop()
+        while True:
+            try:
+                resp = await loop.run_in_executor(None, self._fetch_updates)
+            except (requests.Timeout, requests.RequestException) as e:
+                print(f"VK LONG POLL [{self.group_id}]: сетевая ошибка опроса — {e}")
+                await asyncio.sleep(2)
+                continue
+
+            if "failed" in resp:
+                failed = resp["failed"]
+                if failed == 1:
+                    # История частично утеряна — продолжаем с новым ts, без пересоздания сессии.
+                    self._ts = resp.get("ts", self._ts)
+                    continue
+                if failed in (2, 3):
+                    # Ключ истёк / информация утрачена — запрашиваем новую сессию.
+                    await self._init_session()
+                    continue
+                raise VKAPIError(-1, f"Long Poll: неизвестный failed={failed}")
+
+            self._ts = resp.get("ts", self._ts)
+            for update in resp.get("updates", []):
+                event_type = update.get("type", "")
+                obj = update.get("object", {})
+                try:
+                    await self.on_event(event_type, obj)
+                except Exception as e:
+                    print(f"VK LONG POLL [{self.group_id}]: ошибка обработки события {event_type} — {e}")
+
+    def _fetch_updates(self) -> Dict[str, Any]:
+        """Выполняется в executor'е — requests.get блокирующий, wait=25 сек (см. VK - Документация.md)."""
+        resp = requests.get(
+            self._server,
+            params={"act": "a_check", "key": self._key, "ts": self._ts, "wait": 25},
+            timeout=30,
+        )
+        return resp.json()
 
 
 # ── Singleton factory ───────────────────────────────────────────────────

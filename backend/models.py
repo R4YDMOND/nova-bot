@@ -375,6 +375,19 @@ class RankingSettings(Base):
     np_cooldown_minutes = Column(Integer, default=10)   # кулдаун между парой giver→receiver
     np_daily_limit = Column(Integer, default=50)        # макс. NP в сутки на одного получателя
 
+    # Пассивный фарм NP за текстовые сообщения (ТЗ №5 Rev.9, п.11) — не чаще раза
+    # в минуту на пользователя (см. ranking/np_farm_cache.py), пишется в БД пачкой.
+    np_farm_enabled = Column(Boolean, default=False)
+    np_farm_min = Column(Integer, default=1)
+    np_farm_max = Column(Integer, default=5)
+
+    # Ежедневный бонус /daily (Lolka) и "ежедневный бонус" (VK) — ТЗ №5 Rev.9, п.11.
+    np_daily_enabled = Column(Boolean, default=False)
+    np_daily_min = Column(Integer, default=5)
+    np_daily_max = Column(Integer, default=20)
+    np_daily_jackpot_chance = Column(Integer, default=5)     # шанс джекпота, %
+    np_daily_jackpot_amount = Column(Integer, default=50)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
 
@@ -409,12 +422,29 @@ class NovaPoint(Base):
     monthly_points = Column(Integer, default=0)
     weekly_points = Column(Integer, default=0)
     last_received = Column(DateTime, nullable=True)
+    last_daily_claim = Column(DateTime, nullable=True)  # ТЗ №5 Rev.9, п.11 — ежедневный бонус
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
         UniqueConstraint('server_id', 'platform', 'user_id', name='uq_nova_points_member'),
     )
+
+
+class ShopItem(Base):
+    """Товар «Магазина ролей» — покупка роли за Nova Points (ТЗ №5 Rev.9, п.12).
+    На Lolka роль реально выдаётся через REST (PUT .../members/{user}/roles/{role}).
+    На VK у сообщества нет понятия «роль участника» — покупка фиксируется (списание
+    очков + подтверждение), но реальной выдачи роли API VK не предоставляет."""
+    __tablename__ = "shop_items"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    platform = Column(String(20), default="lolka", index=True)
+    role_id = Column(String(255), nullable=False)
+    role_name = Column(String(255), default="")
+    price = Column(Integer, nullable=False, default=100)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class NovaPointTransaction(Base):
