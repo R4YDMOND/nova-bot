@@ -107,6 +107,81 @@ export function RoleMultiSelect({
   );
 }
 
+/** Мультивыбор текстовых каналов сервера с чипами и списком чекбоксов — по образцу RoleMultiSelect.
+ *  Используется на странице «Команды» для полей allowedChannels/ignoredChannels (только Lolka,
+ *  ТЗ №7.1 — у VK нет сопоставимого способа ограничить команду конкретным каналом бесед). */
+export function ChannelMultiSelect({
+  label,
+  channels,
+  selected,
+  onChange,
+  loading,
+  error,
+}: {
+  label: string;
+  channels: { id: string; name: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  loading?: boolean;
+  error?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedChannels = selected.map(id => channels.find(c => c.id === id)).filter((c): c is { id: string; name: string } => !!c);
+
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
+
+  return (
+    <div className="relative">
+      <label className="text-[10px] uppercase tracking-wide text-[rgb(var(--text-secondary))] block mb-1">{label}</label>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="input w-full min-h-[38px] flex items-center flex-wrap gap-1.5 text-left cursor-pointer"
+      >
+        {selectedChannels.length === 0 ? (
+          <span className="text-[rgb(var(--text-secondary))] text-sm">Все каналы</span>
+        ) : (
+          selectedChannels.map(c => (
+            <span key={c.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[rgb(var(--surface-3))]">
+              <span className="text-[rgb(var(--text-secondary))]">#</span>
+              {c.name}
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={e => { e.stopPropagation(); toggle(c.id); }}
+                className="text-[rgb(var(--text-secondary))] hover:text-red-400"
+              >
+                ✕
+              </span>
+            </span>
+          ))
+        )}
+        <span className="ml-auto text-[rgb(var(--text-secondary))] text-xs shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-xl shadow-2xl p-1.5">
+          {loading ? (
+            <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Загрузка каналов...</p>
+          ) : error ? (
+            <p className="text-xs text-center py-3 text-red-400">{error}</p>
+          ) : channels.length === 0 ? (
+            <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Каналы не найдены</p>
+          ) : (
+            channels.map(c => (
+              <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[rgb(var(--surface-2))] cursor-pointer text-sm">
+                <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="accent-cyan-400" />
+                <span className="text-[rgb(var(--text-secondary))]">#</span>
+                <span className="truncate">{c.name}</span>
+              </label>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Текстовое HEX-поле рядом с color-пикером: держит локальный черновик ввода,
  *  чтобы промежуточные (пока невалидные) символы не затирались контролируемым value,
  *  и прокидывает наверх только валидные HEX-коды. */

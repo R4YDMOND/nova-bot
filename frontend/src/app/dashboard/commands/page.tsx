@@ -13,11 +13,17 @@ import { NoServerSelected } from '@/components/NoServerSelected';
 import { PlatformIcon } from '@/components/PlatformIcon';
 import { cn } from '@/lib/utils';
 import { CommandModal } from './CommandModal';
+import { RoleMultiSelect, ChannelMultiSelect } from '@/components/ranking/RankingFormControls';
 import {
   BUILTIN_COMMANDS, BuiltinOverride, CATEGORY_LABELS, Category, CommandsConfig,
   CustomCommand, EMPTY_CONFIG, PERMISSION_LABELS, Permission, Platform,
-  mergeBuiltinOverrides,
+  mergeBuiltinOverrides, defaultBuiltinOverride, normalizeCustomCommand,
 } from '@/lib/commands-catalog';
+import type { RankingRole, RankingChannel } from '@/lib/api';
+
+// VK: реальные уровни руководителей сообщества. Lolka не показывается в этом списке —
+// доступ на Lolka определяется ролями/каналами (см. ChannelMultiSelect/RoleMultiSelect ниже). ТЗ №7.1.
+const VK_PERMISSION_OPTIONS: Permission[] = ['all', 'moderator', 'editor', 'administrator', 'advertiser', 'owner'];
 
 const MODULE_NAME = 'commands';
 type Server = DashboardServer;
@@ -34,10 +40,20 @@ interface ViewCommand {
   platforms: Platform[];
   cooldown: number;
   permission: Permission;
+  allowedRoles: string[];
+  ignoredRoles: string[];
+  allowedChannels: string[];
+  ignoredChannels: string[];
   enabled: boolean;
   createdAt?: string;
   custom?: CustomCommand;
   builtinOverride?: BuiltinOverride;
+}
+
+/** Есть ли ограничение доступа — под текущую платформу (VK: уровень; Lolka: роли/каналы). */
+function hasAccessRestriction(c: ViewCommand, platform: Platform): boolean {
+  if (platform === 'vk') return c.permission !== 'all';
+  return c.allowedRoles.length > 0 || c.ignoredRoles.length > 0 || c.allowedChannels.length > 0 || c.ignoredChannels.length > 0;
 }
 
 export default function CommandsPage() {
@@ -75,11 +91,34 @@ export default function CommandsPage() {
     api.modules.getConfig<CommandsConfig>(String(effectiveServerId), MODULE_NAME)
       .then(saved => {
         setConfig(saved
-          ? { builtin: mergeBuiltinOverrides(saved.builtin || []), custom: saved.custom || [] }
+          ? { builtin: mergeBuiltinOverrides(saved.builtin || []), custom: (saved.custom || []).map(normalizeCustomCommand) }
           : { builtin: mergeBuiltinOverrides([]), custom: [] });
       })
       .catch(() => setConfig({ builtin: mergeBuiltinOverrides([]), custom: [] }))
       .finally(() => setLoading(false));
+  }, [effectiveServer, effectiveServerId]);
+
+  // ── Роли/каналы Lolka для гибкого доступа (allowedRoles/ignoredRoles/allowedChannels/
+  // ignoredChannels) — переиспользуем эндпоинты, уже используемые вкладкой «Награды» рейтинга. ТЗ №7.1.
+  const [lolkaRoles, setLolkaRoles] = useState<RankingRole[]>([]);
+  const [lolkaChannels, setLolkaChannels] = useState<RankingChannel[]>([]);
+  const [lolkaRolesLoading, setLolkaRolesLoading] = useState(false);
+  const [lolkaChannelsLoading, setLolkaChannelsLoading] = useState(false);
+  const [lolkaRolesError, setLolkaRolesError] = useState<string | undefined>();
+  const [lolkaChannelsError, setLolkaChannelsError] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (!effectiveServer || effectiveServer.platform !== 'lolka') return;
+    setLolkaRolesLoading(true);
+    api.ranking.getRoles(String(effectiveServerId))
+      .then(res => { if (res.error) setLolkaRolesError(res.error); else setLolkaRoles(res.roles || []); })
+      .catch(() => setLolkaRolesError('Не удалось загрузить роли'))
+      .finally(() => setLolkaRolesLoading(false));
+    setLolkaChannelsLoading(true);
+    api.ranking.getChannels(String(effectiveServerId), 'lolka')
+      .then(res => { if (res.error) setLolkaChannelsError(res.error); else setLolkaChannels(res.channels || []); })
+      .catch(() => setLolkaChannelsError('Не удалось загрузить каналы'))
+      .finally(() => setLolkaChannelsLoading(false));
   }, [effectiveServer, effectiveServerId]);
 
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,6 +161,8 @@ export default function CommandsPage() {
           description: c.description, category: c.category, platforms: c.platforms,
           cooldown: override?.cooldown ?? c.defaultCooldown,
           permission: override?.permission ?? c.defaultPermission,
+          allowedRoles: override?.allowedRoles ?? [], ignoredRoles: override?.ignoredRoles ?? [],
+          allowedChannels: override?.allowedChannels ?? [], ignoredChannels: override?.ignoredChannels ?? [],
           enabled: override?.enabled ?? true,
           builtinOverride: override,
         };
@@ -131,6 +172,8 @@ export default function CommandsPage() {
       .map(c => ({
         kind: 'custom', key: `custom:${c.id}`, icon: '⚙️', name: c.name, description: c.description,
         category: c.category, platforms: c.platforms, cooldown: c.cooldown, permission: c.permission,
+        allowedRoles: c.allowedRoles, ignoredRoles: c.ignoredRoles,
+        allowedChannels: c.allowedChannels, ignoredChannels: c.ignoredChannels,
         enabled: c.enabled, createdAt: c.createdAt, custom: c,
       }));
     return [...builtins, ...customs];
@@ -157,7 +200,7 @@ export default function CommandsPage() {
     const base = BUILTIN_COMMANDS.find(c => c.name === name)!;
     const next = config.builtin.some(o => o.name === name)
       ? config.builtin.map(o => o.name === name ? { ...o, enabled: !o.enabled } : o)
-      : [...config.builtin, { name, enabled: false, cooldown: base.defaultCooldown, permission: base.defaultPermission }];
+      : [...config.builtin, { ...defaultBuiltinOverride(base), enabled: false }];
     persist({ ...config, builtin: next });
   };
 
@@ -165,7 +208,7 @@ export default function CommandsPage() {
     const base = BUILTIN_COMMANDS.find(c => c.name === name)!;
     const next = config.builtin.some(o => o.name === name)
       ? config.builtin.map(o => o.name === name ? { ...o, ...patch } : o)
-      : [...config.builtin, { name, enabled: true, cooldown: base.defaultCooldown, permission: base.defaultPermission, ...patch }];
+      : [...config.builtin, { ...defaultBuiltinOverride(base), ...patch }];
     persist({ ...config, builtin: next });
   };
 
@@ -342,8 +385,10 @@ export default function CommandsPage() {
                             <span className={cn('text-xs px-2 py-0.5 rounded-full', cmd.enabled ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400')}>
                               {cmd.enabled ? '🟢 Активна' : '🔴 Неактивна'}
                             </span>
-                            {cmd.permission !== 'all' && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">🔒 {PERMISSION_LABELS[cmd.permission]}</span>
+                            {hasAccessRestriction(cmd, platformFilter) && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">
+                                🔒 {platformFilter === 'vk' ? PERMISSION_LABELS[cmd.permission] : 'Ограничен доступ'}
+                              </span>
                             )}
                           </div>
                           <p className="text-[rgb(var(--text-secondary))] text-sm mt-0.5 truncate">{cmd.description}</p>
@@ -399,8 +444,11 @@ export default function CommandsPage() {
                   <div className={cn('flex items-center gap-1.5', previewCmd.enabled ? 'text-green-400' : 'text-red-400')}>
                     {previewCmd.enabled ? '🟢 Активна' : '🔴 Неактивна'}
                   </div>
-                  {previewCmd.permission !== 'all' && (
-                    <div className="flex items-center gap-1.5 text-amber-400"><ShieldIcon className="w-3.5 h-3.5" /> {PERMISSION_LABELS[previewCmd.permission]}</div>
+                  {hasAccessRestriction(previewCmd, platformFilter) && (
+                    <div className="flex items-center gap-1.5 text-amber-400">
+                      <ShieldIcon className="w-3.5 h-3.5" />
+                      {platformFilter === 'vk' ? PERMISSION_LABELS[previewCmd.permission] : 'Ограничен доступ (роли/каналы)'}
+                    </div>
                   )}
                   <div className="flex items-center gap-1.5 text-[rgb(var(--text-secondary))]"><Clock className="w-3.5 h-3.5" /> Кулдаун: {previewCmd.cooldown > 0 ? `${previewCmd.cooldown} секунд` : 'нет'}</div>
                   <div className="flex items-center gap-1.5 text-[rgb(var(--text-secondary))]">
@@ -431,18 +479,46 @@ export default function CommandsPage() {
                         className="input w-full text-sm"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Права доступа</label>
-                      <select
-                        value={previewCmd.permission}
-                        onChange={e => updateBuiltin(previewCmd.name, { permission: e.target.value as Permission })}
-                        className="input w-full cursor-pointer text-sm"
-                      >
-                        {(Object.keys(PERMISSION_LABELS) as Permission[]).map(p => (
-                          <option key={p} value={p}>{PERMISSION_LABELS[p]}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {platformFilter === 'vk' ? (
+                      <div>
+                        <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Права доступа</label>
+                        <select
+                          value={previewCmd.permission}
+                          onChange={e => updateBuiltin(previewCmd.name, { permission: e.target.value as Permission })}
+                          className="input w-full cursor-pointer text-sm"
+                        >
+                          {VK_PERMISSION_OPTIONS.map(p => (
+                            <option key={p} value={p}>{PERMISSION_LABELS[p]}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">
+                          По уровню руководителя сообщества VK (groups.getMembers)
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <RoleMultiSelect
+                          label="Разрешённые роли" roles={lolkaRoles} loading={lolkaRolesLoading} error={lolkaRolesError}
+                          selected={previewCmd.allowedRoles}
+                          onChange={next => updateBuiltin(previewCmd.name, { allowedRoles: next })}
+                        />
+                        <RoleMultiSelect
+                          label="Игнорируемые роли" roles={lolkaRoles} loading={lolkaRolesLoading} error={lolkaRolesError}
+                          selected={previewCmd.ignoredRoles}
+                          onChange={next => updateBuiltin(previewCmd.name, { ignoredRoles: next })}
+                        />
+                        <ChannelMultiSelect
+                          label="Разрешённые каналы" channels={lolkaChannels} loading={lolkaChannelsLoading} error={lolkaChannelsError}
+                          selected={previewCmd.allowedChannels}
+                          onChange={next => updateBuiltin(previewCmd.name, { allowedChannels: next })}
+                        />
+                        <ChannelMultiSelect
+                          label="Игнорируемые каналы" channels={lolkaChannels} loading={lolkaChannelsLoading} error={lolkaChannelsError}
+                          selected={previewCmd.ignoredChannels}
+                          onChange={next => updateBuiltin(previewCmd.name, { ignoredChannels: next })}
+                        />
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -458,6 +534,12 @@ export default function CommandsPage() {
           existing={config.custom}
           onClose={() => setModalCmd(null)}
           onSave={saveCustom}
+          lolkaRoles={lolkaRoles}
+          lolkaChannels={lolkaChannels}
+          lolkaRolesLoading={lolkaRolesLoading}
+          lolkaChannelsLoading={lolkaChannelsLoading}
+          lolkaRolesError={lolkaRolesError}
+          lolkaChannelsError={lolkaChannelsError}
         />
       )}
 

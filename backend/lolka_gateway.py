@@ -163,7 +163,8 @@ class LolkaGateway:
                 server_id=server_id,
                 user_id=author.get("id"),
                 commands_config=self._load_commands_config(server_id) if server_id else {},
-                member_permissions=member.get("permissions"),
+                channel_id=channel_id,
+                member_roles=member.get("roles"),
             )
             if reply:
                 await self.send_message(channel_id, reply)

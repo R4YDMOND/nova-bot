@@ -128,6 +128,21 @@ class VKBotService:
         })
         return resp.get("items", [])
 
+    def get_managers(self, group_id: str) -> List[Dict[str, Any]]:
+        """
+        Получить список руководителей сообщества (groups.getMembers, filter=managers).
+        Требует ключ доступа сообщества с правом управления сообществом.
+        Поле role в ответе: moderator | editor | administrator | advertiser | creator
+        (creator — владелец/создатель сообщества). ТЗ №7.1 — реальные уровни доступа
+        VK для проверки прав на выполнение команд бота (вместо заглушки "только all").
+        """
+        resp = self._call("groups.getMembers", {
+            "group_id": group_id,
+            "filter": "managers",
+            "count": 1000,
+        })
+        return resp.get("items", [])
+
     def get_users(self, user_ids: List[str], fields: str = "photo_100,online,screen_name") -> List[Dict[str, Any]]:
         """
         Получить данные пользователей по ID (users.get).

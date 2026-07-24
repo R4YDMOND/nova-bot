@@ -7,12 +7,25 @@ import {
   Category, CATEGORY_LABELS, Permission, PERMISSION_LABELS, Platform,
   CustomCommand, commandValidators, isNameTaken,
 } from '@/lib/commands-catalog';
+import { RoleMultiSelect, ChannelMultiSelect } from '@/components/ranking/RankingFormControls';
+import type { RankingRole, RankingChannel } from '@/lib/api';
+
+// VK: реальные уровни руководителей сообщества (см. commands-catalog.ts). ТЗ №7.1.
+const VK_PERMISSION_OPTIONS: Permission[] = ['all', 'moderator', 'editor', 'administrator', 'advertiser', 'owner'];
 
 interface CommandModalProps {
   initial: CustomCommand | null;   // null — создание новой команды
   existing: CustomCommand[];       // для проверки уникальности имени
   onClose: () => void;
   onSave: (cmd: CustomCommand) => void;
+  // Роли/каналы Lolka для гибкого доступа — подгружены на странице (переиспользуем, чтобы
+  // не дублировать запрос при каждом открытии модалки). ТЗ №7.1.
+  lolkaRoles: RankingRole[];
+  lolkaChannels: RankingChannel[];
+  lolkaRolesLoading?: boolean;
+  lolkaChannelsLoading?: boolean;
+  lolkaRolesError?: string;
+  lolkaChannelsError?: string;
 }
 
 type FormState = Omit<CustomCommand, 'id' | 'createdAt'>;
@@ -21,12 +34,17 @@ function emptyForm(): FormState {
   return {
     name: '', description: '', category: 'utility', params: '',
     platforms: ['vk', 'lolka'], vkPrefix: '', lolkaPrefix: '',
-    cooldown: 0, permission: 'all', response: '',
+    cooldown: 0, permission: 'all',
+    allowedRoles: [], ignoredRoles: [], allowedChannels: [], ignoredChannels: [],
+    response: '',
     enabled: true, logUsage: true, showInHelp: true,
   };
 }
 
-export function CommandModal({ initial, existing, onClose, onSave }: CommandModalProps) {
+export function CommandModal({
+  initial, existing, onClose, onSave,
+  lolkaRoles, lolkaChannels, lolkaRolesLoading, lolkaChannelsLoading, lolkaRolesError, lolkaChannelsError,
+}: CommandModalProps) {
   const [form, setForm] = useState<FormState>(initial ? { ...initial } : emptyForm());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -184,15 +202,40 @@ export function CommandModal({ initial, existing, onClose, onSave }: CommandModa
             {errors.cooldown && <p className="text-xs text-red-400 mt-1">⚠️ {errors.cooldown}</p>}
           </div>
 
-          {/* Права доступа */}
-          <div>
-            <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Права доступа</label>
-            <select value={form.permission} onChange={e => update('permission', e.target.value as Permission)} className="input w-full cursor-pointer">
-              {(Object.keys(PERMISSION_LABELS) as Permission[]).map(p => (
-                <option key={p} value={p}>{PERMISSION_LABELS[p]}</option>
-              ))}
-            </select>
-          </div>
+          {/* Права доступа — раздельно по платформам: VK ограничен реальными уровнями
+              руководителей сообщества, Lolka — гибкий доступ по ролям/каналам (ТЗ №7.1) */}
+          {form.platforms.includes('vk') && (
+            <div>
+              <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">Права доступа (VK)</label>
+              <select value={form.permission} onChange={e => update('permission', e.target.value as Permission)} className="input w-full cursor-pointer">
+                {VK_PERMISSION_OPTIONS.map(p => (
+                  <option key={p} value={p}>{PERMISSION_LABELS[p]}</option>
+                ))}
+              </select>
+              <p className="text-xs text-[rgb(var(--text-secondary))] mt-1">По уровню руководителя сообщества VK</p>
+            </div>
+          )}
+          {form.platforms.includes('lolka') && (
+            <div className="space-y-3">
+              <label className="block text-sm text-[rgb(var(--text-secondary))]">Доступ (Lolka)</label>
+              <RoleMultiSelect
+                label="Разрешённые роли" roles={lolkaRoles} loading={lolkaRolesLoading} error={lolkaRolesError}
+                selected={form.allowedRoles} onChange={next => update('allowedRoles', next)}
+              />
+              <RoleMultiSelect
+                label="Игнорируемые роли" roles={lolkaRoles} loading={lolkaRolesLoading} error={lolkaRolesError}
+                selected={form.ignoredRoles} onChange={next => update('ignoredRoles', next)}
+              />
+              <ChannelMultiSelect
+                label="Разрешённые каналы" channels={lolkaChannels} loading={lolkaChannelsLoading} error={lolkaChannelsError}
+                selected={form.allowedChannels} onChange={next => update('allowedChannels', next)}
+              />
+              <ChannelMultiSelect
+                label="Игнорируемые каналы" channels={lolkaChannels} loading={lolkaChannelsLoading} error={lolkaChannelsError}
+                selected={form.ignoredChannels} onChange={next => update('ignoredChannels', next)}
+              />
+            </div>
+          )}
 
           {/* Категория */}
           <div>

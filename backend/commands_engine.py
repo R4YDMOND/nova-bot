@@ -1,17 +1,41 @@
 """
-Движок текстовых команд — ТЗ №7 (страница «Команды»).
+Движок текстовых команд — ТЗ №7 (страница «Команды») + ТЗ №7.1
+(гибкий доступ: роли/каналы для Lolka, реальные уровни VK-руководителей).
+
 Реальное выполнение доступно только для текстовых/prefix-команд:
   - встроенные: /ping, /help (единственные, у кого есть готовый текст ответа)
   - пользовательские: любые команды, созданные в конструкторе (всегда имеют
     фиксированный текстовый ответ, поэтому исполняются полностью)
 
 VK callback-кнопки и настоящие Lolka Slash/Context-Menu (Interactions API)
-не поддерживаются текущей инфраструктурой — не реализуются.
+не поддерживаются текущей инфраструктурой для конструктора команд — не
+реализуются (отдельно от предустановленных кнопок Профиль/Топ/Закрыть
+в редакторе шаблонов, см. ranking/actions.py).
 
 Модерационные встроенные команды (/ban /kick /mute /clear) в этой версии
-не выполняются по тексту — только управляются (enabled/cooldown/permission)
+не выполняются по тексту — только управляются (enabled/cooldown/доступ)
 через дашборд; сами наказания уже выполняются через существующие
 защищённые действия (/api/vk/moderate, журнал модерации).
+
+── Доступ (ТЗ №7.1) ─────────────────────────────────────────────────────
+Lolka и VK принципиально отличаются по модели прав, поэтому проверяются
+раздельно (на все команды — встроенные и пользовательские):
+
+  • Lolka — у бота есть Discord-совместимый список ролей участника
+    (`member.roles`, приходит в каждом MESSAGE_CREATE) и `channel_id`.
+    Доступ гибкий: allowed_roles/ignored_roles/allowed_channels/
+    ignored_channels (пусто = не ограничено), как в Juniper Bot.
+    ВАЖНО: старая проверка через `member.permissions` (битовое поле)
+    удалена — в реальном Gateway MESSAGE_CREATE это поле не приходит
+    (оно есть только в Interactions API), поэтому moderator/admin/owner
+    на Lolka фактически никогда не проходили проверку. Роли — рабочий
+    и единственный источник данных о правах участника на Gateway-событии.
+
+  • VK — жёстко ограничен 5 уровнями руководителей сообщества
+    (groups.getMembers, filter=managers, поле role): moderator, editor,
+    administrator, advertiser, creator(=owner). Кастомных ролей на VK
+    нет, поэтому конструктор ролей/каналов для VK не показывается —
+    только выбор одного из этих уровней.
 
 In-memory кэш кулдаунов (без Redis — free-план), TTL сбрасывается сам по себе,
 т.к. хранится только "последнее использование".
@@ -32,28 +56,47 @@ BUILTIN_RESPONSES: Dict[str, str] = {
     ),
 }
 
-# Уровни прав, которые движок умеет проверить без доп. инфраструктуры.
-# 'moderator' и 'admin' объединены в одну проверку (нет данных для более
-# тонкого разделения без API получения ролей/менеджеров сообщества).
-PERMISSION_LEVELS = ("all", "moderator", "admin", "owner")
+# Уровни прав VK-руководителей (groups.getMembers?filter=managers, поле role) —
+# 'creator' сопоставляется с внутренним уровнем 'owner'. 'advertiser' не входит
+# в иерархию (отдельное неиерархическое право, как и в интерфейсе управления
+# сообществом VK — «Добавление руководителя»).
+VK_ROLE_RANK: Dict[str, int] = {
+    "moderator": 1,
+    "editor": 2,
+    "administrator": 3,
+    "owner": 4,  # creator
+}
+VK_PERMISSION_LEVELS = ("all", "moderator", "editor", "administrator", "advertiser", "owner")
 
 
 class CommandMatch:
-    __slots__ = ("name", "response", "cooldown", "permission", "log_usage")
+    __slots__ = (
+        "name", "response", "cooldown", "permission", "log_usage",
+        "allowed_roles", "ignored_roles", "allowed_channels", "ignored_channels",
+    )
 
-    def __init__(self, name: str, response: str, cooldown: int, permission: str, log_usage: bool):
+    def __init__(
+        self, name: str, response: str, cooldown: int, permission: str, log_usage: bool,
+        allowed_roles: Optional[List[str]] = None, ignored_roles: Optional[List[str]] = None,
+        allowed_channels: Optional[List[str]] = None, ignored_channels: Optional[List[str]] = None,
+    ):
         self.name = name
         self.response = response
         self.cooldown = cooldown
         self.permission = permission
         self.log_usage = log_usage
+        self.allowed_roles = allowed_roles or []
+        self.ignored_roles = ignored_roles or []
+        self.allowed_channels = allowed_channels or []
+        self.ignored_channels = ignored_channels or []
 
 
 class CommandsEngine:
     """
     Разбирает текст сообщения на префикс+имя, ищет активную команду
     (встроенную с готовым ответом или пользовательскую) в конфиге сервера,
-    проверяет кулдаун и права, возвращает готовый ответ бота.
+    проверяет кулдаун и доступ (роли/каналы на Lolka, уровень руководителя
+    на VK), возвращает готовый ответ бота.
     Thread-safe (GIL), in-memory состояние кулдаунов.
     """
 
@@ -77,47 +120,65 @@ class CommandsEngine:
             self._last_used[key] = now
             return True
 
-    # ── Права доступа ───────────────────────────────────────────────────
+    # ── Доступ: Lolka (роли/каналы) ─────────────────────────────────────
 
     @staticmethod
-    def check_permission_lolka(permission: str, member_permissions: Optional[str]) -> bool:
-        """member_permissions — битовое поле прав участника Lolka (Discord-совместимое, строка-число)."""
+    def check_access_lolka(
+        channel_id: Any,
+        member_roles: Optional[List[str]],
+        allowed_roles: List[str], ignored_roles: List[str],
+        allowed_channels: List[str], ignored_channels: List[str],
+    ) -> bool:
+        """Пусто в списке = ограничение не действует (как в Juniper Bot)."""
+        roles = set(member_roles or [])
+
+        if ignored_roles and roles & set(ignored_roles):
+            return False
+        if allowed_roles and not (roles & set(allowed_roles)):
+            return False
+
+        ch = str(channel_id) if channel_id is not None else None
+        if ignored_channels and ch in {str(c) for c in ignored_channels}:
+            return False
+        if allowed_channels and ch not in {str(c) for c in allowed_channels}:
+            return False
+
+        return True
+
+    # ── Доступ: VK (уровень руководителя сообщества) ───────────────────
+
+    @staticmethod
+    def check_permission_vk(permission: str, vk_managers: Optional[Dict[str, Dict[str, Any]]], user_id: Any) -> bool:
+        """
+        vk_managers — {str(user_id): {"role": "moderator"|"editor"|"administrator"|"creator"|"advertiser"}},
+        получено из groups.getMembers(filter=managers) и закэшировано (см. main.py).
+        """
         if permission == "all":
             return True
-        if not member_permissions:
+        info = (vk_managers or {}).get(str(user_id))
+        if not info:
             return False
-        try:
-            bits = int(member_permissions)
-        except (TypeError, ValueError):
+        role = info.get("role")
+        if permission == "advertiser":
+            return role in ("advertiser", "creator")
+        rank = VK_ROLE_RANK["owner"] if role == "creator" else VK_ROLE_RANK.get(role, 0)
+        required = VK_ROLE_RANK.get(permission)
+        if required is None:
             return False
-        ADMINISTRATOR = 0x8
-        BAN_MEMBERS = 0x4
-        KICK_MEMBERS = 0x2
-        if bits & ADMINISTRATOR:
-            return True  # администратор проходит любую проверку (в т.ч. owner-уровень)
-        if permission == "moderator":
-            return bool(bits & (BAN_MEMBERS | KICK_MEMBERS))
-        return False  # admin/owner без ADMINISTRATOR — недостаточно прав
+        return rank >= required
 
-    @staticmethod
-    def check_permission_vk(permission: str) -> bool:
-        """
-        На VK нет доступа к списку менеджеров сообщества без дополнительного
-        API-вызова (groups.getMembers filter=managers) — эта интеграция не
-        входит в текущий объём работ. Чтобы не выдавать привилегированные
-        команды всем подряд, ограниченные по правам команды на VK пока не
-        выполняются (остаются видимыми/переключаемыми в дашборде).
-        """
-        return permission == "all"
-
-    # ── Поиск и выполнение команды ──────────────────────────────────────
+    # ── Поиск команды ────────────────────────────────────────────────────
 
     def match(self, text: str, platform: str, commands_config: Dict[str, Any]) -> Optional[CommandMatch]:
         """
         commands_config — распарсенный JSON конфига модуля 'commands' сервера:
-        {"builtin": [{"name","enabled","cooldown","permission"}, ...],
-         "custom": [{"name","enabled","platforms","vkPrefix","lolkaPrefix",
-                     "cooldown","permission","response","logUsage"}, ...]}
+        {"builtin": [{"name","enabled","cooldown","permission",
+                      "allowedRoles","ignoredRoles","allowedChannels","ignoredChannels"}, ...],
+         "custom": [{"name","enabled","platforms","vkPrefix","lolkaPrefix","cooldown",
+                     "permission","allowedRoles","ignoredRoles","allowedChannels","ignoredChannels",
+                     "response","logUsage"}, ...]}
+        Поля ролей/каналов актуальны только для platform="lolka" — для VK игнорируются
+        (проверка идёт по permission через check_permission_vk).
         """
         if not text:
             return None
@@ -127,6 +188,14 @@ class CommandsEngine:
 
         builtin_overrides = {o.get("name"): o for o in (commands_config.get("builtin") or [])}
         custom_commands: List[dict] = commands_config.get("custom") or []
+
+        def _access_fields(src: dict) -> dict:
+            return {
+                "allowed_roles": src.get("allowedRoles") or [],
+                "ignored_roles": src.get("ignoredRoles") or [],
+                "allowed_channels": src.get("allowedChannels") or [],
+                "ignored_channels": src.get("ignoredChannels") or [],
+            }
 
         # 1. Пользовательские команды — точное совпадение с их префиксом на платформе
         prefix_field = "vkPrefix" if platform == "vk" else "lolkaPrefix"
@@ -143,24 +212,28 @@ class CommandsEngine:
                     cooldown=int(cmd.get("cooldown") or 0),
                     permission=cmd.get("permission", "all"),
                     log_usage=bool(cmd.get("logUsage", True)),
+                    **_access_fields(cmd),
                 )
 
         # 2. Встроенные команды с реальным ответом (ping/help), только с "/"-префиксом
         if token.startswith("/"):
             name = token[1:]
             if name in BUILTIN_RESPONSES:
-                override = builtin_overrides.get(name)
-                if override and not override.get("enabled", True):
+                override = builtin_overrides.get(name) or {}
+                if not override.get("enabled", True):
                     return None
                 return CommandMatch(
                     name=name,
                     response=BUILTIN_RESPONSES[name],
-                    cooldown=int((override or {}).get("cooldown", 0) or 0),
-                    permission=(override or {}).get("permission", "all"),
+                    cooldown=int(override.get("cooldown", 0) or 0),
+                    permission=override.get("permission", "all"),
                     log_usage=True,
+                    **_access_fields(override),
                 )
 
         return None
+
+    # ── Выполнение ───────────────────────────────────────────────────────
 
     def execute(
         self,
@@ -169,18 +242,23 @@ class CommandsEngine:
         server_id: Any,
         user_id: Any,
         commands_config: Dict[str, Any],
-        member_permissions: Optional[str] = None,
+        channel_id: Any = None,
+        member_roles: Optional[List[str]] = None,
+        vk_managers: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> Optional[str]:
-        """Возвращает текст ответа бота или None (команда не найдена/не выполнена)."""
+        """Возвращает текст ответа бота или None (команда не найдена/недоступна)."""
         m = self.match(text, platform, commands_config)
         if not m:
             return None
 
         if platform == "lolka":
-            if not self.check_permission_lolka(m.permission, member_permissions):
+            if not self.check_access_lolka(
+                channel_id, member_roles,
+                m.allowed_roles, m.ignored_roles, m.allowed_channels, m.ignored_channels,
+            ):
                 return None
         else:
-            if not self.check_permission_vk(m.permission):
+            if not self.check_permission_vk(m.permission, vk_managers, user_id):
                 return None
 
         if not self._check_cooldown(server_id, platform, user_id, m.name, m.cooldown):

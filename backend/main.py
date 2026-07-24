@@ -12,6 +12,7 @@ from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, get_profile_summary, get_leaderboard_text, resolve_action
 from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows
+from ranking.cache import cache as _shared_cache
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service
 from moderation_engine import ModerationEngine
 from commands_engine import get_commands_engine
@@ -241,6 +242,28 @@ app.add_middleware(
 # ── Moderation engine (ТЗ №5) ───────────────────────────────────────────────
 _moderation_engine = ModerationEngine()
 _commands_engine = get_commands_engine()
+
+
+def _get_vk_managers_cached(access_token: str, group_id: str) -> dict:
+    """
+    {str(user_id): {"role": "moderator"|"editor"|"administrator"|"advertiser"|"creator"}}
+    для проверки доступа команд бота (commands_engine.check_permission_vk, ТЗ №7.1).
+    Кэш 5 минут (ranking/cache.py, тот же слой, что и /api/ranking/cache/*) —
+    вызывается на каждое текстовое сообщение в vk_callback, без кэша это лишний
+    groups.getMembers на каждое сообщение и риск упереться в rate limit VK.
+    """
+    cache_key = f"vk_managers:{group_id}"
+    cached = _shared_cache.get(cache_key)
+    if cached is not None:
+        return cached
+    try:
+        items = get_vk_service(access_token).get_managers(group_id)
+    except VKAPIError as e:
+        print(f"❌ VK Callback: не удалось получить руководителей сообщества — {e}")
+        items = []
+    managers = {str(it.get("id")): {"role": it.get("role")} for it in items if it.get("id")}
+    _shared_cache.set(cache_key, managers, ttl_seconds=300)
+    return managers
 
 
 @app.exception_handler(Exception)
@@ -3534,6 +3557,7 @@ async def vk_callback(request: Request):
                     server_id=conn.server_id,
                     user_id=from_id,
                     commands_config=cmd_config,
+                    vk_managers=_get_vk_managers_cached(conn.access_token, conn.group_id),
                 )
                 if reply:
                     try:
