@@ -954,7 +954,21 @@ export default function RankingPage() {
               <Switch checked={formData.np_enabled ?? settings?.np_enabled ?? false} onCheckedChange={val => updateField('np_enabled', val)} />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">
+                  Название валюты
+                  <Hint text="Своё название вместо «Nova Points» — отображается участникам в /daily, /shop, уведомлениях о начислении и на этой странице" />
+                </label>
+                <input
+                  type="text"
+                  maxLength={64}
+                  placeholder="Nova Points"
+                  value={formData.np_name ?? settings?.np_name ?? ''}
+                  onChange={e => updateField('np_name', e.target.value)}
+                  className="input w-full"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Emoji для выдачи</label>
                 <input
@@ -979,7 +993,7 @@ export default function RankingPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Суточный лимит получения NP</label>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Суточный лимит получения</label>
                 <input
                   type="number"
                   min={1}
@@ -1011,7 +1025,7 @@ export default function RankingPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-[rgb(var(--surface-2))]">
                     <tr>
-                      {['#', 'Участник', 'Nova Points'].map(h => (
+                      {['#', 'Участник', formData.np_name ?? settings?.np_name ?? 'Nova Points'].map(h => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[rgb(var(--text-secondary))] uppercase">{h}</th>
                       ))}
                     </tr>
@@ -1021,14 +1035,14 @@ export default function RankingPage() {
                       <tr key={entry.user_id} className="hover:bg-[rgb(var(--surface-2))] transition-colors">
                         <td className="px-4 py-3 font-bold">{MEDALS[entry.rank] || `#${entry.rank}`}</td>
                         <td className="px-4 py-3 font-medium">{entry.user_id}</td>
-                        <td className="px-4 py-3 text-[rgb(var(--text-secondary))]">🌟 {entry.points}</td>
+                        <td className="px-4 py-3 text-[rgb(var(--text-secondary))]">{formData.np_emoji ?? settings?.np_emoji ?? '🌟'} {entry.points}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <p className="text-center text-[rgb(var(--text-secondary))] py-12">🌟 Пока никто не получил Nova Points</p>
+              <p className="text-center text-[rgb(var(--text-secondary))] py-12">🌟 Пока никто не получил {formData.np_name ?? settings?.np_name ?? 'Nova Points'}</p>
             )}
           </Card>
         </div>

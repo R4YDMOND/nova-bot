@@ -11,7 +11,7 @@ from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Even
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text, resolve_action, resolve_receiver_id
-from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows, claim_daily, list_shop_items, buy_shop_item
+from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows, claim_daily, list_shop_items, buy_shop_item, get_currency_label
 from ranking.cache import cache as _shared_cache
 from ranking import np_farm_cache
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service, VKLongPollListener
@@ -165,7 +165,7 @@ async def _handle_vk_message_event(
                     np_result = give_nova_point(db, server_id, "vk", str(user_id), receiver_id)
                 finally:
                     db.close()
-                text = "⭐ +1 Nova Point!" if np_result.get("status") == "ok" else np_result.get("error", "Не удалось выдать Nova Point")
+                text = np_result.get("message") or np_result.get("error", "Не удалось выдать Nova Point")
                 service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
 
         elif action == "shop_buy":
@@ -179,7 +179,7 @@ async def _handle_vk_message_event(
                 finally:
                     db.close()
                 if buy_result.get("status") == "ok":
-                    text = f"✅ Куплено: {buy_result.get('role_name') or buy_result.get('role_id')} (-{buy_result.get('price')} NP). На VK роль выдаётся вручную — API сообщества не поддерживает назначение ролей участникам."
+                    text = buy_result.get("message") + ". На VK роль выдаётся вручную — API сообщества не поддерживает назначение ролей участникам."
                 else:
                     text = buy_result.get("error", "Не удалось купить товар")
                 service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
@@ -207,12 +207,12 @@ def _resolve_shop_item_id(payload) -> Optional[int]:
         return None
 
 
-def _vk_build_shop_keyboard(items) -> str:
+def _vk_build_shop_keyboard(items, currency_name: str = "NP") -> str:
     """Инлайн-клавиатура VK для /shop — по одной кнопке-товару в ряд (см. VK - Документация.md,
     формат callback-кнопок; тот же payload-паттерн, что и nova_action в template.py)."""
     buttons = []
     for it in items:
-        label = f"{(it.role_name or it.role_id)} — {it.price} NP"[:40]
+        label = f"{(it.role_name or it.role_id)} — {it.price} {currency_name}"[:40]
         payload = json.dumps({"nova_action": "shop_buy", "item_id": it.id}, ensure_ascii=False)
         buttons.append([{"action": {"type": "callback", "label": label, "payload": payload}, "color": "primary"}])
     return json.dumps({"inline": True, "buttons": buttons}, ensure_ascii=False)
@@ -380,18 +380,14 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                         )
                     if lower_text in ("ежедневный бонус", "/daily"):
                         daily_result = claim_daily(db, str(conn.server_id), "vk", str(from_id))
-                        if daily_result.get("status") == "ok":
-                            reply_text = f"🎁 Ежедневный бонус: +{daily_result['amount']} Nova Points!"
-                            if daily_result.get("jackpot"):
-                                reply_text += " 🎉 ДЖЕКПОТ!"
-                        else:
-                            reply_text = daily_result.get("error", "Не удалось получить бонус")
+                        reply_text = daily_result.get("message") or daily_result.get("error", "Не удалось получить бонус")
                         try:
                             get_vk_service(conn.access_token).send_message(peer_id=peer_id, message=reply_text)
                         except VKAPIError as e:
                             print(f"❌ VK event: ошибка ответа на ежедневный бонус — {e}")
                     elif lower_text == "/shop":
                         items = list_shop_items(db, str(conn.server_id), "vk")
+                        currency_name = farm_settings.np_name or "Nova Points"
                         try:
                             if not items:
                                 get_vk_service(conn.access_token).send_message(
@@ -399,13 +395,13 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                                     message="🛒 Магазин пуст — администратор ещё не добавил роли на продажу",
                                 )
                             else:
-                                lines = ["🛒 Магазин ролей:"] + [
-                                    f"• {it.role_name or it.role_id} — {it.price} NP" for it in items
+                                lines = [f"🛒 Магазин ролей ({currency_name}):"] + [
+                                    f"• {it.role_name or it.role_id} — {it.price} {currency_name}" for it in items
                                 ]
                                 get_vk_service(conn.access_token).send_message(
                                     peer_id=peer_id,
                                     message="\n".join(lines),
-                                    keyboard=_vk_build_shop_keyboard(items),
+                                    keyboard=_vk_build_shop_keyboard(items, currency_name),
                                 )
                         except VKAPIError as e:
                             print(f"❌ VK event: ошибка отправки /shop — {e}")
@@ -3072,6 +3068,7 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "card_bg_fit": s.card_bg_fit,
         "card_bg_position": s.card_bg_position,
         "np_enabled": s.np_enabled,
+        "np_name": s.np_name,
         "np_emoji": s.np_emoji,
         "np_cooldown_minutes": s.np_cooldown_minutes,
         "np_daily_limit": s.np_daily_limit,
@@ -3129,7 +3126,7 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             "card_radius", "card_glass_intensity",
             "card_bg_image_url", "card_bg_image_enabled", "card_bg_shade",
             "card_bg_fit", "card_bg_position",
-            "np_enabled", "np_emoji", "np_cooldown_minutes", "np_daily_limit",
+            "np_enabled", "np_name", "np_emoji", "np_cooldown_minutes", "np_daily_limit",
         }
         for field in simple_fields:
             if field in payload:
@@ -3393,10 +3390,11 @@ def api_list_shop_items(server_id: str = Query(...), platform: str = Query("lolk
         if not server:
             return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
         items = list_shop_items(db, str(server.id), platform)
+        currency = get_currency_label(db, str(server.id), platform)
         return {"items": [
             {"id": it.id, "role_id": it.role_id, "role_name": it.role_name, "price": it.price}
             for it in items
-        ]}
+        ], "currency_name": currency["name"], "currency_emoji": currency["emoji"]}
     except Exception as e:
         return {"error": str(e)}
     finally:

@@ -52,9 +52,11 @@ def give_nova_point(
     )).first()
     if not settings or not settings.np_enabled:
         return {"status": "error", "error": "Nova Points отключены на этом сервере"}
+    name = settings.np_name or "Nova Points"
+    emoji = settings.np_emoji or "🌟"
 
     if giver_id == receiver_id:
-        return {"status": "error", "error": "Нельзя выдать Nova Point самому себе"}
+        return {"status": "error", "error": f"Нельзя начислить {name} самому себе"}
 
     cooldown_minutes = settings.np_cooldown_minutes or 10
     daily_limit = settings.np_daily_limit or 50
@@ -78,7 +80,7 @@ def give_nova_point(
         NovaPointTransaction.created_at >= day_ago,
     )).scalar() or 0
     if received_today + 1 > daily_limit:
-        return {"status": "error", "error": f"Достигнут суточный лимит получения NP ({daily_limit})"}
+        return {"status": "error", "error": f"Достигнут суточный лимит получения {name} ({daily_limit})"}
 
     tx = NovaPointTransaction(
         server_id=server_id, platform=platform,
@@ -95,7 +97,7 @@ def give_nova_point(
     _get_or_create_np(db, server_id, platform, giver_id)  # чтобы giver тоже появился в системе с 0 очков
 
     db.commit()
-    return {"status": "ok", "total_points": receiver.total_points}
+    return {"status": "ok", "total_points": receiver.total_points, "message": f"{emoji} +1 {name}!"}
 
 
 def get_top(db: Session, server_id: str, platform: str, period: str = "all", limit: int = 10):
@@ -162,10 +164,32 @@ def claim_daily(db: Session, server_id: str, platform: str, user_id: str) -> dic
     np_row.weekly_points += amount
     np_row.last_daily_claim = now
     db.commit()
-    return {"status": "ok", "amount": amount, "jackpot": jackpot, "total_points": np_row.total_points}
+
+    name = settings.np_name or "Nova Points"
+    emoji = settings.np_emoji or "🌟"
+    message = f"🎁 Ежедневный бонус: +{amount} {name} {emoji}!"
+    if jackpot:
+        message += " 🎉 ДЖЕКПОТ!"
+    return {"status": "ok", "amount": amount, "jackpot": jackpot, "total_points": np_row.total_points, "message": message}
 
 
 # ── Магазин ролей (ТЗ №5 Rev.9, п.12) ────────────────────────────────────────
+
+def get_currency_label(db: Session, server_id: str, platform: str) -> dict:
+    """Название и emoji валюты очков, заданные админом (ТЗ №5 Rev.9, п.16)."""
+    try:
+        server_id_int = int(server_id)
+    except (TypeError, ValueError):
+        return {"name": "Nova Points", "emoji": "🌟"}
+    settings = db.query(RankingSettings).filter(and_(
+        RankingSettings.server_id == server_id_int,
+        RankingSettings.platform == platform,
+    )).first()
+    return {
+        "name": (settings.np_name if settings else None) or "Nova Points",
+        "emoji": (settings.np_emoji if settings else None) or "🌟",
+    }
+
 
 def list_shop_items(db: Session, server_id: str, platform: str):
     return db.query(ShopItem).filter(and_(
@@ -189,10 +213,14 @@ def buy_shop_item(db: Session, server_id: str, platform: str, user_id: str, item
     if not item:
         return {"status": "error", "error": "Товар не найден"}
 
+    name = get_currency_label(db, server_id, platform)["name"]
     np_row = _get_or_create_np(db, server_id, platform, user_id)
     if np_row.total_points < item.price:
-        return {"status": "error", "error": f"Недостаточно Nova Points (нужно {item.price}, у вас {np_row.total_points})"}
+        return {"status": "error", "error": f"Недостаточно {name} (нужно {item.price}, у вас {np_row.total_points})"}
 
     np_row.total_points -= item.price
     db.commit()
-    return {"status": "ok", "item_id": item.id, "role_id": item.role_id, "role_name": item.role_name, "price": item.price}
+    return {
+        "status": "ok", "item_id": item.id, "role_id": item.role_id, "role_name": item.role_name,
+        "price": item.price, "message": f"✅ Куплено: {item.role_name or item.role_id} (-{item.price} {name})",
+    }

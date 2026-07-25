@@ -371,6 +371,7 @@ class RankingSettings(Base):
 
     # Nova Points (ТЗ №5 Rev.7, п.3.1) — независимая от XP система репутации.
     np_enabled = Column(Boolean, default=False)
+    np_name = Column(String(64), default="Nova Points")  # ТЗ №5 Rev.9, п.16 — админ задаёт своё название валюты
     np_emoji = Column(String(16), default="🌟")
     np_cooldown_minutes = Column(Integer, default=10)   # кулдаун между парой giver→receiver
     np_daily_limit = Column(Integer, default=50)        # макс. NP в сутки на одного получателя

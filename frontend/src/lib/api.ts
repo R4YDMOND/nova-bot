@@ -106,6 +106,7 @@ export type RankingSettings = {
   card_bg_fit: string;
   card_bg_position: string;
   np_enabled: boolean;
+  np_name: string;
   np_emoji: string;
   np_cooldown_minutes: number;
   np_daily_limit: number;

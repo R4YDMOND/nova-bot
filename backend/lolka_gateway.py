@@ -12,7 +12,7 @@ import websockets
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text
-from ranking.nova_points import give_nova_point, claim_daily, list_shop_items, buy_shop_item
+from ranking.nova_points import give_nova_point, claim_daily, list_shop_items, buy_shop_item, get_currency_label
 from ranking import np_farm_cache
 from database import SessionLocal
 from commands_engine import get_commands_engine
@@ -217,18 +217,14 @@ class LolkaGateway:
             result = claim_daily(db, server_id, "lolka", user_id)
         finally:
             db.close()
-        if result.get("status") == "ok":
-            text = f"🎁 Ежедневный бонус: +{result['amount']} Nova Points!"
-            if result.get("jackpot"):
-                text += " 🎉 ДЖЕКПОТ!"
-        else:
-            text = result.get("error", "Не удалось получить бонус")
+        text = result.get("message") or result.get("error", "Не удалось получить бонус")
         await self.send_message(channel_id, text)
 
     async def _handle_shop(self, channel_id: str, server_id: str) -> None:
         db = SessionLocal()
         try:
             items = list_shop_items(db, server_id, "lolka")
+            currency_name = get_currency_label(db, server_id, "lolka")["name"]
         finally:
             db.close()
         if not items:
@@ -238,7 +234,7 @@ class LolkaGateway:
             "type": 1,
             "components": [{
                 "type": 2, "style": 1,
-                "label": f"{(it.role_name or it.role_id)} — {it.price} NP"[:80],
+                "label": f"{(it.role_name or it.role_id)} — {it.price} {currency_name}"[:80],
                 "custom_id": f"shop_buy:{it.id}",
             }],
         } for it in items]
@@ -482,7 +478,7 @@ class LolkaGateway:
                     np_result = give_nova_point(db, server_id, "lolka", str(user_id), receiver_id)
                 finally:
                     db.close()
-                text = "⭐ +1 Nova Point!" if np_result.get("status") == "ok" else np_result.get("error", "Не удалось выдать Nova Point")
+                text = np_result.get("message") or np_result.get("error", "Не удалось выдать Nova Point")
                 await self._followup_edit_original(interaction_token, {"content": text})
 
             elif effective_id.startswith("shop_buy:") and server_id and user_id:
@@ -502,7 +498,7 @@ class LolkaGateway:
                         db.close()
                     if buy_result.get("status") == "ok":
                         await self._grant_role(guild_id, str(user_id), buy_result["role_id"])
-                        text = f"✅ Куплено: {buy_result.get('role_name') or buy_result.get('role_id')} (-{buy_result.get('price')} NP)"
+                        text = buy_result.get("message")
                     else:
                         text = buy_result.get("error", "Не удалось купить товар")
                     await self._followup_edit_original(interaction_token, {"content": text})

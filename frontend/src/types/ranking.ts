@@ -69,6 +69,8 @@ export interface RankingSettings {
   card_bg_position: string;
   /** Nova Points (ТЗ №5 Rev.7, п.3.1) — независимая от XP система репутации. */
   np_enabled: boolean;
+  /** Название валюты очков, задаётся админом — отображается везде вместо "Nova Points" (ТЗ №5 Rev.9, п.16) */
+  np_name: string;
   np_emoji: string;
   np_cooldown_minutes: number;
   np_daily_limit: number;
