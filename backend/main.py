@@ -18,6 +18,7 @@ from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_se
 from moderation_engine import ModerationEngine, ModerationResult
 from commands_engine import get_commands_engine
 import ai_engine
+import max_gateway
 from fastapi.responses import PlainTextResponse
 from typing import Optional
 from auth_utils import (
@@ -100,7 +101,9 @@ async def _award_xp_and_notify_vk(
                 rank=result.get("rank"),
                 target_user_id=str(user_id),
             )
-            service.send_message(peer_id=target_peer_id, message=rendered["message"] or " ", keyboard=rendered.get("keyboard"))
+            await asyncio.to_thread(
+                service.send_message, peer_id=target_peer_id, message=rendered["message"] or " ", keyboard=rendered.get("keyboard")
+            )
         else:
             template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
             text_to_send = render_notify_template(
@@ -112,7 +115,7 @@ async def _award_xp_and_notify_vk(
                 next_level_xp=result.get("next_level_xp"),
                 rank=result.get("rank"),
             )
-            service.send_message(peer_id=target_peer_id, message=text_to_send)
+            await asyncio.to_thread(service.send_message, peer_id=target_peer_id, message=text_to_send)
     except Exception as e:
         logger.error(f"level-up notify (VK) error: {e}")
 
@@ -140,25 +143,25 @@ async def _handle_vk_message_event(
 
         if action == ACTION_PROFILE:
             text = get_profile_summary(server_id, "vk", str(user_id))
-            service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
+            await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
 
         elif action == ACTION_LEADERBOARD:
-            service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "📊 Топ участников"})
-            service.send_message(peer_id=peer_id, message=get_leaderboard_text(server_id, "vk"))
+            await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": "📊 Топ участников"})
+            await asyncio.to_thread(service.send_message, peer_id=peer_id, message=get_leaderboard_text(server_id, "vk"))
 
         elif action == ACTION_CLOSE:
             if conversation_message_id:
-                service.delete_by_cmid(peer_id, conversation_message_id)
-                service.answer_message_event(event_id, user_id, peer_id)
+                await asyncio.to_thread(service.delete_by_cmid, peer_id, conversation_message_id)
+                await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id)
             else:
                 # VK не передаёт conversation_message_id для клавиатур беседы —
                 # без него не определить, какое сообщение удалять (см. VK - Документация.md).
-                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить сообщение для удаления"})
+                await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить сообщение для удаления"})
 
         elif action == ACTION_NP_GIVE:
             receiver_id = resolve_receiver_id(payload)
             if not receiver_id:
-                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить получателя"})
+                await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить получателя"})
             else:
                 db = SessionLocal()
                 try:
@@ -166,12 +169,12 @@ async def _handle_vk_message_event(
                 finally:
                     db.close()
                 text = np_result.get("message") or np_result.get("error", "Не удалось выдать Nova Point")
-                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
+                await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
 
         elif action == "shop_buy":
             item_id = _resolve_shop_item_id(payload)
             if not item_id:
-                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить товар"})
+                await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить товар"})
             else:
                 db = SessionLocal()
                 try:
@@ -182,10 +185,10 @@ async def _handle_vk_message_event(
                     text = buy_result.get("message") + ". На VK роль выдаётся вручную — API сообщества не поддерживает назначение ролей участникам."
                 else:
                     text = buy_result.get("error", "Не удалось купить товар")
-                service.answer_message_event(event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
+                await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
 
         else:
-            service.answer_message_event(event_id, user_id, peer_id)
+            await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id)
     except Exception as e:
         logger.error(f"VK message_event handling error: {e}")
 
@@ -270,7 +273,12 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
             if not result and text and _moderation_engine.is_suspicious(text):
                 ai_settings_row = db.query(AISettings).filter(AISettings.server_id == conn.server_id).first()
                 if ai_settings_row and ai_settings_row.moderation_enabled:
-                    toxicity = ai_engine.check_toxicity(text, ai_settings_row.provider or "yandexgpt")
+                    # ВАЖНО: check_toxicity делает блокирующий requests.post к LLM (до 20с на
+                    # провайдера, до 3 провайдеров при failover) — вызов напрямую в этом async def
+                    # заморозил бы event loop всего приложения (включая дашборд) на это время.
+                    toxicity = await asyncio.to_thread(
+                        ai_engine.check_toxicity, text, ai_settings_row.provider or "yandexgpt"
+                    )
                     if toxicity["score"] >= ai_settings_row.moderation_threshold:
                         result = ModerationResult(
                             "delete",
@@ -279,7 +287,8 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                         )
 
             if result:
-                get_vk_service(conn.access_token).moderate_message(
+                await asyncio.to_thread(
+                    get_vk_service(conn.access_token).moderate_message,
                     group_id=conn.group_id,
                     message_id=msg_id,
                     action=result.action,
@@ -341,18 +350,19 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                         print(f"⚠️ VK: не удалось залогировать использование команды '{name}': {e}")
                         db.rollback()
 
+                vk_managers = await asyncio.to_thread(_get_vk_managers_cached, conn.access_token, conn.group_id)
                 reply = _commands_engine.execute(
                     text=text,
                     platform="vk",
                     server_id=conn.server_id,
                     user_id=from_id,
                     commands_config=cmd_config,
-                    vk_managers=_get_vk_managers_cached(conn.access_token, conn.group_id),
+                    vk_managers=vk_managers,
                     on_usage=_bump_command_usage,
                 )
                 if reply:
                     try:
-                        get_vk_service(conn.access_token).send_message(peer_id=peer_id, message=reply)
+                        await asyncio.to_thread(get_vk_service(conn.access_token).send_message, peer_id=peer_id, message=reply)
                     except VKAPIError as e:
                         print(f"❌ VK event: ошибка отправки ответа команды — {e}")
 
@@ -382,7 +392,7 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                         daily_result = claim_daily(db, str(conn.server_id), "vk", str(from_id))
                         reply_text = daily_result.get("message") or daily_result.get("error", "Не удалось получить бонус")
                         try:
-                            get_vk_service(conn.access_token).send_message(peer_id=peer_id, message=reply_text)
+                            await asyncio.to_thread(get_vk_service(conn.access_token).send_message, peer_id=peer_id, message=reply_text)
                         except VKAPIError as e:
                             print(f"❌ VK event: ошибка ответа на ежедневный бонус — {e}")
                     elif lower_text == "/shop":
@@ -390,7 +400,8 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                         currency_name = farm_settings.np_name or "Nova Points"
                         try:
                             if not items:
-                                get_vk_service(conn.access_token).send_message(
+                                await asyncio.to_thread(
+                                    get_vk_service(conn.access_token).send_message,
                                     peer_id=peer_id,
                                     message="🛒 Магазин пуст — администратор ещё не добавил роли на продажу",
                                 )
@@ -398,7 +409,8 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                                 lines = [f"🛒 Магазин ролей ({currency_name}):"] + [
                                     f"• {it.role_name or it.role_id} — {it.price} {currency_name}" for it in items
                                 ]
-                                get_vk_service(conn.access_token).send_message(
+                                await asyncio.to_thread(
+                                    get_vk_service(conn.access_token).send_message,
                                     peer_id=peer_id,
                                     message="\n".join(lines),
                                     keyboard=_vk_build_shop_keyboard(items, currency_name),
@@ -596,6 +608,9 @@ async def startup():
     asyncio.create_task(np_farm_cache.flush_loop())
     print("OK: NP farm flush task запущена")
 
+    if max_gateway.is_configured():
+        await asyncio.to_thread(max_gateway.register_webhook)
+
 
 def _start_vk_long_poll_listeners():
     """
@@ -678,6 +693,15 @@ def _normalize_server_id(raw_id: str, platform: str) -> str:
         raise ValueError(
             "Не удалось распознать числовой ID Lolka-сервера. "
             "Укажите ID напрямую или ссылку вида lolka.app/servers/780713670838272."
+        )
+
+    if platform == "max":
+        if raw_id.isdigit():
+            return raw_id
+        raise ValueError(
+            "Не удалось распознать chat_id чата MAX. Укажите числовой ID чата "
+            "(бот получает его в событиях bot_started/message_created после того, "
+            "как пользователь напишет боту в MAX)."
         )
 
     return raw_id
@@ -3967,6 +3991,99 @@ def test_vk_connection(connection_id: int):
 
 
 # ── Callback API Webhook ──────────────────────────────────────────────────────
+
+# ── MAX: приём событий (только 2 функции сейчас — AI-ассистент + модерация; ─────────────────
+# репостинг событий через вебхуки — в планах, не реализован) ────────────────────────────────
+
+@app.post("/api/max/webhook")
+async def max_webhook(request: Request):
+    secret = os.getenv("MAX_WEBHOOK_SECRET", "")
+    if secret and request.headers.get("X-Max-Bot-Api-Secret") != secret:
+        return JSONResponse(status_code=403, content={"error": "invalid_secret"})
+
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "invalid_json"})
+
+    if data.get("update_type") != "message_created":
+        return JSONResponse(content={"ok": True})
+
+    message = data.get("message") or {}
+    body = message.get("body") or {}
+    text = (body.get("text") or "").strip()
+    mid = body.get("mid")
+    sender = message.get("sender") or {}
+    recipient = message.get("recipient") or {}
+    chat_id = recipient.get("chat_id")
+    user_id = sender.get("user_id")
+    user_name = sender.get("name") or sender.get("username") or (str(user_id) if user_id else "")
+
+    if not text or not chat_id or not user_id:
+        return JSONResponse(content={"ok": True})
+
+    db = SessionLocal()
+    try:
+        server = db.query(Server).filter(Server.server_id == str(chat_id), Server.platform == "max").first()
+        if not server:
+            # Бот получает события из чата, который ещё не подключён на странице /dashboard/servers —
+            # игнорируем (администратор должен явно добавить чат по chat_id, как и для VK/Lolka).
+            return JSONResponse(content={"ok": True})
+
+        # 1. Модерация (Level 1 — локальные правила, Level 2 — AI, ТЗ №9 этап 4)
+        mod_config_row = db.query(ModuleConfig).filter(
+            ModuleConfig.server_id == server.id, ModuleConfig.module_name == "moderation"
+        ).first()
+        config = {}
+        if mod_config_row and mod_config_row.config:
+            try:
+                config = json.loads(mod_config_row.config)
+            except Exception:
+                pass
+
+        result = _moderation_engine.check_message(user_id, text, config)
+
+        ai_settings_row = db.query(AISettings).filter(AISettings.server_id == server.id).first()
+
+        if not result and _moderation_engine.is_suspicious(text) and ai_settings_row and ai_settings_row.moderation_enabled:
+            toxicity = await asyncio.to_thread(
+                ai_engine.check_toxicity, text, ai_settings_row.provider or "yandexgpt"
+            )
+            if toxicity["score"] >= ai_settings_row.moderation_threshold:
+                result = ModerationResult(
+                    "delete",
+                    f"AI-модерация: токсичность {toxicity['score']}% (тематики: {', '.join(toxicity['topics']) or '—'})",
+                    "aiModeration",
+                )
+
+        if result:
+            if mid:
+                await asyncio.to_thread(max_gateway.delete_message, mid)
+            db.add(ModerationEvent(
+                server_id=server.id, platform="max", type=f"{result.action}_message",
+                title=result.reason, description=f"Правило: {result.rule}",
+                target_user_id=str(user_id), target_message_id=str(mid or ""),
+            ))
+            db.commit()
+            return JSONResponse(content={"ok": True})
+
+        # 2. AI-ассистент — разговорный ответ (ТЗ №9; область MAX сейчас — только AI)
+        if ai_settings_row:
+            reply = await asyncio.to_thread(
+                ai_engine.generate_ai_reply, db, str(chat_id), str(chat_id), str(user_id),
+                user_name, server.name or "", text, ai_settings_row,
+            )
+            if reply:
+                await asyncio.to_thread(max_gateway.send_message, str(chat_id), reply)
+
+        return JSONResponse(content={"ok": True})
+    except Exception as e:
+        db.rollback()
+        print(f"❌ MAX webhook error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        db.close()
+
 
 @app.post("/api/vk/callback")
 async def vk_callback(request: Request):

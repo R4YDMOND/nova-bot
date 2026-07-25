@@ -16,8 +16,15 @@ interface ServerCardProps {
   deleting: boolean;
 }
 
+const PLATFORM_COLOR: Record<DashboardServer['platform'], { border: string; badgeBg: string; badgeText: string; emoji: string; btnBg: string }> = {
+  vk: { border: 'border-blue-500/30 hover:border-blue-500/50', badgeBg: 'bg-blue-500', badgeText: 'VK', emoji: '🔵', btnBg: 'bg-blue-500 hover:bg-blue-600' },
+  lolka: { border: 'border-purple-500/30 hover:border-purple-500/50', badgeBg: 'bg-purple-500', badgeText: 'L', emoji: '💜', btnBg: 'bg-purple-500 hover:bg-purple-600' },
+  max: { border: 'border-red-500/30 hover:border-red-500/50', badgeBg: 'bg-red-500', badgeText: 'M', emoji: '🔴', btnBg: 'bg-red-500 hover:bg-red-600' },
+};
+
 export function ServerCard({ server, selected, onSelect, onConfigure, onRemove, deleting }: ServerCardProps) {
   const isActive = server.is_active !== false;
+  const colors = PLATFORM_COLOR[server.platform];
 
   const handleConfigure = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -27,10 +34,8 @@ export function ServerCard({ server, selected, onSelect, onConfigure, onRemove, 
   return (
     <Card
       className={cn(
-        'relative overflow-hidden transition-all hover:shadow-lg cursor-pointer group',
-        server.platform === 'vk'
-          ? 'border-2 border-blue-500/30 hover:border-blue-500/50'
-          : 'border-2 border-purple-500/30 hover:border-purple-500/50'
+        'relative overflow-hidden transition-all hover:shadow-lg cursor-pointer group border-2',
+        colors.border
       )}
       onClick={onSelect}
     >
@@ -38,9 +43,9 @@ export function ServerCard({ server, selected, onSelect, onConfigure, onRemove, 
       <div className="absolute top-4 right-4 z-10">
         <div className={cn(
           "w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm",
-          server.platform === 'vk' ? 'bg-blue-500' : 'bg-purple-500'
+          colors.badgeBg
         )}>
-          {server.platform === 'vk' ? 'VK' : 'L'}
+          {colors.badgeText}
         </div>
       </div>
 
@@ -50,7 +55,7 @@ export function ServerCard({ server, selected, onSelect, onConfigure, onRemove, 
             {server.icon_url ? (
               <Image src={server.icon_url} alt="" width={80} height={80} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-3xl">{server.platform === 'vk' ? '🔵' : '💜'}</span>
+              <span className="text-3xl">{colors.emoji}</span>
             )}
           </div>
         </div>
@@ -82,10 +87,7 @@ export function ServerCard({ server, selected, onSelect, onConfigure, onRemove, 
         <div className="flex w-full gap-2">
           <Button 
             onClick={handleConfigure}
-            className={cn(
-              "flex-1 h-10 text-sm",
-              server.platform === 'vk' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-purple-500 hover:bg-purple-600'
-            )}
+            className={cn("flex-1 h-10 text-sm", colors.btnBg)}
           >
             Настроить
           </Button>

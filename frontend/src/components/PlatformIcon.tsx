@@ -3,7 +3,7 @@
 // серверов, в свитчере и в фильтрах. Теперь везде один и тот же чистый SVG.
 import type { FC } from 'react';
 
-type Platform = 'vk' | 'lolka';
+export type Platform = 'vk' | 'lolka' | 'max';
 
 interface PlatformIconProps {
   platform: Platform;
@@ -34,8 +34,23 @@ function LolkaGlyph({ className }: { className?: string }) {
   );
 }
 
+function MaxGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="6" fill="#EF3124" />
+      <path
+        fill="#fff"
+        d="M6 16.5V8.2c0-.4.32-.7.7-.7.24 0 .46.12.59.33L12 14l4.71-6.17c.13-.21.35-.33.59-.33.38 0 .7.3.7.7v8.3c0 .39-.31.7-.7.7s-.7-.31-.7-.7v-6.2l-3.42 4.48a1.4 1.4 0 0 1-2.36 0L7.4 10.3v6.2c0 .39-.31.7-.7.7s-.7-.31-.7-.7Z"
+      />
+    </svg>
+  );
+}
+
+const GLYPHS: Record<Platform, FC<{ className?: string }>> = { vk: VkGlyph, lolka: LolkaGlyph, max: MaxGlyph };
+
 export const PlatformIcon: FC<PlatformIconProps> = ({ platform, className = 'w-5 h-5 rounded-md' }) => {
-  return platform === 'vk' ? <VkGlyph className={className} /> : <LolkaGlyph className={className} />;
+  const Glyph = GLYPHS[platform] || VkGlyph;
+  return <Glyph className={className} />;
 };
 
-export const PLATFORM_LABEL: Record<Platform, string> = { vk: 'VK', lolka: 'Lolka' };
+export const PLATFORM_LABEL: Record<Platform, string> = { vk: 'VK', lolka: 'Lolka', max: 'MAX' };

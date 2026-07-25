@@ -374,6 +374,48 @@ def translate_or_summarize(page_text: str, provider: str = "yandexgpt") -> str:
     return text
 
 
+# ==================== Разговорный AI-ответ (RAG + кэш + роутер) ====================
+# Общая точка входа для платформенных обработчиков (сейчас — MAX, см. backend/main.py::max_webhook).
+# Инкапсулирует весь пайплайн: лимит запросов → семантический кэш → RAG-память → LLMRouter → сохранение.
+
+def generate_ai_reply(db: Session, server_id: str, channel_id: str, user_id: str, user_name: str,
+                       server_name: str, user_text: str, ai_settings) -> Optional[str]:
+    """Возвращает текст ответа AI-ассистента или None (лимит исчерпан / все провайдеры недоступны).
+    ai_settings — строка models.AISettings (provider/context_size/cache_enabled/system_prompt/temperature)."""
+    daily_limit = int(os.getenv("AI_DAILY_LIMIT", "200"))
+    if get_usage_today(db, server_id) >= daily_limit:
+        return None
+
+    system_prompt = build_system_prompt(
+        ai_settings.system_prompt or "", user_name=user_name, server_name=server_name, channel_name=channel_id,
+    )
+
+    embedding = get_embedding(user_text) if ai_settings.cache_enabled else None
+    if ai_settings.cache_enabled and embedding:
+        cached = semantic_cache_lookup(db, server_id, embedding)
+        if cached:
+            save_memory(db, server_id, channel_id, user_id, "user", user_text)
+            save_memory(db, server_id, channel_id, user_id, "assistant", cached)
+            return cached
+
+    history = get_recent_memory(db, server_id, channel_id, ai_settings.context_size or 0)
+    messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_text}]
+
+    router = LLMRouter(ai_settings.provider or "yandexgpt")
+    try:
+        reply, _provider = router.chat(messages, temperature=ai_settings.temperature or 0.7, max_tokens=500)
+    except LLMError as e:
+        print(f"AI_REPLY: все провайдеры недоступны — {e}")
+        return None
+
+    save_memory(db, server_id, channel_id, user_id, "user", user_text)
+    save_memory(db, server_id, channel_id, user_id, "assistant", reply)
+    if ai_settings.cache_enabled and embedding:
+        semantic_cache_store(db, server_id, user_text, embedding, reply)
+    increment_usage(db, server_id)
+    return reply
+
+
 # ==================== Function Calling: доступные инструменты (ТЗ, этап 3.4) ====================
 
 TOOL_SCHEMAS = [

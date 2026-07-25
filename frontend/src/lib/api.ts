@@ -13,7 +13,7 @@ export type DashboardServer = {
   id: number;
   name: string;
   server_id: string;
-  platform: "vk" | "lolka";
+  platform: "vk" | "lolka" | "max";
   icon_url: string;
   member_count: number;
   is_active?: boolean;
@@ -308,14 +308,14 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, _isRetry = f
 
 export const api = {
   servers: {
-    list: (platform?: "vk" | "lolka") =>
+    list: (platform?: "vk" | "lolka" | "max") =>
       apiFetch<{ servers: DashboardServer[]; total: number }>(
         `/api/servers${platform ? `?platform=${platform}` : ""}`
       ),
     create: (data: {
       name: string;
       server_id: string;
-      platform?: "vk" | "lolka";
+      platform?: "vk" | "lolka" | "max";
       webhook_url?: string;
       icon_url?: string;
       member_count?: number;

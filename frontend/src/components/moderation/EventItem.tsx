@@ -9,7 +9,7 @@ type ModerationEvent = {
   created_at: string;
 };
 
-type Platform = 'vk' | 'lolka';
+type Platform = 'vk' | 'lolka' | 'max';
 
 interface EventItemProps {
   event: ModerationEvent;

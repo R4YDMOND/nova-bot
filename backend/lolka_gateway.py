@@ -519,7 +519,8 @@ class LolkaGateway:
             print("LOLKA GATEWAY: не задан application_id (LOLKA_CLIENT_ID) — followup @original невозможен")
             return
         try:
-            requests.patch(
+            await asyncio.to_thread(
+                requests.patch,
                 f"{self.api_base_url}/webhooks/{self.application_id}/{interaction_token}/messages/@original",
                 headers={"Content-Type": "application/json"},
                 json=data,
@@ -534,7 +535,8 @@ class LolkaGateway:
             return
         import requests
         try:
-            requests.put(
+            await asyncio.to_thread(
+                requests.put,
                 f"{self.api_base_url}/guilds/{guild_id}/members/{user_id}/roles/{role_id}",
                 headers={"Authorization": f"Bot {self.token}"},
                 timeout=10,
@@ -549,7 +551,8 @@ class LolkaGateway:
         if data:
             payload["data"] = data
         try:
-            requests.post(
+            await asyncio.to_thread(
+                requests.post,
                 f"{self.api_base_url}/interactions/{interaction_id}/{interaction_token}/callback",
                 headers={"Content-Type": "application/json"},
                 json=payload,
@@ -564,7 +567,8 @@ class LolkaGateway:
         а не как ответ на интеракцию)."""
         import requests
         try:
-            requests.delete(
+            await asyncio.to_thread(
+                requests.delete,
                 f"{self.api_base_url}/channels/{channel_id}/messages/{message_id}",
                 headers={"Authorization": f"Bot {self.token}"},
                 timeout=10,
@@ -582,7 +586,8 @@ class LolkaGateway:
         if components:
             payload["components"] = components
         try:
-            requests.post(
+            await asyncio.to_thread(
+                requests.post,
                 f"{self.api_base_url}/channels/{channel_id}/messages",
                 headers={"Authorization": f"Bot {self.token}", "Content-Type": "application/json"},
                 json=payload,

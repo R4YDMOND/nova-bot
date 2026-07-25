@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { useServer } from '@/context/ServerProvider';
 import { NoServerSelected } from '@/components/NoServerSelected';
 import { AIPlaygroundModal } from '@/components/AIPlaygroundModal';
 import { PROVIDERS, PROMPT_VARIABLES, type AIProvider, type AIUsage } from '@/types/ai';
+import { cn } from '@/lib/utils';
 
 interface AISettings {
   botName: string;
@@ -26,10 +27,6 @@ interface AISettings {
   contextMessages: number;
   systemPrompt: string;
   autoModeration: boolean;
-  serverName: string;
-  platform: string;
-  avatarStyle: string;
-  avatarUrl: string;
   // ── ТЗ №9: LLM-роутер, RAG, кэш, модерация, function calling ──
   provider: AIProvider;
   contextSize: number;
@@ -44,7 +41,7 @@ const DEFAULT: AISettings = {
   geminiEnabled: true, geminiTemperature: 0.8, geminiStyle: 'friendly', geminiCustomPrompt: '',
   deepseekEnabled: true, deepseekTemperature: 0.7, deepseekStyle: 'creative', deepseekCustomPrompt: '',
   useContext: true, contextMessages: 10, systemPrompt: 'Ты — дружелюбный AI-помощник. Отвечай на русском языке. 🤖',
-  autoModeration: false, serverName: '', platform: 'VK', avatarStyle: 'nova', avatarUrl: '',
+  autoModeration: false,
   provider: 'yandexgpt', contextSize: 5, cacheEnabled: true,
   moderationEnabled: false, moderationThreshold: 70, toolGrantRoles: false,
 };
@@ -61,23 +58,23 @@ const DEEPSEEK_STYLES = [
   { value: 'anime', label: '🌸 Аниме', desc: 'В стиле аниме-персонажа' },
 ];
 
-const AVATARS = [
-  { id: 'nova', icon: 'N', label: 'Нова ✨', color: '#00E5FF' },
-  { id: 'star', icon: '✨', label: 'Звезда', color: '#FBBF24' },
-  { id: 'robot', icon: '🤖', label: 'Робот', color: '#60A5FA' },
-  { id: 'cat', icon: '🐒', label: 'Кот', color: '#F472B6' },
-];
-
 const TABS = [
   { id: 'general', label: '⚙️ Общие' },
   { id: 'provider', label: '🔌 Провайдер и RAG' },
   { id: 'gemini', label: '🔥 Gemini' },
   { id: 'deepseek', label: '🧠 DeepSeek' },
-  { id: 'server', label: '🌐 Сервер' },
 ];
 
 export default function AIPage() {
-  const { selectedServer, selectedServerId, loading: serverLoading } = useServer();
+  const { servers, selectedServer, selectedServerId, loading: serverLoading } = useServer();
+  const [platformFilter, setPlatformFilter] = useState<'vk' | 'lolka' | 'max'>('vk');
+  const filteredServers = useMemo(() => servers.filter(s => s.platform === platformFilter), [servers, platformFilter]);
+  const effectiveServer = useMemo(() => {
+    if (selectedServer && selectedServer.platform === platformFilter) return selectedServer;
+    return filteredServers[0] || null;
+  }, [selectedServer, platformFilter, filteredServers]);
+  const effectiveServerId = effectiveServer?.server_id || selectedServerId;
+
   const [settings, setSettings] = useState<AISettings>(DEFAULT);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -86,10 +83,44 @@ export default function AIPage() {
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
   const [usage, setUsage] = useState<AIUsage | null>(null);
 
+  // MAX сейчас поддерживает только AI-ассистента (диалог + модерация) — легаси-вкладки
+  // форвард-комментариев Gemini/DeepSeek и инструмент "выдавать роли" (только Lolka) к нему
+  // не относятся (вебхуки/репостинг для MAX — в планах, ТЗ №9 doc).
+  const visibleTabs = platformFilter === 'max' ? TABS.filter(t => t.id === 'general' || t.id === 'provider') : TABS;
+
   useEffect(() => {
-    if (!selectedServer) { setSettingsLoading(false); return; }
+    if (!visibleTabs.some(t => t.id === activeTab)) setActiveTab('general');
+  }, [visibleTabs, activeTab]);
+
+  const platformPills = (
+    <div className="flex p-1 rounded-lg border bg-[rgb(var(--surface))] border-[rgb(var(--border))]">
+      {[
+        { id: 'vk' as const, label: 'VK', color: 'bg-blue-500' },
+        { id: 'lolka' as const, label: 'Lolka', color: 'bg-purple-500' },
+        { id: 'max' as const, label: 'MAX', color: 'bg-red-500' },
+      ].map(p => (
+        <button
+          key={p.id}
+          onClick={() => setPlatformFilter(p.id)}
+          title="Выберите платформу для настройки AI"
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-all',
+            platformFilter === p.id
+              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+              : 'text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]'
+          )}
+        >
+          <span className={cn('w-2 h-2 rounded-full', p.color)} />
+          <span>{p.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  useEffect(() => {
+    if (!effectiveServer) { setSettingsLoading(false); return; }
     setSettingsLoading(true);
-    api.ai.get(selectedServerId).then((data) => {
+    api.ai.get(effectiveServerId).then((data) => {
       if (data.settings) {
         const s = data.settings as Record<string, unknown>;
         setSettings(prev => ({
@@ -109,14 +140,14 @@ export default function AIPage() {
         setSettings(DEFAULT);
       }
     }).catch(() => {}).finally(() => setSettingsLoading(false));
-  }, [selectedServer, selectedServerId]);
+  }, [effectiveServer, effectiveServerId]);
 
   const refreshUsage = useCallback(() => {
-    if (!selectedServer) return;
-    api.ai.getUsage(selectedServerId).then((data) => {
+    if (!effectiveServer) return;
+    api.ai.getUsage(effectiveServerId).then((data) => {
       if (!data.error) setUsage({ used: data.used, limit: data.limit });
     }).catch(() => {});
-  }, [selectedServer, selectedServerId]);
+  }, [effectiveServer, effectiveServerId]);
 
   useEffect(() => { refreshUsage(); }, [refreshUsage]);
 
@@ -127,12 +158,12 @@ export default function AIPage() {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
 
   const save = async () => {
-    if (!selectedServer) return;
+    if (!effectiveServer) return;
     setSaving(true);
     try {
       await api.ai.save({
-        server_id: selectedServerId,
-        platform: selectedServer.platform,
+        server_id: effectiveServerId,
+        platform: effectiveServer.platform,
         botName: settings.botName,
         personality: settings.activeModel,
         temperature: settings.geminiTemperature,
@@ -154,7 +185,24 @@ export default function AIPage() {
     return <div className="p-8 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
   }
 
-  if (!selectedServer) {
+  if (filteredServers.length === 0) {
+    return (
+      <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+        <div className="flex items-center gap-3 mb-5">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-secondary))]">Платформа:</span>
+          {platformPills}
+        </div>
+        <NoServerSelected
+          heading={`Нет серверов ${platformFilter === 'vk' ? 'VK' : platformFilter === 'lolka' ? 'Lolka' : 'MAX'}`}
+          description={`Добавьте и настройте сервер ${platformFilter === 'vk' ? 'VK' : platformFilter === 'lolka' ? 'Lolka' : 'MAX'} на странице управления серверами.`}
+          link="/dashboard/servers"
+          linkText="Перейти к серверам"
+        />
+      </div>
+    );
+  }
+
+  if (!effectiveServer) {
     return <NoServerSelected title="✨ AI-Настройки" />;
   }
 
@@ -165,7 +213,8 @@ export default function AIPage() {
           <h1 className="text-3xl font-bold">✨ AI-Настройки</h1>
           <p className="text-[rgb(var(--text-secondary))] text-sm mt-1">Гибкая настройка моделей и стилей общения 🤖</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          {platformPills}
           <Button variant="secondary" onClick={() => setPlaygroundOpen(true)}>
             <Sparkles className="h-4 w-4 mr-1.5" /> Playground
           </Button>
@@ -191,7 +240,7 @@ export default function AIPage() {
       )}
 
       <div className="flex gap-1.5 flex-wrap">
-        {TABS.map(tab => (
+        {visibleTabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 rounded-2xl text-sm font-medium transition-all ${
               activeTab === tab.id
@@ -349,15 +398,17 @@ export default function AIPage() {
             )}
           </Card>
 
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-3">🧰 Инструменты (Function Calling)</h3>
-            <label className="flex items-center gap-3 py-2 cursor-pointer">
-              <input type="checkbox" checked={settings.toolGrantRoles}
-                onChange={() => toggle('toolGrantRoles')}
-                className="w-4 h-4 accent-indigo-500" />
-              <span className="text-sm">Выдавать роли (только Lolka)</span>
-            </label>
-          </Card>
+          {platformFilter === 'lolka' && (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-3">🧰 Инструменты (Function Calling)</h3>
+              <label className="flex items-center gap-3 py-2 cursor-pointer">
+                <input type="checkbox" checked={settings.toolGrantRoles}
+                  onChange={() => toggle('toolGrantRoles')}
+                  className="w-4 h-4 accent-indigo-500" />
+                <span className="text-sm">Выдавать роли (только Lolka)</span>
+              </label>
+            </Card>
+          )}
         </div>
       )}
 
@@ -439,55 +490,6 @@ export default function AIPage() {
             </div>
           </>)}
         </Card>
-      )}
-
-      {activeTab === 'server' && (
-        <div className="space-y-4">
-          <Card className="p-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-[rgb(var(--text-secondary))] block mb-2">Платформа</label>
-                <select value={settings.platform} onChange={e => update('platform', e.target.value)} className="input w-full">
-                  <option value="VK">💬 VK</option>
-                  <option value="Lolka">⚡ Lolka</option>
-                  <option value="MAX">🚀 MAX</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-[rgb(var(--text-secondary))] block mb-2">Название сервера/группы</label>
-                <input type="text" value={settings.serverName}
-                  onChange={e => update('serverName', e.target.value)}
-                  placeholder="Phoenix Gaming" className="input w-full" />
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">🖼️ Аватар AI-помощника</h3>
-            <div className="grid grid-cols-4 gap-3 mb-4">
-              {AVATARS.map(avatar => (
-                <button key={avatar.id} onClick={() => update('avatarStyle', avatar.id)}
-                  className={`p-4 rounded-2xl text-center border-2 transition-all ${
-                    settings.avatarStyle === avatar.id
-                      ? 'border-indigo-500 bg-indigo-500/10'
-                      : 'border-[rgb(var(--border))] bg-[rgb(var(--surface-2))] hover:border-indigo-400/50'
-                  }`}>
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mx-auto mb-2 bg-[rgb(var(--surface))]"
-                    style={{ border: `2px solid ${avatar.color}40`, color: avatar.color }}>
-                    {avatar.icon}
-                  </div>
-                  <div className="text-xs font-medium">{avatar.label}</div>
-                </button>
-              ))}
-            </div>
-            <div>
-              <label className="text-sm text-[rgb(var(--text-secondary))] block mb-2">Или укажите свой URL аватара</label>
-              <input type="text" value={settings.avatarUrl}
-                onChange={e => update('avatarUrl', e.target.value)}
-                placeholder="https://example.com/avatar.png" className="input w-full" />
-            </div>
-          </Card>
-        </div>
       )}
 
       {saved && (

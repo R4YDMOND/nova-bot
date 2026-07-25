@@ -54,18 +54,20 @@ function detectServerLink(raw: string): Detection | null {
 
 export default function ServersPage() {
   const { servers, loading, selectedServerId, selectServer, refresh } = useServer();
-  const [platformFilter, setPlatformFilter] = useState<'all' | 'vk' | 'lolka'>('all');
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'vk' | 'lolka' | 'max'>('all');
 
   const vkServers = useMemo(() => servers.filter(s => s.platform === 'vk'), [servers]);
   const lolkaServers = useMemo(() => servers.filter(s => s.platform === 'lolka'), [servers]);
+  const maxServers = useMemo(() => servers.filter(s => s.platform === 'max'), [servers]);
   const filteredServers = useMemo(() => {
     if (platformFilter === 'vk') return vkServers;
     if (platformFilter === 'lolka') return lolkaServers;
+    if (platformFilter === 'max') return maxServers;
     return servers;
-  }, [platformFilter, servers, vkServers, lolkaServers]);
+  }, [platformFilter, servers, vkServers, lolkaServers, maxServers]);
 
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', server_id: '', platform: 'vk' as 'vk' | 'lolka', webhook_url: '' });
+  const [form, setForm] = useState({ name: '', server_id: '', platform: 'vk' as 'vk' | 'lolka' | 'max', webhook_url: '' });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [detection, setDetection] = useState<Detection | null>(null);
@@ -152,7 +154,7 @@ export default function ServersPage() {
     if (!detection || detection.status === 'unresolved') return;
     const id = form.server_id.trim();
     const platform = form.platform;
-    if (!id) return;
+    if (!id || platform === 'max') return;
 
     let cancelled = false;
     const timer = setTimeout(async () => {
@@ -295,6 +297,10 @@ export default function ServersPage() {
               className={`shrink-0 px-5 py-2.5 ${platformFilter === 'lolka' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}>
               Lolka ({lolkaServers.length})
             </Button>
+            <Button variant={platformFilter === 'max' ? 'default' : 'outline'} onClick={() => setPlatformFilter('max')}
+              className={`shrink-0 px-5 py-2.5 ${platformFilter === 'max' ? 'bg-red-500 hover:bg-red-600' : ''}`}>
+              MAX ({maxServers.length})
+            </Button>
           </div>
         </div>
 
@@ -319,7 +325,7 @@ export default function ServersPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {platformFilter !== 'vk' && botStatus && (
+            {(platformFilter === 'lolka' || platformFilter === 'all') && botStatus && (
               <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 p-7">
                 <div className="flex items-center gap-5">
                   <div className="relative w-16 h-16 shrink-0">
@@ -353,6 +359,7 @@ export default function ServersPage() {
               <p className="text-[rgb(var(--text-secondary))] text-sm">
                 {platformFilter === 'vk' && 'Нет подключённых сообществ VK'}
                 {platformFilter === 'lolka' && 'Нет подключённых серверов Lolka'}
+                {platformFilter === 'max' && 'Нет подключённых чатов MAX'}
                 {platformFilter === 'all' && 'Нет подключённых серверов'}
               </p>
             ) : (
@@ -411,7 +418,7 @@ export default function ServersPage() {
                 <Select value={form.platform} onValueChange={(v: string) => {
                   // Сброс ID при смене платформы — иначе ID предыдущей платформы
                   // (например, club123 от VK) остаётся подставленным в форму Lolka.
-                  setForm(f => ({ ...f, platform: v as 'vk' | 'lolka', server_id: '' }));
+                  setForm(f => ({ ...f, platform: v as 'vk' | 'lolka' | 'max', server_id: '' }));
                   setDetection(null);
                 }}>
                   <SelectTrigger>
@@ -426,6 +433,9 @@ export default function ServersPage() {
                     <SelectItem value="lolka">
                       <span className="inline-flex items-center gap-2"><PlatformIcon platform="lolka" className="w-4 h-4 rounded" /> Lolka</span>
                     </SelectItem>
+                    <SelectItem value="max">
+                      <span className="inline-flex items-center gap-2"><PlatformIcon platform="max" className="w-4 h-4 rounded" /> MAX</span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -435,13 +445,13 @@ export default function ServersPage() {
               </div>
               <div>
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">
-                  ID {form.platform === 'vk' ? 'сообщества VK' : 'сервера Lolka'}
+                  ID {form.platform === 'vk' ? 'сообщества VK' : form.platform === 'lolka' ? 'сервера Lolka' : 'чата MAX'}
                 </label>
                 <input
                   type="text"
                   value={form.server_id}
                   onChange={e => handleServerIdChange(e.target.value)}
-                  placeholder="123456789 или ссылка vk.com/club123456"
+                  placeholder={form.platform === 'max' ? '123456789 (chat_id из событий бота)' : '123456789 или ссылка vk.com/club123456'}
                   className="input w-full font-mono text-sm px-4 py-2.5 rounded-xl bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text))] placeholder:text-[rgb(var(--text-secondary))] outline-none focus:border-primary transition-colors"
                 />
                 {detection?.status === 'ok' && (
@@ -501,7 +511,7 @@ export default function ServersPage() {
               </div>
               <div>
                 <label className="block text-sm text-[rgb(var(--text-secondary))] mb-1.5">
-                  ID {editingServer.platform === 'vk' ? 'сообщества VK' : 'сервера Lolka'}
+                  ID {editingServer.platform === 'vk' ? 'сообщества VK' : editingServer.platform === 'lolka' ? 'сервера Lolka' : 'чата MAX'}
                 </label>
                 <div className="font-mono text-sm px-4 py-2.5 rounded-xl bg-[rgb(var(--surface-2))]/50 border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
                   {editingServer.server_id}

@@ -3,7 +3,7 @@ import { EventItem } from './EventItem';
 import { ActivityChart } from './ActivityChart';
 import { cn } from '@/lib/utils';
 
-type Platform = 'vk' | 'lolka';
+type Platform = 'vk' | 'lolka' | 'max';
 
 type ModerationEvent = {
   type: string;

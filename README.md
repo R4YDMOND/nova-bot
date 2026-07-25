@@ -79,6 +79,24 @@ Community-токен сообщества (`VK_ACCESS_TOKEN` для форвар
 3. При старте backend поднимает Gateway-соединение (`LolkaGateway.run_forever()`) с
    автопереподключением.
 
+## Настройка MAX
+
+Третья платформа бота (`backend/max_gateway.py`). Область функционала сейчас — **только
+AI-ассистент** (диалог с ботом + двухуровневая AI-модерация); вебхуки/репостинг событий —
+в планах, не реализованы. В отличие от VK (свой access-токен на каждое сообщество), MAX
+устроен как Lolka — один бот-токен на всё приложение, конкретные чаты добавляются на
+странице `/dashboard/servers` по их `chat_id`.
+
+1. Получите токен бота на [dev.max.ru](https://dev.max.ru) и задайте `MAX_BOT_TOKEN`.
+2. Задайте `MAX_WEBHOOK_URL` — публичный HTTPS-адрес этого backend'а + `/api/max/webhook`
+   (например, `https://nova-bot-1-1hsz.onrender.com/api/max/webhook`). При старте backend
+   сам регистрирует подписку на события (`max_gateway.register_webhook()`), MAX официально
+   не рекомендует Long Polling для продакшна, поэтому альтернативы Webhook здесь нет.
+3. Задайте `MAX_WEBHOOK_SECRET` (проверяется в заголовке `X-Max-Bot-Api-Secret` входящих
+   запросов) — защищает от подмены отправителя.
+4. Напишите боту в MAX, чтобы получить `chat_id` (приходит в событии `message_created`/
+   `bot_started`), затем добавьте чат на странице `/dashboard/servers` → платформа MAX.
+
 ### Семантический кэш и RAG (pgvector)
 
 На проде (Supabase) расширение `pgvector` включается автоматически при старте backend'а
