@@ -13,6 +13,7 @@ from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text
 from ranking.nova_points import give_nova_point, claim_daily, list_shop_items, buy_shop_item, get_currency_label
+from ranking.account_link import generate_link_code, confirm_link_code
 from ranking import np_farm_cache
 from database import SessionLocal
 from commands_engine import get_commands_engine
@@ -190,6 +191,8 @@ class LolkaGateway:
                     await self._handle_daily(channel_id, server_id, str(author["id"]))
                 elif lower == "/shop":
                     await self._handle_shop(channel_id, server_id)
+                elif lower == "/link" or lower.startswith("/link "):
+                    await self._handle_link(channel_id, server_id, str(author["id"]), content.strip())
 
         # Начисление XP за сообщение + level-up уведомление (по аналогии с VK, см. main.py)
         user_id = author.get("id")
@@ -210,6 +213,28 @@ class LolkaGateway:
                         server_id_for_farm, "lolka", str(user_id),
                         settings.np_farm_min, settings.np_farm_max,
                     )
+
+    async def _handle_link(self, channel_id: str, server_id: str, user_id: str, raw_text: str) -> None:
+        parts = raw_text.split(maxsplit=1)
+        db = SessionLocal()
+        try:
+            if len(parts) == 1:
+                result = generate_link_code(db, server_id, "lolka", user_id)
+                if result.get("status") == "ok":
+                    text = (
+                        f"🔗 Код для связки аккаунтов: {result['code']}\n"
+                        f"Введите «/link {result['code']}» в VK-сообществе в течение 10 минут, "
+                        f"чтобы Nova Points и роли работали на обеих платформах через один баланс."
+                    )
+                else:
+                    text = result.get("error", "Не удалось создать код")
+            else:
+                result = confirm_link_code(db, server_id, "lolka", user_id, parts[1])
+                text = "✅ Аккаунты VK и Lolka связаны!" if result.get("status") == "ok" \
+                    else result.get("error", "Не удалось связать аккаунты")
+        finally:
+            db.close()
+        await self.send_message(channel_id, text)
 
     async def _handle_daily(self, channel_id: str, server_id: str, user_id: str) -> None:
         db = SessionLocal()
@@ -497,7 +522,7 @@ class LolkaGateway:
                     finally:
                         db.close()
                     if buy_result.get("status") == "ok":
-                        await self._grant_role(guild_id, str(user_id), buy_result["role_id"])
+                        await self._grant_role(guild_id, buy_result["target_user_id"], buy_result["role_id"])
                         text = buy_result.get("message")
                     else:
                         text = buy_result.get("error", "Не удалось купить товар")

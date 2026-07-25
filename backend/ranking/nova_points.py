@@ -198,12 +198,29 @@ def list_shop_items(db: Session, server_id: str, platform: str):
     )).order_by(ShopItem.price.asc()).all()
 
 
+def render_shop_purchase_message(settings: Optional[RankingSettings], *, user: str, item_name: str,
+                                  price: int, currency: str, balance: int) -> str:
+    """Подставляет переменные в шаблон сообщения о покупке (RankingSettings.shop_purchase_template).
+    Пуст — используется дефолтный текст. Плейсхолдеры: {user}, {item}, {price}, {currency}, {balance}."""
+    template = (settings.shop_purchase_template if settings else "") or \
+        "✅ Куплено: {item} (-{price} {currency})"
+    return (template
+            .replace("{user}", user)
+            .replace("{item}", item_name)
+            .replace("{price}", str(price))
+            .replace("{currency}", currency)
+            .replace("{balance}", str(balance)))
+
+
 def buy_shop_item(db: Session, server_id: str, platform: str, user_id: str, item_id: int) -> dict:
     """
-    Списывает баланс и возвращает товар для последующей выдачи роли платформой
-    (Lolka: PUT .../members/{user}/roles/{role} в вызывающем коде — lolka_gateway.py;
-    VK: API сообщества не даёт назначать роли участникам, поэтому на VK покупка
-    только подтверждается списанием очков).
+    Списывает баланс с той платформы, где сделана покупка, и возвращает данные для выдачи роли.
+    Роль реально выдаётся ТОЛЬКО в Lolka (у API VK-сообщества нет назначения ролей участникам):
+      - platform == "lolka": роль выдаётся тому же user_id, который покупал;
+      - platform == "vk": списывается VK-баланс, а роль выдаётся в СВЯЗАННОМ Lolka-аккаунте
+        (см. ranking/account_link.py, команда /link) — без связки покупка отклоняется ДО списания.
+    Фактический вызов API выдачи роли — в вызывающем коде (main.py/lolka_gateway.py), т.к. этот
+    модуль не должен знать про HTTP/токены платформ.
     """
     item = db.query(ShopItem).filter(and_(
         ShopItem.id == item_id,
@@ -213,14 +230,39 @@ def buy_shop_item(db: Session, server_id: str, platform: str, user_id: str, item
     if not item:
         return {"status": "error", "error": "Товар не найден"}
 
+    target_user_id = user_id
+    if platform == "vk":
+        from ranking.account_link import get_linked_user_id
+        linked = get_linked_user_id(db, server_id, "vk", user_id)
+        if not linked:
+            return {
+                "status": "error",
+                "error": "Роль выдаётся в Lolka — сначала свяжите аккаунты командой /link "
+                         "(напишите «/link» здесь, затем полученный код — в Lolka)",
+            }
+        target_user_id = linked
+
+    settings = None
+    if str(server_id).isdigit():
+        settings = db.query(RankingSettings).filter(and_(
+            RankingSettings.server_id == int(server_id),
+            RankingSettings.platform == platform,
+        )).first()
     name = get_currency_label(db, server_id, platform)["name"]
+
     np_row = _get_or_create_np(db, server_id, platform, user_id)
     if np_row.total_points < item.price:
         return {"status": "error", "error": f"Недостаточно {name} (нужно {item.price}, у вас {np_row.total_points})"}
 
     np_row.total_points -= item.price
     db.commit()
+
+    message = render_shop_purchase_message(
+        settings, user=f"id{user_id}", item_name=(item.role_name or item.role_id),
+        price=item.price, currency=name, balance=np_row.total_points,
+    )
     return {
         "status": "ok", "item_id": item.id, "role_id": item.role_id, "role_name": item.role_name,
-        "price": item.price, "message": f"✅ Куплено: {item.role_name or item.role_id} (-{item.price} {name})",
+        "price": item.price, "message": message,
+        "target_platform": "lolka", "target_user_id": target_user_id,
     }

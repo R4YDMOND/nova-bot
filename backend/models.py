@@ -389,6 +389,12 @@ class RankingSettings(Base):
     np_daily_jackpot_chance = Column(Integer, default=5)     # шанс джекпота, %
     np_daily_jackpot_amount = Column(Integer, default=50)
 
+    # Шаблон сообщения о покупке в магазине ролей (ТЗ №5 Rev.9, п.12) — тот же формат JSON,
+    # что и notify_template (структурированный шаблон из MessageTemplateModal). Пуст — используется
+    # дефолтный текст (см. ranking/nova_points.py::buy_shop_item). Переменные: {{user}}, {{item}},
+    # {{price}}, {{currency}}, {{balance}}.
+    shop_purchase_template = Column(Text, default="")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow, default=datetime.utcnow)
 
@@ -446,6 +452,38 @@ class ShopItem(Base):
     role_name = Column(String(255), default="")
     price = Column(Integer, nullable=False, default=100)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LinkCode(Base):
+    """Временный код для команды /link (ТЗ №5 Rev.9, п.13) — исчезает через 10 минут или после
+    использования. Скоуп — server_owner_id (User.id админа), а не Server.id, т.к. VK- и
+    Lolka-подключения одного проекта — разные строки Server с разными id (Server.platform)."""
+    __tablename__ = "link_codes"
+
+    id = Column(Integer, primary_key=True)
+    server_owner_id = Column(Integer, nullable=False, index=True)
+    platform = Column(String(20), nullable=False)   # платформа, ГДЕ сгенерирован код
+    user_id = Column(String(255), nullable=False)   # user_id на этой платформе
+    code = Column(String(16), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AccountLink(Base):
+    """Подтверждённая связка VK↔Lolka аккаунтов одного человека (ТЗ №5 Rev.9, п.13) — единый
+    кошелёк Nova Points. Скоуп — server_owner_id, см. комментарий у LinkCode."""
+    __tablename__ = "account_links"
+
+    id = Column(Integer, primary_key=True)
+    server_owner_id = Column(Integer, nullable=False, index=True)
+    vk_user_id = Column(String(255), nullable=False, index=True)
+    lolka_user_id = Column(String(255), nullable=False, index=True)
+    linked_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('server_owner_id', 'vk_user_id', name='uq_link_vk'),
+        UniqueConstraint('server_owner_id', 'lolka_user_id', name='uq_link_lolka'),
+    )
 
 
 class NovaPointTransaction(Base):

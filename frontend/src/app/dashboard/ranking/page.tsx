@@ -22,6 +22,7 @@ import {
 import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
 import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
 import { Hint, HexColorField, RoleMultiSelect } from '@/components/ranking/RankingFormControls';
+import { ShopPurchaseTemplateModal } from '@/components/ranking/ShopPurchaseTemplateModal';
 import { MessageTemplateModal } from '@/components/MessageTemplateModal';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -261,6 +262,11 @@ export default function RankingPage() {
   const { data: rolesData, isFetching: rolesLoading } = useRankingRoles(effectiveServerId, effectivePlatform);
   const serverRoles = rolesData?.roles ?? [];
 
+  // Роли для магазина — ВСЕГДА из Lolka (единственная платформа, где роли реально выдаются,
+  // см. ranking/nova_points.py::buy_shop_item), даже если сейчас открыта вкладка VK.
+  const { data: lolkaRolesForShop, isFetching: shopRolesLoading } = useRankingRoles(lolkaServer?.server_id ?? '', 'lolka');
+  const shopRoles = lolkaRolesForShop?.roles ?? [];
+
   // Показываем название канала уведомлений вместо сырого ID, если он есть в списке.
   const currentNotifyChannel: string = formData.notify_channel ?? settings?.notify_channel ?? '';
   const resolvedNotifyChannel = channelsData?.channels?.find(ch => ch.id === currentNotifyChannel);
@@ -327,6 +333,7 @@ export default function RankingPage() {
   const [newShopRoleName, setNewShopRoleName] = useState('');
   const [newShopPrice, setNewShopPrice] = useState('');
   const [shopFormError, setShopFormError] = useState<string | null>(null);
+  const [shopTemplateOpen, setShopTemplateOpen] = useState(false);
 
   const handleAddShopItem = async () => {
     setShopFormError(null);
@@ -1089,11 +1096,11 @@ export default function RankingPage() {
             <div>
               <h3 className="font-semibold flex items-center gap-1.5">
                 🛒 Магазин ролей
-                <Hint text="Участники покупают роль за очки командой /shop. На Lolka роль выдаётся автоматически; на VK у сообщества нет API для назначения ролей участникам, поэтому покупка только списывает баланс и подтверждается сообщением." />
+                <Hint text="Участники покупают роль за очки командой /shop. Роль всегда выдаётся в Lolka (у API VK-сообщества нет назначения ролей участникам). Если покупка сделана в VK, участник должен предварительно связать аккаунты командой /link — иначе бот не будет знать, кому в Lolka выдавать роль." />
               </h3>
               <p className="text-xs text-[rgb(var(--text-secondary))] mt-1">
                 {effectivePlatform === 'vk'
-                  ? 'На VK роль — это просто название товара; реальная выдача возможна только вручную.'
+                  ? 'Списывается баланс VK, роль выдаётся в связанном аккаунте Lolka (команда /link).'
                   : 'Роль выдаётся автоматически участнику сразу после покупки.'}
               </p>
             </div>
@@ -1127,30 +1134,20 @@ export default function RankingPage() {
 
             <div className="pt-3 border-t border-[rgb(var(--border))] space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {effectivePlatform === 'lolka' ? (
-                  <select
-                    value={newShopRoleId}
-                    onChange={e => {
-                      const role = serverRoles.find(r => r.id === e.target.value);
-                      setNewShopRoleId(e.target.value);
-                      setNewShopRoleName(role?.name ?? '');
-                    }}
-                    className="input sm:col-span-1"
-                  >
-                    <option value="">{rolesLoading ? 'Загрузка ролей...' : 'Выберите роль'}</option>
-                    {serverRoles.map(role => (
-                      <option key={role.id} value={role.id}>{role.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="Название товара (например, «VIP»)"
-                    value={newShopRoleName}
-                    onChange={e => { setNewShopRoleName(e.target.value); setNewShopRoleId(e.target.value); }}
-                    className="input sm:col-span-1"
-                  />
-                )}
+                <select
+                  value={newShopRoleId}
+                  onChange={e => {
+                    const role = shopRoles.find(r => r.id === e.target.value);
+                    setNewShopRoleId(e.target.value);
+                    setNewShopRoleName(role?.name ?? '');
+                  }}
+                  className="input sm:col-span-1"
+                >
+                  <option value="">{shopRolesLoading ? 'Загрузка ролей Lolka...' : 'Выберите роль (Lolka)'}</option>
+                  {shopRoles.map(role => (
+                    <option key={role.id} value={role.id}>{role.name}</option>
+                  ))}
+                </select>
                 <input
                   type="number"
                   min={1}
@@ -1168,11 +1165,32 @@ export default function RankingPage() {
                 </button>
               </div>
               {shopFormError && <p className="text-xs text-red-400">{shopFormError}</p>}
-              {rolesData?.error && effectivePlatform === 'lolka' && (
-                <p className="text-xs text-amber-400">⚠️ {rolesData.error}</p>
+              {!lolkaServer && (
+                <p className="text-xs text-amber-400">⚠️ Lolka-сервер не подключён — выдача ролей из магазина недоступна, пока он не добавлен на странице «Серверы».</p>
               )}
             </div>
+
+            <div className="pt-3 border-t border-[rgb(var(--border))]">
+              <button
+                onClick={() => setShopTemplateOpen(true)}
+                className="text-sm font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+              >
+                ✏️ Настроить сообщение о покупке
+              </button>
+            </div>
           </Card>
+
+          {shopTemplateOpen && (
+            <ShopPurchaseTemplateModal
+              open={shopTemplateOpen}
+              onOpenChange={setShopTemplateOpen}
+              serverId={effectiveServerId}
+              platform={effectivePlatform}
+              initialText={formData.shop_purchase_template ?? settings?.shop_purchase_template ?? ''}
+              currencyName={formData.np_name ?? settings?.np_name ?? 'Nova Points'}
+              onSave={(text) => updateField('shop_purchase_template', text)}
+            />
+          )}
         </div>
       )}
 

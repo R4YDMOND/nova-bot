@@ -110,6 +110,7 @@ export type RankingSettings = {
   np_emoji: string;
   np_cooldown_minutes: number;
   np_daily_limit: number;
+  shop_purchase_template: string;
 };
 
 export type NovaPointEntry = {
@@ -711,6 +712,12 @@ export const api = {
       apiFetch<{ status: string; error?: string }>(
         `/api/nova-points/shop/${itemId}?server_id=${serverId}&platform=${platform}`,
         { method: "DELETE" }
+      ),
+
+    generateShopMessage: (serverId: string, platform: "vk" | "lolka") =>
+      apiFetch<{ status: string; text?: string; error?: string }>(
+        `/api/nova-points/shop/generate-message?server_id=${serverId}&platform=${platform}`,
+        { method: "POST" }
       ),
   },
 

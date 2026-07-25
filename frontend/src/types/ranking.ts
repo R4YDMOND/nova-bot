@@ -74,6 +74,8 @@ export interface RankingSettings {
   np_emoji: string;
   np_cooldown_minutes: number;
   np_daily_limit: number;
+  /** Шаблон сообщения о покупке в магазине ролей — {user}/{item}/{price}/{currency}/{balance} (ТЗ №5 Rev.9, п.12) */
+  shop_purchase_template: string;
 }
 
 export interface NovaPointEntry {

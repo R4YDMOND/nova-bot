@@ -12,6 +12,7 @@ from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text, resolve_action, resolve_receiver_id
 from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows, claim_daily, list_shop_items, buy_shop_item, get_currency_label
+from ranking.account_link import generate_link_code, confirm_link_code, resolve_lolka_guild_for_server
 from ranking.cache import cache as _shared_cache
 from ranking import np_farm_cache
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service, VKLongPollListener
@@ -179,18 +180,28 @@ async def _handle_vk_message_event(
                 db = SessionLocal()
                 try:
                     buy_result = buy_shop_item(db, server_id, "vk", str(user_id), item_id)
+                    if buy_result.get("status") == "ok":
+                        text = await _grant_shop_role_in_lolka(db, server_id, buy_result)
+                    else:
+                        text = buy_result.get("error", "Не удалось купить товар")
                 finally:
                     db.close()
-                if buy_result.get("status") == "ok":
-                    text = buy_result.get("message") + ". На VK роль выдаётся вручную — API сообщества не поддерживает назначение ролей участникам."
-                else:
-                    text = buy_result.get("error", "Не удалось купить товар")
                 await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
 
         else:
             await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id)
     except Exception as e:
         logger.error(f"VK message_event handling error: {e}")
+
+
+async def _grant_shop_role_in_lolka(db, vk_server_id: str, buy_result: dict) -> str:
+    """После успешного списания VK-баланса (buy_shop_item) выдаёт купленную роль в связанном
+    Lolka-аккаунте (ТЗ №5 Rev.9, п.13 — единый кошелёк). Возвращает итоговый текст для VK snackbar."""
+    guild_id = resolve_lolka_guild_for_server(db, vk_server_id)
+    if not guild_id or not lolka_gateway_instance:
+        return buy_result.get("message", "") + " ⚠️ Не удалось выдать роль в Lolka (бот не подключён к Lolka-серверу этого проекта)"
+    await lolka_gateway_instance._grant_role(guild_id, buy_result["target_user_id"], buy_result["role_id"])
+    return buy_result.get("message", "")
 
 
 def _resolve_shop_item_id(payload) -> Optional[int]:
@@ -417,6 +428,27 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                                 )
                         except VKAPIError as e:
                             print(f"❌ VK event: ошибка отправки /shop — {e}")
+
+                if lower_text == "/link" or lower_text.startswith("/link "):
+                    parts = text.strip().split(maxsplit=1)
+                    if len(parts) == 1:
+                        link_result = generate_link_code(db, str(conn.server_id), "vk", str(from_id))
+                        if link_result.get("status") == "ok":
+                            reply_text = (
+                                f"🔗 Код для связки аккаунтов: {link_result['code']}\n"
+                                f"Введите «/link {link_result['code']}» в Lolka в течение 10 минут, "
+                                f"чтобы Nova Points и роли работали на обеих платформах через один баланс."
+                            )
+                        else:
+                            reply_text = link_result.get("error", "Не удалось создать код")
+                    else:
+                        confirm_result = confirm_link_code(db, str(conn.server_id), "vk", str(from_id), parts[1])
+                        reply_text = "✅ Аккаунты VK и Lolka связаны!" if confirm_result.get("status") == "ok" \
+                            else confirm_result.get("error", "Не удалось связать аккаунты")
+                    try:
+                        await asyncio.to_thread(get_vk_service(conn.access_token).send_message, peer_id=peer_id, message=reply_text)
+                    except VKAPIError as e:
+                        print(f"❌ VK event: ошибка ответа /link — {e}")
 
         # ── Group join / leave ────────────────────────────────────────
         elif event_type == "group_join":
@@ -3096,6 +3128,7 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "np_emoji": s.np_emoji,
         "np_cooldown_minutes": s.np_cooldown_minutes,
         "np_daily_limit": s.np_daily_limit,
+        "shop_purchase_template": s.shop_purchase_template,
     }
 
 
@@ -3151,6 +3184,7 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             "card_bg_image_url", "card_bg_image_enabled", "card_bg_shade",
             "card_bg_fit", "card_bg_position",
             "np_enabled", "np_name", "np_emoji", "np_cooldown_minutes", "np_daily_limit",
+            "shop_purchase_template",
         }
         for field in simple_fields:
             if field in payload:
@@ -3472,6 +3506,47 @@ def api_delete_shop_item(item_id: int, server_id: str = Query(...), platform: st
         return {"status": "ok"}
     except Exception as e:
         db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/nova-points/shop/generate-message")
+async def api_generate_shop_message(server_id: str = Query(...), platform: str = Query("lolka")):
+    """
+    Черновик текста сообщения о покупке через AI (ТЗ №5 Rev.9, п.12+16) — использует
+    LLMRouter с провайдером из AISettings этого сервера (если настроен), иначе дефолтный.
+    Возвращает ГОТОВЫЙ ШАБЛОН с плейсхолдерами {user}/{item}/{price}/{currency}/{balance} —
+    админ может отредактировать перед сохранением (см. ShopPurchaseTemplateModal.tsx).
+    """
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        ai_settings_row = db.query(AISettings).filter(AISettings.server_id == server.id).first()
+        currency = get_currency_label(db, str(server.id), platform)["name"]
+        provider = (ai_settings_row.provider if ai_settings_row else None) or "yandexgpt"
+
+        router = ai_engine.LLMRouter(provider)
+        prompt = (
+            f"Напиши короткое дружелюбное сообщение бота о покупке роли за внутриигровую валюту "
+            f'"{currency}" в чат-боте сообщества. Обязательно используй плейсхолдеры {{user}}, {{item}}, '
+            f"{{price}}, {{currency}}, {{balance}} ровно в таком виде (не переводи их и не меняй фигурные "
+            f"скобки). Пример смысла: поздравление с покупкой {{item}} за {{price}} {{currency}}, "
+            f"текущий баланс {{balance}} {{currency}}. Без Markdown, максимум 2 коротких предложения, "
+            f"можно 1 эмодзи. Ответь только текстом сообщения, без пояснений."
+        )
+        try:
+            text, _provider = await asyncio.to_thread(
+                router.chat, [{"role": "user", "content": prompt}], 0.8, 150
+            )
+        except ai_engine.LLMError as e:
+            return {"error": f"AI недоступен: {e}"}
+
+        return {"status": "ok", "text": text.strip()}
+    except Exception as e:
         return {"error": str(e)}
     finally:
         db.close()
