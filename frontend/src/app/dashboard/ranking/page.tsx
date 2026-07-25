@@ -15,6 +15,9 @@ import {
   useRankingRoles,
   useSyncMembers,
   useNovaPointsTop,
+  useShopItems,
+  useCreateShopItem,
+  useDeleteShopItem,
 } from '@/hooks/useRanking';
 import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
 import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
@@ -314,6 +317,42 @@ export default function RankingPage() {
     effectiveServerId, effectivePlatform, npPeriod, activeTab === 'nova-points'
   );
   const npEntries = npTopData?.entries ?? [];
+
+  // ── ТЗ №5 Rev.9, п.12: магазин ролей ──────────────────────────────────
+  const { data: shopData, isFetching: shopLoading } = useShopItems(effectiveServerId, effectivePlatform, activeTab === 'nova-points');
+  const shopItems = shopData?.items ?? [];
+  const createShopItemMutation = useCreateShopItem();
+  const deleteShopItemMutation = useDeleteShopItem();
+  const [newShopRoleId, setNewShopRoleId] = useState('');
+  const [newShopRoleName, setNewShopRoleName] = useState('');
+  const [newShopPrice, setNewShopPrice] = useState('');
+  const [shopFormError, setShopFormError] = useState<string | null>(null);
+
+  const handleAddShopItem = async () => {
+    setShopFormError(null);
+    const price = parseInt(newShopPrice, 10);
+    if (!newShopRoleId.trim() || !price || price <= 0) {
+      setShopFormError('Укажите роль и цену больше 0');
+      return;
+    }
+    try {
+      await createShopItemMutation.mutateAsync({
+        serverId: effectiveServerId, platform: effectivePlatform,
+        data: { role_id: newShopRoleId.trim(), role_name: newShopRoleName.trim(), price },
+      });
+      setNewShopRoleId(''); setNewShopRoleName(''); setNewShopPrice('');
+    } catch {
+      setShopFormError('Не удалось добавить товар');
+    }
+  };
+
+  const handleDeleteShopItem = async (itemId: number) => {
+    try {
+      await deleteShopItemMutation.mutateAsync({ serverId: effectiveServerId, platform: effectivePlatform, itemId });
+    } catch {
+      alert('❌ Не удалось удалить товар');
+    }
+  };
 
   const updateField = (field: string, value: any) => setFormData((prev: any) => ({ ...prev, [field]: value }));
 
@@ -1044,6 +1083,95 @@ export default function RankingPage() {
             ) : (
               <p className="text-center text-[rgb(var(--text-secondary))] py-12">🌟 Пока никто не получил {formData.np_name ?? settings?.np_name ?? 'Nova Points'}</p>
             )}
+          </Card>
+
+          <Card className="p-5 space-y-4">
+            <div>
+              <h3 className="font-semibold flex items-center gap-1.5">
+                🛒 Магазин ролей
+                <Hint text="Участники покупают роль за очки командой /shop. На Lolka роль выдаётся автоматически; на VK у сообщества нет API для назначения ролей участникам, поэтому покупка только списывает баланс и подтверждается сообщением." />
+              </h3>
+              <p className="text-xs text-[rgb(var(--text-secondary))] mt-1">
+                {effectivePlatform === 'vk'
+                  ? 'На VK роль — это просто название товара; реальная выдача возможна только вручную.'
+                  : 'Роль выдаётся автоматически участнику сразу после покупки.'}
+              </p>
+            </div>
+
+            {shopLoading ? (
+              <p className="text-center py-8 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</p>
+            ) : shopItems.length > 0 ? (
+              <div className="space-y-2">
+                {shopItems.map(item => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-[rgb(var(--surface-2))]">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{item.role_name || item.role_id}</p>
+                      <p className="text-xs text-[rgb(var(--text-secondary))]">
+                        {item.price} {formData.np_name ?? settings?.np_name ?? 'Nova Points'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteShopItem(item.id)}
+                      disabled={deleteShopItemMutation.isPending}
+                      className="px-2 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                      title="Удалить товар"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-[rgb(var(--text-secondary))] py-6 text-sm">Магазин пуст — добавьте первый товар ниже</p>
+            )}
+
+            <div className="pt-3 border-t border-[rgb(var(--border))] space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {effectivePlatform === 'lolka' ? (
+                  <select
+                    value={newShopRoleId}
+                    onChange={e => {
+                      const role = serverRoles.find(r => r.id === e.target.value);
+                      setNewShopRoleId(e.target.value);
+                      setNewShopRoleName(role?.name ?? '');
+                    }}
+                    className="input sm:col-span-1"
+                  >
+                    <option value="">{rolesLoading ? 'Загрузка ролей...' : 'Выберите роль'}</option>
+                    {serverRoles.map(role => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Название товара (например, «VIP»)"
+                    value={newShopRoleName}
+                    onChange={e => { setNewShopRoleName(e.target.value); setNewShopRoleId(e.target.value); }}
+                    className="input sm:col-span-1"
+                  />
+                )}
+                <input
+                  type="number"
+                  min={1}
+                  placeholder={`Цена в ${formData.np_name ?? settings?.np_name ?? 'Nova Points'}`}
+                  value={newShopPrice}
+                  onChange={e => setNewShopPrice(e.target.value)}
+                  className="input"
+                />
+                <button
+                  onClick={handleAddShopItem}
+                  disabled={createShopItemMutation.isPending}
+                  className="px-3 py-1.5 rounded-xl text-sm font-medium bg-cyan-400 text-black hover:bg-cyan-300 transition-colors disabled:opacity-50"
+                >
+                  {createShopItemMutation.isPending ? 'Добавление...' : '+ Добавить товар'}
+                </button>
+              </div>
+              {shopFormError && <p className="text-xs text-red-400">{shopFormError}</p>}
+              {rolesData?.error && effectivePlatform === 'lolka' && (
+                <p className="text-xs text-amber-400">⚠️ {rolesData.error}</p>
+              )}
+            </div>
           </Card>
         </div>
       )}

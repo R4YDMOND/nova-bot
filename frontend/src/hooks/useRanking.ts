@@ -144,3 +144,35 @@ export function useNovaPointsTop(serverId: string, platform: 'vk' | 'lolka' = 'v
     refetchInterval: 60 * 1000,
   });
 }
+
+// ── ТЗ №5 Rev.9, п.12: магазин ролей ─────────────────────────────────────
+export function useShopItems(serverId: string, platform: 'vk' | 'lolka' = 'vk', enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['ranking', 'nova-points', 'shop', serverId, platform],
+    queryFn: () => api.novaPoints.listShopItems(serverId, platform),
+    enabled: !!serverId && enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useCreateShopItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serverId, platform, data }: { serverId: string; platform: 'vk' | 'lolka'; data: { role_id: string; role_name?: string; price: number } }) =>
+      api.novaPoints.createShopItem(serverId, platform, data),
+    onSuccess: (_, { serverId, platform }) => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'nova-points', 'shop', serverId, platform] });
+    },
+  });
+}
+
+export function useDeleteShopItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serverId, platform, itemId }: { serverId: string; platform: 'vk' | 'lolka'; itemId: number }) =>
+      api.novaPoints.deleteShopItem(serverId, platform, itemId),
+    onSuccess: (_, { serverId, platform }) => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'nova-points', 'shop', serverId, platform] });
+    },
+  });
+}

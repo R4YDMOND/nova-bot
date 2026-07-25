@@ -126,6 +126,14 @@ export type NovaPointTopEntry = {
   points: number;
 };
 
+/** Товар магазина ролей (ТЗ №5 Rev.9, п.12) */
+export type ShopItem = {
+  id: number;
+  role_id: string;
+  role_name: string;
+  price: number;
+};
+
 export type RankingChannel = {
   id: string;
   name: string;
@@ -685,6 +693,24 @@ export const api = {
       apiFetch<{ status: string; total_points?: number; error?: string }>(
         `/api/nova-points/give?server_id=${serverId}&platform=${platform}`,
         { method: "POST", body: JSON.stringify({ giver_id: giverId, receiver_id: receiverId, reason }) }
+      ),
+
+    // ── ТЗ №5 Rev.9, п.12: магазин ролей ────────────────────────────────
+    listShopItems: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+      apiFetch<{ items: ShopItem[]; currency_name?: string; currency_emoji?: string; error?: string }>(
+        `/api/nova-points/shop?server_id=${serverId}&platform=${platform}`
+      ),
+
+    createShopItem: (serverId: string, platform: "vk" | "lolka", data: { role_id: string; role_name?: string; price: number }) =>
+      apiFetch<{ status: string; id?: number; error?: string }>(
+        `/api/nova-points/shop?server_id=${serverId}&platform=${platform}`,
+        { method: "POST", body: JSON.stringify(data) }
+      ),
+
+    deleteShopItem: (serverId: string, platform: "vk" | "lolka", itemId: number) =>
+      apiFetch<{ status: string; error?: string }>(
+        `/api/nova-points/shop/${itemId}?server_id=${serverId}&platform=${platform}`,
+        { method: "DELETE" }
       ),
   },
 
