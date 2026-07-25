@@ -104,6 +104,7 @@ export interface CustomCommand {
   usageCount?: number;            // пишет backend при выполнении (log_usage), UI только читает
   showInHelp: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface CommandsConfig {
@@ -124,6 +125,7 @@ export function normalizeCustomCommand(cmd: CustomCommand): CustomCommand {
     ignoredRoles: cmd.ignoredRoles || [],
     allowedChannels: cmd.allowedChannels || [],
     ignoredChannels: cmd.ignoredChannels || [],
+    updatedAt: cmd.updatedAt || cmd.createdAt,
   };
 }
 

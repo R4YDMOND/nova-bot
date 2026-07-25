@@ -28,7 +28,7 @@ const VK_PERMISSION_OPTIONS: Permission[] = ['all', 'moderator', 'editor', 'admi
 
 const MODULE_NAME = 'commands';
 type Server = DashboardServer;
-type SortKey = 'name_asc' | 'name_desc' | 'created' | 'popularity';
+type SortKey = 'name_asc' | 'name_desc' | 'created' | 'updated' | 'popularity' | 'cooldown';
 
 // Единая карточка для рендера — и встроенная, и пользовательская команда.
 interface ViewCommand {
@@ -47,6 +47,7 @@ interface ViewCommand {
   ignoredChannels: string[];
   enabled: boolean;
   createdAt?: string;
+  updatedAt?: string;
   usageCount: number;
   custom?: CustomCommand;
   builtinOverride?: BuiltinOverride;
@@ -183,7 +184,7 @@ export default function CommandsPage() {
         category: c.category, platforms: c.platforms, cooldown: c.cooldown, permission: c.permission,
         allowedRoles: c.allowedRoles, ignoredRoles: c.ignoredRoles,
         allowedChannels: c.allowedChannels, ignoredChannels: c.ignoredChannels,
-        enabled: c.enabled, createdAt: c.createdAt, usageCount: c.usageCount ?? 0, custom: c,
+        enabled: c.enabled, createdAt: c.createdAt, updatedAt: c.updatedAt, usageCount: c.usageCount ?? 0, custom: c,
       }));
     return [...builtins, ...customs];
   }, [config, platformFilter]);
@@ -198,6 +199,8 @@ export default function CommandsPage() {
       if (sortKey === 'name_asc') return a.name.localeCompare(b.name);
       if (sortKey === 'name_desc') return b.name.localeCompare(a.name);
       if (sortKey === 'popularity') return b.usageCount - a.usageCount;
+      if (sortKey === 'cooldown') return a.cooldown - b.cooldown;
+      if (sortKey === 'updated') return (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || '');
       return (b.createdAt || '').localeCompare(a.createdAt || '');
     });
     return list;
@@ -350,7 +353,9 @@ export default function CommandsPage() {
               <option value="name_asc">По имени (А-Я)</option>
               <option value="name_desc">По имени (Я-А)</option>
               <option value="popularity">По популярности</option>
+              <option value="cooldown">По кулдауну</option>
               <option value="created">По дате создания</option>
+              <option value="updated">По дате изменения</option>
             </select>
           </div>
 

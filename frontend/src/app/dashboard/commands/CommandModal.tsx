@@ -37,7 +37,7 @@ function emptyForm(): FormState {
     cooldown: 0, permission: 'all',
     allowedRoles: [], ignoredRoles: [], allowedChannels: [], ignoredChannels: [],
     response: '',
-    enabled: true, logUsage: true, showInHelp: true,
+    enabled: true, logUsage: true, showInHelp: true, updatedAt: '',
   };
 }
 
@@ -94,6 +94,7 @@ export function CommandModal({
       createdAt: initial?.createdAt || new Date().toISOString(),
       ...form,
       name: form.name.toLowerCase(),
+      updatedAt: new Date().toISOString(),
     });
   };
 
