@@ -100,6 +100,8 @@ export interface CustomCommand {
   ignoredChannels: string[];
   response: string;
   enabled: boolean;
+  isFavorite: boolean;            // ⭐ только фильтр/сортировка на фронте, backend не проверяет
+  isDraft: boolean;               // 📝 никогда не выполняется и не видна в /help, независимо от enabled
   logUsage: boolean;
   usageCount?: number;            // пишет backend при выполнении (log_usage), UI только читает
   showInHelp: boolean;
@@ -126,6 +128,8 @@ export function normalizeCustomCommand(cmd: CustomCommand): CustomCommand {
     allowedChannels: cmd.allowedChannels || [],
     ignoredChannels: cmd.ignoredChannels || [],
     updatedAt: cmd.updatedAt || cmd.createdAt,
+    isFavorite: cmd.isFavorite ?? false,
+    isDraft: cmd.isDraft ?? false,
   };
 }
 

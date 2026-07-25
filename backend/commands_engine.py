@@ -169,6 +169,37 @@ class CommandsEngine:
 
     # ── Поиск команды ────────────────────────────────────────────────────
 
+    @staticmethod
+    def _build_help_response(commands_config: Dict[str, Any], platform: str) -> str:
+        """
+        Раньше /help был статическим текстом (только ping/help), showInHelp у
+        пользовательских команд ни на что не влиял. Теперь список собирается из
+        реального конфига сервера: встроенный ping (если включён) + пользовательские
+        команды с showInHelp=True, enabled=True, не черновики (isDraft), для текущей
+        платформы. ТЗ №7, группа C — "Черновик" честно скрыт из /help.
+        """
+        lines = ["🤖 Команды Нова:"]
+        builtin_overrides = {o.get("name"): o for o in (commands_config.get("builtin") or [])}
+        if (builtin_overrides.get("ping") or {}).get("enabled", True):
+            lines.append("🏓 /ping — проверка бота")
+        lines.append("❓ /help — список команд")
+
+        prefix_field = "vkPrefix" if platform == "vk" else "lolkaPrefix"
+        for cmd in commands_config.get("custom") or []:
+            if not cmd.get("enabled", True) or cmd.get("isDraft"):
+                continue
+            if not cmd.get("showInHelp", True):
+                continue
+            if platform not in (cmd.get("platforms") or []):
+                continue
+            prefix = (cmd.get(prefix_field) or "").strip()
+            if not prefix:
+                continue
+            desc = cmd.get("description") or cmd.get("name", "")
+            lines.append(f"⚙️ {prefix} — {desc}")
+
+        return "\n".join(lines)
+
     def match(self, text: str, platform: str, commands_config: Dict[str, Any]) -> Optional[CommandMatch]:
         """
         commands_config — распарсенный JSON конфига модуля 'commands' сервера:
@@ -202,6 +233,8 @@ class CommandsEngine:
         for cmd in custom_commands:
             if not cmd.get("enabled", True):
                 continue
+            if cmd.get("isDraft"):
+                continue
             if platform not in (cmd.get("platforms") or []):
                 continue
             prefix = (cmd.get(prefix_field) or "").strip().lower()
@@ -222,9 +255,10 @@ class CommandsEngine:
                 override = builtin_overrides.get(name) or {}
                 if not override.get("enabled", True):
                     return None
+                response = self._build_help_response(commands_config, platform) if name == "help" else BUILTIN_RESPONSES[name]
                 return CommandMatch(
                     name=name,
-                    response=BUILTIN_RESPONSES[name],
+                    response=response,
                     cooldown=int(override.get("cooldown", 0) or 0),
                     permission=override.get("permission", "all"),
                     log_usage=True,

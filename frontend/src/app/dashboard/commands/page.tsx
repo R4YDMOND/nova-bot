@@ -14,7 +14,6 @@ import { PlatformIcon } from '@/components/PlatformIcon';
 import { cn } from '@/lib/utils';
 import { CommandModal } from './CommandModal';
 import { RoleMultiSelect, ChannelMultiSelect } from '@/components/ranking/RankingFormControls';
-import { useToast } from '@/hooks/use-toast';
 import {
   BUILTIN_COMMANDS, BuiltinOverride, CATEGORY_LABELS, Category, CommandsConfig,
   CustomCommand, EMPTY_CONFIG, PERMISSION_LABELS, Permission, Platform,
@@ -46,6 +45,8 @@ interface ViewCommand {
   allowedChannels: string[];
   ignoredChannels: string[];
   enabled: boolean;
+  isFavorite: boolean;
+  isDraft: boolean;
   createdAt?: string;
   updatedAt?: string;
   usageCount: number;
@@ -61,7 +62,6 @@ function hasAccessRestriction(c: ViewCommand, platform: Platform): boolean {
 
 export default function CommandsPage() {
   const { servers, selectedServer, selectedServerId, selectServer, loading: serverLoading } = useServer();
-  const { toast, ToastContainer } = useToast();
   const [platformFilter, setPlatformFilter] = useState<Platform>('vk');
   const [config, setConfig] = useState<CommandsConfig>(EMPTY_CONFIG);
   const [loading, setLoading] = useState(true);
@@ -70,6 +70,7 @@ export default function CommandsPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<Category | 'all'>('all');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('name_asc');
 
   const [modalCmd, setModalCmd] = useState<CustomCommand | null | 'new'>(null);
@@ -132,11 +133,13 @@ export default function CommandsPage() {
 
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingConfig = useRef<CommandsConfig | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const flushPersist = async () => {
     if (!effectiveServer || !pendingConfig.current) return;
     const next = pendingConfig.current;
     setSaving(true);
+    setSaveError(null);
     try {
       const res = await api.modules.saveConfig(String(effectiveServerId), effectiveServer.platform, MODULE_NAME, next);
       if (res.error) throw new Error(res.error);
@@ -144,7 +147,10 @@ export default function CommandsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      toast('Не удалось сохранить изменения — сервер бота не отвечает (уже после повторной попытки), попробуйте через минуту', 'error');
+      // Не toast: пропадает сам через несколько секунд и легко теряется среди списка команд.
+      // Постоянная плашка снизу — видна, пока пользователь явно не нажмёт "Повторить" (данные
+      // при этом не теряются — pendingConfig.current сохраняет последнее изменение).
+      setSaveError('Сервер бота не отвечает (уже после повторной попытки)');
     } finally {
       setSaving(false);
     }
@@ -173,6 +179,7 @@ export default function CommandsPage() {
           allowedRoles: override?.allowedRoles ?? [], ignoredRoles: override?.ignoredRoles ?? [],
           allowedChannels: override?.allowedChannels ?? [], ignoredChannels: override?.ignoredChannels ?? [],
           enabled: override?.enabled ?? true,
+          isFavorite: false, isDraft: false,
           usageCount: override?.usageCount ?? 0,
           builtinOverride: override,
         };
@@ -184,7 +191,7 @@ export default function CommandsPage() {
         category: c.category, platforms: c.platforms, cooldown: c.cooldown, permission: c.permission,
         allowedRoles: c.allowedRoles, ignoredRoles: c.ignoredRoles,
         allowedChannels: c.allowedChannels, ignoredChannels: c.ignoredChannels,
-        enabled: c.enabled, createdAt: c.createdAt, updatedAt: c.updatedAt, usageCount: c.usageCount ?? 0, custom: c,
+        enabled: c.enabled, isFavorite: c.isFavorite, isDraft: c.isDraft, createdAt: c.createdAt, updatedAt: c.updatedAt, usageCount: c.usageCount ?? 0, custom: c,
       }));
     return [...builtins, ...customs];
   }, [config, platformFilter]);
@@ -193,6 +200,7 @@ export default function CommandsPage() {
     const q = searchQuery.toLowerCase();
     let list = allCommands.filter(c =>
       (categoryFilter === 'all' || c.category === categoryFilter) &&
+      (!favoritesOnly || c.isFavorite) &&
       (c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q))
     );
     list = [...list].sort((a, b) => {
@@ -204,7 +212,7 @@ export default function CommandsPage() {
       return (b.createdAt || '').localeCompare(a.createdAt || '');
     });
     return list;
-  }, [allCommands, searchQuery, categoryFilter, sortKey]);
+  }, [allCommands, searchQuery, categoryFilter, favoritesOnly, sortKey]);
 
   const previewCmd = filtered.find(c => c.key === previewKey) || filtered[0] || null;
 
@@ -227,6 +235,9 @@ export default function CommandsPage() {
 
   const toggleCustom = (id: string) =>
     persist({ ...config, custom: config.custom.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c) });
+
+  const toggleFavorite = (id: string) =>
+    persist({ ...config, custom: config.custom.map(c => c.id === id ? { ...c, isFavorite: !c.isFavorite } : c) });
 
   const saveCustom = (cmd: CustomCommand) => {
     const exists = config.custom.some(c => c.id === cmd.id);
@@ -357,6 +368,17 @@ export default function CommandsPage() {
               <option value="created">По дате создания</option>
               <option value="updated">По дате изменения</option>
             </select>
+            <button
+              type="button"
+              onClick={() => setFavoritesOnly(v => !v)}
+              title="Только избранное"
+              className={cn(
+                'input flex items-center gap-1.5 px-3 cursor-pointer text-sm whitespace-nowrap',
+                favoritesOnly && 'border-amber-400 text-amber-500 bg-amber-500/10'
+              )}
+            >
+              {favoritesOnly ? '⭐' : '☆'} Избранное
+            </button>
           </div>
 
           {/* Список команд */}
@@ -398,9 +420,13 @@ export default function CommandsPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <code className="bg-[rgb(var(--surface-2))] px-2 py-0.5 rounded-lg text-primary font-mono text-xs">/{cmd.name}</code>
-                            <span className={cn('text-xs px-2 py-0.5 rounded-full', cmd.enabled ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400')}>
-                              {cmd.enabled ? '🟢 Активна' : '🔴 Неактивна'}
-                            </span>
+                            {cmd.isDraft ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-400">📝 Черновик</span>
+                            ) : (
+                              <span className={cn('text-xs px-2 py-0.5 rounded-full', cmd.enabled ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400')}>
+                                {cmd.enabled ? '🟢 Активна' : '🔴 Неактивна'}
+                              </span>
+                            )}
                             {hasAccessRestriction(cmd, platformFilter) && (
                               <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">
                                 🔒 {platformFilter === 'vk' ? PERMISSION_LABELS[cmd.permission] : 'Ограничен доступ'}
@@ -420,6 +446,15 @@ export default function CommandsPage() {
                       <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                         {cmd.kind === 'custom' && cmd.custom && (
                           <>
+                            <button title={cmd.isFavorite ? 'Убрать из избранного' : 'В избранное'} onClick={() => toggleFavorite(cmd.custom!.id)}
+                              className={cn(
+                                'p-1.5 rounded-md border transition-colors',
+                                cmd.isFavorite
+                                  ? 'border-amber-400 text-amber-400 bg-amber-500/10'
+                                  : 'border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-amber-400 hover:bg-amber-500/10'
+                              )}>
+                              {cmd.isFavorite ? '⭐' : '☆'}
+                            </button>
                             <button title="Редактировать команду" onClick={() => setModalCmd(cmd.custom!)}
                               className="p-1.5 rounded-md border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
                               <Pencil className="w-3.5 h-3.5" />
@@ -578,17 +613,32 @@ export default function CommandsPage() {
         </div>
       )}
 
-      {saved && (
-        <div className="fixed bottom-6 right-6 bg-green-400 text-black px-5 py-3 rounded-2xl font-semibold shadow-xl z-50 animate-bounce flex items-center gap-2">
-          <Check className="w-5 h-5" /> Команда сохранена
+      {(saving || saved || saveError) && (
+        <div
+          className={cn(
+            'fixed bottom-0 left-0 right-0 z-50 px-6 py-4 flex flex-wrap items-center justify-center gap-3 shadow-2xl border-t text-sm sm:text-base',
+            saveError
+              ? 'bg-red-500 border-red-600 text-white'
+              : saved
+              ? 'bg-emerald-500 border-emerald-600 text-black'
+              : 'bg-[rgb(var(--surface-2))] border-[rgb(var(--border))] text-[rgb(var(--text))]'
+          )}
+        >
+          {saveError ? (
+            <>
+              <span className="flex items-center gap-2 font-medium">❌ Не удалось сохранить изменения: {saveError}</span>
+              <Button size="sm" variant="outline" className="!bg-white !text-red-600 hover:!bg-red-50" onClick={flushPersist}>
+                🔄 Повторить
+              </Button>
+              <button onClick={() => setSaveError(null)} className="ml-1 opacity-80 hover:opacity-100 text-lg leading-none" aria-label="Скрыть">✕</button>
+            </>
+          ) : saved ? (
+            <span className="flex items-center gap-2 font-semibold"><Check className="w-5 h-5" /> Изменения сохранены</span>
+          ) : (
+            <span className="flex items-center gap-2 font-medium"><Save className="w-4 h-4 animate-pulse" /> Сохранение...</span>
+          )}
         </div>
       )}
-      {saving && !saved && (
-        <div className="fixed bottom-6 right-6 bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text))] px-5 py-3 rounded-2xl font-medium shadow-xl z-50 flex items-center gap-2">
-          <Save className="w-4 h-4 animate-pulse" /> Сохранение...
-        </div>
-      )}
-      <ToastContainer />
     </div>
   );
 }

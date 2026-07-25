@@ -37,7 +37,7 @@ function emptyForm(): FormState {
     cooldown: 0, permission: 'all',
     allowedRoles: [], ignoredRoles: [], allowedChannels: [], ignoredChannels: [],
     response: '',
-    enabled: true, logUsage: true, showInHelp: true, updatedAt: '',
+    enabled: true, isFavorite: false, isDraft: false, logUsage: true, showInHelp: true, updatedAt: '',
   };
 }
 
@@ -261,6 +261,13 @@ export function CommandModal({
             <div className="flex justify-between items-center">
               <span className="text-sm text-[rgb(var(--text))]">Команда активна</span>
               <Switch checked={form.enabled} onCheckedChange={v => update('enabled', v)} />
+            </div>
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-sm text-[rgb(var(--text))]">📝 Черновик</span>
+                <p className="text-xs text-[rgb(var(--text-secondary))]">Сохранить без активации — не выполняется и не видна в /help</p>
+              </div>
+              <Switch checked={form.isDraft} onCheckedChange={v => update('isDraft', v)} />
             </div>
           </div>
         </div>
