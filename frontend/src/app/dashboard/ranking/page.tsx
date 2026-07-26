@@ -27,7 +27,7 @@ import { MessageTemplateModal } from '@/components/MessageTemplateModal';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 const TABS = [
-  { id: 'settings', label: '⚙️ Настройки' },
+  { id: 'settings', label: '⚙️ Общие' },
   { id: 'formula', label: '🧮 Формула XP' },
   { id: 'rewards', label: '🎁 Награды' },
   { id: 'leaderboard', label: '🏆 Лидерборд' },
@@ -238,7 +238,6 @@ export default function RankingPage() {
   const [sort, setSort] = useState<'xp' | 'level' | 'messages'>('xp');
   const [formulaTest, setFormulaTest] = useState<{ valid: boolean; test_xp?: number; level_10_required_xp?: number; error?: string } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingExpanded, setOnboardingExpanded] = useState(false);
 
   const effectivePlatform = viewPlatform;
 
@@ -452,20 +451,6 @@ export default function RankingPage() {
     try { localStorage.setItem(ONBOARDING_STORAGE_KEY, '1'); } catch {}
   };
 
-  // Сворачивание баннера (slide-up) + скролл к настройкам после «▶️ Начать настройку»
-  // (ТЗ №5 Rev.6, п.4.1.2). Framer Motion в проекте не используется ни в одном файле —
-  // анимация на CSS-transition, по аналогии с остальными transition-* в этом компоненте.
-  const [bannerCollapsing, setBannerCollapsing] = useState(false);
-  const tabsRef = useRef<HTMLDivElement>(null);
-  const handleStartSetup = () => {
-    setBannerCollapsing(true);
-    setTimeout(() => {
-      dismissOnboarding();
-      setBannerCollapsing(false);
-      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 400);
-  };
-
   if (serverLoading || settingsLoading) {
     return <div className="p-8 text-center text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
   }
@@ -535,59 +520,18 @@ export default function RankingPage() {
       </div>
 
       {showOnboarding && (
-        <div
-          className="grid transition-[grid-template-rows,opacity] duration-[400ms] ease-out"
-          style={{ gridTemplateRows: bannerCollapsing ? '0fr' : '1fr', opacity: bannerCollapsing ? 0 : 1 }}
-        >
-          <div className="overflow-hidden">
-            <div className="relative overflow-hidden rounded-2xl border border-[rgb(var(--border))] bg-[rgb(var(--surface-2))] p-5 sm:p-6">
-              <div className="pointer-events-none absolute -top-12 -right-12 w-40 h-40 rounded-full bg-cyan-400/20 blur-3xl" />
-              <div className="pointer-events-none absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-purple-500/20 blur-3xl" />
-              <button
-                type="button"
-                onClick={dismissOnboarding}
-                aria-label="Закрыть приветствие"
-                className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-lg text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-3))] transition-colors"
-              >
-                ✕
-              </button>
-              <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 pr-8 sm:pr-0">
-                <div className="flex-1">
-                  <h2 className="text-lg font-bold">🎮 Добро пожаловать в систему уровней!</h2>
-                  <p className="text-sm text-[rgb(var(--text-secondary))] mt-1">
-                    Настройте начисление опыта и мотивируйте участников вашего сообщества быть активнее.
-                  </p>
-                  {onboardingExpanded && (
-                    <p className="text-sm text-[rgb(var(--text-secondary))] mt-3 pt-3 border-t border-[rgb(var(--border))]">
-                      Участники получают XP за сообщения и голосовую активность («⚙️ Настройки»), повышают уровень по формуле из «🧮 Формула XP»
-                      и автоматически получают награды — роли, валюту или значки («🎁 Награды»). Прогресс всех участников виден в «🏆 Лидерборд»,
-                      а внешний вид карточки профиля настраивается на вкладке «🪪 Карточка».
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleStartSetup}
-                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-cyan-400 text-black hover:bg-cyan-300 transition-colors whitespace-nowrap"
-                  >
-                    ▶️ Начать настройку
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOnboardingExpanded(v => !v)}
-                    className="px-4 py-2 rounded-xl text-sm font-medium bg-[rgb(var(--surface-3))] hover:bg-[rgb(var(--surface-2))] transition-colors whitespace-nowrap"
-                  >
-                    ℹ️ {onboardingExpanded ? 'Свернуть' : 'Узнать больше'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <p className="text-sm text-[rgb(var(--text-secondary))] -mt-2">
+          Участники получают XP за сообщения и голосовую активность («⚙️ Общие»), повышают уровень по формуле из «🧮 Формула XP»
+          и автоматически получают награды — роли, валюту или значки («🎁 Награды»). Прогресс всех участников виден в «🏆 Лидерборд»,
+          а внешний вид карточки профиля настраивается на вкладке «🪪 Карточка».
+          {' '}
+          <button type="button" onClick={dismissOnboarding} className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+            Понятно, скрыть
+          </button>
+        </p>
       )}
 
-      <div ref={tabsRef} className="flex gap-1 mb-6 overflow-x-auto">
+      <div className="flex gap-1 mb-6 overflow-x-auto">
         {TABS.map(tab => (
           <button
             key={tab.id}

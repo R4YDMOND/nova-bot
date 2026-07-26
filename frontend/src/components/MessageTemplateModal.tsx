@@ -71,23 +71,31 @@ const VARIABLES: { group: string; items: { token: string; desc: string }[] }[] =
 
 const BUTTON_STYLES: { value: ButtonStyle; label: string; className: string }[] = [
   { value: 'primary', label: 'Primary', className: 'bg-cyan-400 text-black' },
-  { value: 'secondary', label: 'Secondary', className: 'bg-[rgb(var(--surface-3))] text-[rgb(var(--text))]' },
+  { value: 'secondary', label: 'Secondary', className: 'bg-[#4e5058] text-white' },
   { value: 'success', label: 'Success', className: 'bg-emerald-500 text-white' },
   { value: 'danger', label: 'Danger', className: 'bg-red-500 text-white' },
-  { value: 'link', label: 'Link', className: 'bg-transparent border border-[rgb(var(--border))] text-[rgb(var(--text))]' },
+  { value: 'link', label: 'Link', className: 'bg-transparent border border-gray-400 text-white underline' },
 ];
 
 /** Цвета превью для платформы VK — те же категории стилей (Primary/Secondary/Success/
  * Danger), что и в Lolka, но собственная палитра VK-клавиатур (см. _VK_BUTTON_COLOR
  * в backend/ranking/template.py: primary/secondary/positive/negative). Раньше превью
  * VK всегда рисовалось одним нейтральным классом независимо от b.style — кнопка
- * визуально «залипала» на один цвет при смене стиля. */
+ * визуально «залипала» на один цвет при смене стиля.
+ *
+ * ВАЖНО: цвета здесь заданы жёстко (не через CSS-переменные темы дашборда --surface-3/
+ * --text/--border), т.к. блок превью справа имитирует фиксированно-тёмный чат
+ * VK/Lolka и не должен зависеть от текущей светлой/тёмной темы самого дашборда —
+ * иначе в светлой теме текст/фон кнопки сливались с чёрным фоном превью (баг).
+ * VK API не поддерживает отдельный "link"-стиль кнопок — backend маппит link на тот
+ * же цвет, что и primary (_VK_BUTTON_COLOR), здесь для наглядности добавлено
+ * подчёркивание текста, чтобы отличать Link от Primary визуально в редакторе. */
 const VK_BUTTON_STYLES: Record<ButtonStyle, string> = {
   primary: 'bg-blue-500 text-white',
-  secondary: 'bg-[rgb(var(--surface-3))] text-[rgb(var(--text))] border border-[rgb(var(--border))]',
+  secondary: 'bg-[#4a4a4a] text-white border border-gray-500',
   success: 'bg-emerald-500 text-white',
   danger: 'bg-red-500 text-white',
-  link: 'bg-blue-500 text-white',
+  link: 'bg-blue-500 text-white underline',
 };
 
 let uidCounter = 0;
@@ -750,7 +758,7 @@ export function MessageTemplateModal({
                     );
                   })}
                   {selectMenu && (
-                    <div className="mt-2 px-3 py-2 rounded-lg bg-[rgb(var(--surface-2))] text-xs text-[rgb(var(--text-secondary))]">
+                    <div className="mt-2 px-3 py-2 rounded-lg bg-[#2b2d31] text-xs text-gray-300 border border-[#1e1f22]">
                       {selectMenu.placeholder || 'Выберите вариант'} ▾
                     </div>
                   )}
