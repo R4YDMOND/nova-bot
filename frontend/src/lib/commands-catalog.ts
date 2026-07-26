@@ -133,6 +133,52 @@ export function normalizeCustomCommand(cmd: CustomCommand): CustomCommand {
   };
 }
 
+const VALID_CATEGORIES: Category[] = ['info', 'moderation', 'levels', 'music', 'utility', 'ai', 'entertainment', 'economy', 'other'];
+const VALID_PLATFORMS: Platform[] = ['vk', 'lolka'];
+
+/** Приводит произвольный распарсенный JSON (экспорт/импорт, группа C) к валидной
+ *  CustomCommand — экспортированный файл мог редактироваться руками или прийти с другого
+ *  сервера/версии страницы, поэтому нельзя доверять форме объекта целиком. Всегда генерирует
+ *  новый id/даты — импорт не перезаписывает существующие команды. Бросает Error с понятной
+ *  причиной, если восстановить команду в принципе нельзя (нет валидного name). */
+export function sanitizeImportedCommand(raw: unknown, id: string): CustomCommand {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Ожидался объект команды');
+  }
+  const r = raw as Record<string, unknown>;
+  const name = typeof r.name === 'string' ? r.name.trim().toLowerCase() : '';
+  if (!name) {
+    throw new Error('Отсутствует или пустое поле "name"');
+  }
+  const now = new Date().toISOString();
+  const asStringArray = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  const platforms = asStringArray(r.platforms).filter((p): p is Platform => (VALID_PLATFORMS as string[]).includes(p));
+  return {
+    id,
+    name,
+    description: typeof r.description === 'string' ? r.description : '',
+    category: (VALID_CATEGORIES as string[]).includes(r.category as string) ? (r.category as Category) : 'other',
+    params: typeof r.params === 'string' ? r.params : '',
+    platforms: platforms.length > 0 ? platforms : ['vk', 'lolka'],
+    vkPrefix: typeof r.vkPrefix === 'string' ? r.vkPrefix : '',
+    lolkaPrefix: typeof r.lolkaPrefix === 'string' ? r.lolkaPrefix : '',
+    cooldown: typeof r.cooldown === 'number' && r.cooldown >= 0 ? r.cooldown : 0,
+    permission: normalizePermission(r.permission as string),
+    allowedRoles: asStringArray(r.allowedRoles),
+    ignoredRoles: asStringArray(r.ignoredRoles),
+    allowedChannels: asStringArray(r.allowedChannels),
+    ignoredChannels: asStringArray(r.ignoredChannels),
+    response: typeof r.response === 'string' ? r.response : '',
+    enabled: typeof r.enabled === 'boolean' ? r.enabled : true,
+    isFavorite: false,   // импорт не переносит личные пометки прошлого владельца файла
+    isDraft: typeof r.isDraft === 'boolean' ? r.isDraft : false,
+    logUsage: typeof r.logUsage === 'boolean' ? r.logUsage : true,
+    showInHelp: typeof r.showInHelp === 'boolean' ? r.showInHelp : true,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 export function defaultBuiltinOverride(cmd: BuiltinCommand): BuiltinOverride {
   return {
     name: cmd.name, enabled: true, cooldown: cmd.defaultCooldown, permission: cmd.defaultPermission,

@@ -17,7 +17,7 @@ import { RoleMultiSelect, ChannelMultiSelect } from '@/components/ranking/Rankin
 import {
   BUILTIN_COMMANDS, BuiltinOverride, CATEGORY_LABELS, Category, CommandsConfig,
   CustomCommand, EMPTY_CONFIG, PERMISSION_LABELS, Permission, Platform,
-  mergeBuiltinOverrides, defaultBuiltinOverride, normalizeCustomCommand,
+  mergeBuiltinOverrides, defaultBuiltinOverride, normalizeCustomCommand, sanitizeImportedCommand,
 } from '@/lib/commands-catalog';
 import type { RankingRole, RankingChannel } from '@/lib/api';
 
@@ -251,9 +251,83 @@ export default function CommandsPage() {
     setDeleteTarget(null);
   };
 
+  // ── Экспорт/импорт (группа C, текстовое ТЗ раздел 12) — целиком на клиенте: команда уже
+  // полностью представлена как JSON (CustomCommand), новый backend-эндпоинт не нужен.
+  const downloadJson = (data: unknown, filename: string) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCommand = (cmd: CustomCommand) => downloadJson(cmd, `${cmd.name || 'command'}.nova-command.json`);
+  const exportAllCustom = () => downloadJson(config.custom, `nova-commands-${platformFilter}.json`);
+
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // разрешить повторный импорт того же файла
+    if (!file) return;
+    setImportError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(String(reader.result));
+      } catch {
+        setImportError('Файл повреждён или не является JSON');
+        return;
+      }
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      const existingNames = new Set(config.custom.map(c => c.name.toLowerCase()));
+      const imported: CustomCommand[] = [];
+      const errors: string[] = [];
+      for (const raw of items) {
+        try {
+          const cmd = sanitizeImportedCommand(raw, crypto.randomUUID());
+          if (existingNames.has(cmd.name)) {
+            errors.push(`«${cmd.name}» — команда с таким именем уже существует, пропущена`);
+            continue;
+          }
+          existingNames.add(cmd.name);
+          imported.push(cmd);
+        } catch (err) {
+          errors.push(err instanceof Error ? err.message : 'Неизвестная ошибка');
+        }
+      }
+      if (imported.length === 0) {
+        setImportError(errors[0] || 'Файл не содержит валидных команд');
+        return;
+      }
+      persist({ ...config, custom: [...config.custom, ...imported] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      if (errors.length > 0) setImportError(`Импортировано ${imported.length}, пропущено: ${errors.join('; ')}`);
+    };
+    reader.onerror = () => setImportError('Не удалось прочитать файл');
+    reader.readAsText(file);
+  };
+
   const enabledCount = allCommands.filter(c => c.enabled).length;
   const builtinCount = allCommands.filter(c => c.kind === 'builtin').length;
   const customCount = allCommands.filter(c => c.kind === 'custom').length;
+
+  // ── Статистика команд (группа C, текстовое ТЗ раздел 11 — блок в футере) ──────────────
+  const pct = (n: number) => allCommands.length === 0 ? 0 : Math.round((n / allCommands.length) * 100);
+  const disabledCount = allCommands.length - enabledCount;
+  const categoryStats = useMemo(() => {
+    const counts = new Map<Category, number>();
+    for (const c of allCommands) counts.set(c.category, (counts.get(c.category) || 0) + 1);
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([cat, count]) => ({ cat, count, pct: pct(count) }));
+  }, [allCommands]);
 
   const platformPills = (
     <div className="flex p-1 rounded-lg border bg-[rgb(var(--surface))] border-[rgb(var(--border))]">
@@ -318,11 +392,32 @@ export default function CommandsPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--text-secondary))] hidden sm:inline">Платформа:</span>
           {platformPills}
+          <Button
+            onClick={exportAllCustom}
+            variant="outline"
+            title="Скачать все пользовательские команды этой платформы одним JSON-файлом"
+            disabled={config.custom.length === 0}
+            className="flex items-center gap-1.5 text-sm px-4 py-2.5"
+          >
+            📤 Экспорт
+          </Button>
+          <Button onClick={() => importFileRef.current?.click()} variant="outline" className="flex items-center gap-1.5 text-sm px-4 py-2.5">
+            📥 Импорт
+          </Button>
+          <input ref={importFileRef} type="file" accept="application/json,.json" onChange={handleImportFile} className="hidden" />
           <Button onClick={() => setModalCmd('new')} variant="gradient" className="flex items-center gap-1.5 text-sm px-5 py-2.5">
             <Plus className="w-4 h-4" /> Добавить команду
           </Button>
         </div>
       </div>
+
+      {importError && (
+        <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-sm rounded-xl px-4 py-3">
+          <span>⚠️</span>
+          <span className="flex-1">{importError}</span>
+          <button onClick={() => setImportError(null)} className="opacity-70 hover:opacity-100" aria-label="Скрыть">✕</button>
+        </div>
+      )}
 
       {/* Статистика */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -455,6 +550,10 @@ export default function CommandsPage() {
                               )}>
                               {cmd.isFavorite ? '⭐' : '☆'}
                             </button>
+                            <button title="Экспортировать команду" onClick={() => exportCommand(cmd.custom!)}
+                              className="p-1.5 rounded-md border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
+                              📤
+                            </button>
                             <button title="Редактировать команду" onClick={() => setModalCmd(cmd.custom!)}
                               className="p-1.5 rounded-md border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))] hover:bg-[rgb(var(--surface-2))] transition-colors">
                               <Pencil className="w-3.5 h-3.5" />
@@ -580,6 +679,29 @@ export default function CommandsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Статистика команд (footer, текстовое ТЗ раздел 11) */}
+      {allCommands.length > 0 && (
+        <Card className="p-6">
+          <h3 className="font-semibold text-[rgb(var(--text))] flex items-center gap-2 mb-4">📊 Статистика команд</h3>
+          <div className="grid sm:grid-cols-2 gap-6 text-sm">
+            <div className="space-y-1.5">
+              <p className="text-[rgb(var(--text-secondary))]">Всего команд: <span className="text-[rgb(var(--text))] font-medium">{allCommands.length}</span></p>
+              <p className="text-[rgb(var(--text-secondary))]">• Встроенных: <span className="text-[rgb(var(--text))] font-medium">{builtinCount} ({pct(builtinCount)}%)</span></p>
+              <p className="text-[rgb(var(--text-secondary))]">• Пользовательских: <span className="text-[rgb(var(--text))] font-medium">{customCount} ({pct(customCount)}%)</span></p>
+              <p className="text-[rgb(var(--text-secondary))]">• Отключённых: <span className="text-[rgb(var(--text))] font-medium">{disabledCount} ({pct(disabledCount)}%)</span></p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[rgb(var(--text-secondary))] mb-1">Популярные категории:</p>
+              {categoryStats.map(({ cat, count, pct: p }) => (
+                <p key={cat} className="text-[rgb(var(--text-secondary))]">
+                  {CATEGORY_LABELS[cat]} — <span className="text-[rgb(var(--text))] font-medium">{count} {count === 1 ? 'команда' : 'команд'} ({p}%)</span>
+                </p>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Модалка создания/редактирования */}
       {modalCmd !== null && (
