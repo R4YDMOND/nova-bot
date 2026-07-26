@@ -450,6 +450,25 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                     except VKAPIError as e:
                         print(f"❌ VK event: ошибка ответа /link — {e}")
 
+                if lower_text == "/ai" or lower_text.startswith("/ai "):
+                    question = text.strip()[3:].strip()
+                    if not question:
+                        reply_text = "Использование: /ai <вопрос>"
+                    else:
+                        ai_settings_for_reply = db.query(AISettings).filter(AISettings.server_id == conn.server_id).first()
+                        if not ai_settings_for_reply:
+                            reply_text = "AI не настроен для этого сервера — откройте /dashboard/ai"
+                        else:
+                            ai_reply = await asyncio.to_thread(
+                                ai_engine.generate_ai_reply, db, str(conn.server_id), str(peer_id), str(from_id),
+                                f"id{from_id}", "", question, ai_settings_for_reply, "vk", str(conn.group_id),
+                            )
+                            reply_text = ai_reply or "AI сейчас недоступен (дневной лимит исчерпан или все провайдеры недоступны)"
+                    try:
+                        await asyncio.to_thread(get_vk_service(conn.access_token).send_message, peer_id=peer_id, message=reply_text)
+                    except VKAPIError as e:
+                        print(f"❌ VK event: ошибка ответа /ai — {e}")
+
         # ── Group join / leave ────────────────────────────────────────
         elif event_type == "group_join":
             user_id = obj.get("user_id")
@@ -1137,7 +1156,7 @@ def get_ai_usage(server_id: str = Query("default")):
         server = db.query(Server).filter(Server.server_id == server_id).first()
         if not server:
             return {"used": 0, "limit": AI_DAILY_LIMIT}
-        used = ai_engine.get_usage_today(db, server_id)
+        used = ai_engine.get_usage_today(db, str(server.id))
         return {"used": used, "limit": AI_DAILY_LIMIT}
     except Exception as e:
         return {"error": str(e)}
@@ -1178,7 +1197,7 @@ def ai_playground(data: dict):
             return {"error": f"Все провайдеры недоступны: {e}"}
 
         if server:
-            ai_engine.increment_usage(db, server_id)
+            ai_engine.increment_usage(db, str(server.id))
 
         return {"reply": reply, "provider": used_provider, "systemPrompt": rendered_system}
     except Exception as e:
@@ -1212,7 +1231,7 @@ def ai_process_url(data: dict):
         except ai_engine.LLMError as e:
             return {"error": f"Все провайдеры недоступны: {e}"}
         if server:
-            ai_engine.increment_usage(db, server_id)
+            ai_engine.increment_usage(db, str(server.id))
         return {"result": result}
     except Exception as e:
         return {"error": str(e)}
@@ -4156,8 +4175,8 @@ async def max_webhook(request: Request):
         # 2. AI-ассистент — разговорный ответ (ТЗ №9; область MAX сейчас — только AI)
         if ai_settings_row:
             reply = await asyncio.to_thread(
-                ai_engine.generate_ai_reply, db, str(chat_id), str(chat_id), str(user_id),
-                user_name, server.name or "", text, ai_settings_row,
+                ai_engine.generate_ai_reply, db, str(server.id), str(chat_id), str(user_id),
+                user_name, server.name or "", text, ai_settings_row, "max", str(chat_id),
             )
             if reply:
                 await asyncio.to_thread(max_gateway.send_message, str(chat_id), reply)

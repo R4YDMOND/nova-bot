@@ -374,21 +374,87 @@ def translate_or_summarize(page_text: str, provider: str = "yandexgpt") -> str:
     return text
 
 
-# ==================== Разговорный AI-ответ (RAG + кэш + роутер) ====================
-# Общая точка входа для платформенных обработчиков (сейчас — MAX, см. backend/main.py::max_webhook).
-# Инкапсулирует весь пайплайн: лимит запросов → семантический кэш → RAG-память → LLMRouter → сохранение.
+# ==================== Разговорный AI-ответ (RAG + кэш + роутер + tools + URL) ====================
+# Общая точка входа для платформенных обработчиков (main.py::_process_vk_event / commands_engine
+# через special-case "/ai", lolka_gateway.py::_handle_ai, main.py::max_webhook).
+# Инкапсулирует весь пайплайн: лимит запросов → авто-детект URL → семантический кэш → RAG-память →
+# → Function Calling → LLMRouter → сохранение.
+
+_URL_RE = re.compile(r'https?://\S+')
+
+_PLATFORM_LABELS = {"vk": "VK", "lolka": "Lolka", "max": "MAX"}
+
+
+def _list_lolka_roles(guild_id: str) -> List[Dict[str, str]]:
+    """GET /guilds/{id}/roles — список ролей для подсказки LLM в Function Calling (grant_role)."""
+    token = os.getenv("LOLKA_BOT_TOKEN", "")
+    if not token or not guild_id:
+        return []
+    try:
+        resp = requests.get(
+            f"https://lolka.app/api/bot/v10/guilds/{guild_id}/roles",
+            headers={"Authorization": f"Bot {token}"}, timeout=10,
+        )
+        if not resp.ok:
+            return []
+        data = resp.json()
+        return [{"id": str(r.get("id")), "name": r.get("name", "")} for r in data if r.get("id")]
+    except Exception as e:
+        print(f"AI_TOOLS: не удалось получить роли Lolka — {e}")
+        return []
+
+
+def _try_parse_tool_call(text: str) -> Optional[Dict[str, Any]]:
+    """Если ответ модели — JSON вида {"tool_call": {"name":..., "arguments": {...}}}, парсит его."""
+    cleaned = re.sub(r"^```json|^```|```$", "", text.strip(), flags=re.MULTILINE).strip()
+    if not cleaned.startswith("{"):
+        return None
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        return None
+    call = data.get("tool_call")
+    if isinstance(call, dict) and call.get("name"):
+        return call
+    return None
+
 
 def generate_ai_reply(db: Session, server_id: str, channel_id: str, user_id: str, user_name: str,
-                       server_name: str, user_text: str, ai_settings) -> Optional[str]:
+                       server_name: str, user_text: str, ai_settings,
+                       platform: str = "", server_platform_id: str = "") -> Optional[str]:
     """Возвращает текст ответа AI-ассистента или None (лимит исчерпан / все провайдеры недоступны).
-    ai_settings — строка models.AISettings (provider/context_size/cache_enabled/system_prompt/temperature)."""
+    ai_settings — строка models.AISettings. platform/server_platform_id нужны для Function Calling
+    (grant_role требует guild_id Lolka) и для инжекции платформенного контекста в промпт."""
     daily_limit = int(os.getenv("AI_DAILY_LIMIT", "200"))
     if get_usage_today(db, server_id) >= daily_limit:
         return None
 
+    # ── Авто-детект и перевод/пересказ URL (ТЗ, этап 3.5, Acceptance Criteria №4) ──
+    url_match = _URL_RE.search(user_text)
+    if url_match:
+        url = url_match.group(0)
+        page_text = fetch_page_text(url)
+        if not page_text:
+            reply = "Не удалось прочитать содержимое страницы"
+        elif contains_forbidden_topics(page_text):
+            reply = "Содержимое страницы затрагивает запрещённую тематику"
+        else:
+            try:
+                reply = translate_or_summarize(page_text, ai_settings.provider or "yandexgpt")
+            except LLMError as e:
+                print(f"AI_REPLY: не удалось перевести URL — {e}")
+                reply = "Не удалось обработать ссылку — все провайдеры недоступны"
+        save_memory(db, server_id, channel_id, user_id, "user", user_text)
+        save_memory(db, server_id, channel_id, user_id, "assistant", reply)
+        increment_usage(db, server_id)
+        return reply
+
     system_prompt = build_system_prompt(
         ai_settings.system_prompt or "", user_name=user_name, server_name=server_name, channel_name=channel_id,
     )
+    platform_label = _PLATFORM_LABELS.get(platform)
+    if platform_label:
+        system_prompt += f"\n\nТы общаешься с пользователем на платформе {platform_label}."
 
     embedding = get_embedding(user_text) if ai_settings.cache_enabled else None
     if ai_settings.cache_enabled and embedding:
@@ -397,6 +463,22 @@ def generate_ai_reply(db: Session, server_id: str, channel_id: str, user_id: str
             save_memory(db, server_id, channel_id, user_id, "user", user_text)
             save_memory(db, server_id, channel_id, user_id, "assistant", cached)
             return cached
+
+    # ── Function Calling (ТЗ, этап 3.4) — сейчас единственный инструмент: выдача ролей Lolka ──
+    tools_enabled = bool(ai_settings.tool_grant_roles) and platform == "lolka" and bool(server_platform_id)
+    if tools_enabled:
+        roles = _list_lolka_roles(server_platform_id)
+        if roles:
+            roles_list = "\n".join(f'- "{r["name"]}" → role_id={r["id"]}' for r in roles)
+            system_prompt += (
+                "\n\nЕсли пользователь явно просит выдать ему роль (например, «выдай мне роль X»), "
+                "и такая роль есть в списке ниже, ответь СТРОГО JSON без пояснений: "
+                '{"tool_call": {"name": "grant_role", "arguments": {"user_id": "<ID из контекста диалога>", "role_id": "<id из списка>"}}}. '
+                f"В остальных случаях отвечай обычным текстом.\n\nДоступные роли:\n{roles_list}\n\n"
+                f"ID текущего пользователя: {user_id}"
+            )
+        else:
+            tools_enabled = False
 
     history = get_recent_memory(db, server_id, channel_id, ai_settings.context_size or 0)
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_text}]
@@ -408,9 +490,19 @@ def generate_ai_reply(db: Session, server_id: str, channel_id: str, user_id: str
         print(f"AI_REPLY: все провайдеры недоступны — {e}")
         return None
 
+    is_tool_call = False
+    if tools_enabled:
+        call = _try_parse_tool_call(reply)
+        if call:
+            is_tool_call = True
+            result = execute_tool(call.get("name"), call.get("arguments") or {}, platform, server_platform_id)
+            reply = result.get("message") or result.get("error") or "Не удалось выполнить действие"
+
     save_memory(db, server_id, channel_id, user_id, "user", user_text)
     save_memory(db, server_id, channel_id, user_id, "assistant", reply)
-    if ai_settings.cache_enabled and embedding:
+    # Ответы-вызовы инструментов не кладём в семантический кэш — они привязаны к конкретному
+    # user_id/контексту диалога и не переиспользуемы для других пользователей.
+    if ai_settings.cache_enabled and embedding and not is_tool_call:
         semantic_cache_store(db, server_id, user_text, embedding, reply)
     increment_usage(db, server_id)
     return reply

@@ -17,6 +17,10 @@ from ranking.account_link import generate_link_code, confirm_link_code
 from ranking import np_farm_cache
 from database import SessionLocal
 from commands_engine import get_commands_engine
+import ai_engine
+from moderation_engine import ModerationEngine, ModerationResult
+
+_moderation_engine = ModerationEngine()
 
 _commands_engine = get_commands_engine()
 
@@ -169,6 +173,52 @@ class LolkaGateway:
             # переопределения builtin просто недоступны без конфига (commands_config={}).
             server_id = self._resolve_server_id(guild_id) if guild_id else None
             member = data.get("member") or {}
+
+            # Модерация (Level 1 — локальные правила, Level 2 — AI) — ТЗ №9, этап 4.
+            # Раньше была подключена только для VK/MAX; Lolka — основная тестовая платформа,
+            # поэтому отсутствие проверки здесь было существенным пробелом.
+            if server_id and author.get("id"):
+                from models import ModuleConfig, ModerationEvent, AISettings
+
+                db = SessionLocal()
+                try:
+                    mod_config_row = db.query(ModuleConfig).filter(
+                        ModuleConfig.server_id == int(server_id), ModuleConfig.module_name == "moderation"
+                    ).first()
+                    mod_config = {}
+                    if mod_config_row and mod_config_row.config:
+                        try:
+                            mod_config = json.loads(mod_config_row.config)
+                        except Exception:
+                            pass
+
+                    result = _moderation_engine.check_message(author["id"], content, mod_config)
+
+                    if not result and _moderation_engine.is_suspicious(content):
+                        ai_settings_row = db.query(AISettings).filter(AISettings.server_id == int(server_id)).first()
+                        if ai_settings_row and ai_settings_row.moderation_enabled:
+                            toxicity = await asyncio.to_thread(
+                                ai_engine.check_toxicity, content, ai_settings_row.provider or "yandexgpt"
+                            )
+                            if toxicity["score"] >= ai_settings_row.moderation_threshold:
+                                result = ModerationResult(
+                                    "delete",
+                                    f"AI-модерация: токсичность {toxicity['score']}% (тематики: {', '.join(toxicity['topics']) or '—'})",
+                                    "aiModeration",
+                                )
+
+                    if result:
+                        await self._delete_message(channel_id, data.get("id", ""))
+                        db.add(ModerationEvent(
+                            server_id=int(server_id), platform="lolka", type=f"{result.action}_message",
+                            title=result.reason, description=f"Правило: {result.rule}",
+                            target_user_id=str(author["id"]), target_message_id=str(data.get("id", "")),
+                        ))
+                        db.commit()
+                        return
+                finally:
+                    db.close()
+
             if content.startswith("/"):
                 print(f"LOLKA GATEWAY DEBUG: получена команда '{content}' guild_id={guild_id} server_id={server_id} channel_id={channel_id}")
             reply = _commands_engine.execute(
@@ -197,6 +247,9 @@ class LolkaGateway:
                     await self._handle_shop(channel_id, server_id)
                 elif lower == "/link" or lower.startswith("/link "):
                     await self._handle_link(channel_id, server_id, str(author["id"]), content.strip())
+                elif lower == "/ai" or lower.startswith("/ai "):
+                    display_name = author.get("global_name") or author.get("username") or str(author["id"])
+                    await self._handle_ai(channel_id, server_id, str(author["id"]), display_name, content.strip(), str(guild_id))
 
         # Начисление XP за сообщение + level-up уведомление (по аналогии с VK, см. main.py)
         user_id = author.get("id")
@@ -217,6 +270,29 @@ class LolkaGateway:
                         server_id_for_farm, "lolka", str(user_id),
                         settings.np_farm_min, settings.np_farm_max,
                     )
+
+    async def _handle_ai(self, channel_id: str, server_id: str, user_id: str, user_name: str, raw_text: str, guild_id: str) -> None:
+        question = raw_text[3:].strip()
+        if not question:
+            await self.send_message(channel_id, "Использование: /ai <вопрос>")
+            return
+
+        from models import AISettings
+
+        db = SessionLocal()
+        try:
+            ai_settings_row = db.query(AISettings).filter(AISettings.server_id == int(server_id)).first()
+            if not ai_settings_row:
+                text = "AI не настроен для этого сервера — откройте /dashboard/ai"
+            else:
+                reply = await asyncio.to_thread(
+                    ai_engine.generate_ai_reply, db, server_id, channel_id, user_id,
+                    user_name, "", question, ai_settings_row, "lolka", guild_id,
+                )
+                text = reply or "AI сейчас недоступен (дневной лимит исчерпан или все провайдеры недоступны)"
+        finally:
+            db.close()
+        await self.send_message(channel_id, text)
 
     async def _handle_link(self, channel_id: str, server_id: str, user_id: str, raw_text: str) -> None:
         parts = raw_text.split(maxsplit=1)

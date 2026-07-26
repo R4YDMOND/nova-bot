@@ -30,35 +30,46 @@ def get_db():
 
 def _run_light_migrations():
     """Без Alembic: досоздаёт в уже существующих таблицах колонки,
-    которые есть в моделях, но отсутствуют в реальной БД (на Render)."""
+    которые есть в моделях, но отсутствуют в реальной БД (на Render).
+
+    Каждая ALTER TABLE выполняется в СВОЕЙ отдельной транзакции. Раньше весь цикл был
+    в одной with engine.begin(): одна неудачная миграция (например, "DEFAULT 1" для
+    BOOLEAN-колонки — валидно на SQLite, но не на Postgres) переводила транзакцию в
+    aborted-состояние, и ВСЕ последующие ALTER TABLE в этом же деплое падали с
+    (psycopg2.errors.InFailedSqlTransaction), хотя сами по себе были корректны.
+    """
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
 
-    with engine.begin() as conn:
-        for table in Base.metadata.sorted_tables:
-            if table.name not in existing_tables:
-                continue  # новую таблицу create_all уже создал целиком
-            existing_columns = {c["name"] for c in inspector.get_columns(table.name)}
-            for column in table.columns:
-                if column.name in existing_columns:
-                    continue
-                col_type = column.type.compile(dialect=engine.dialect)
-                default_clause = ""
-                if column.default is not None and getattr(column.default, "is_scalar", False):
-                    val = column.default.arg
-                    if isinstance(val, str):
-                        default_clause = f" DEFAULT '{val}'"
-                    elif isinstance(val, bool):
-                        default_clause = f" DEFAULT {1 if val else 0}"
-                    elif isinstance(val, (int, float)):
-                        default_clause = f" DEFAULT {val}"
-                try:
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue  # новую таблицу create_all уже создал целиком
+        existing_columns = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing_columns:
+                continue
+            col_type = column.type.compile(dialect=engine.dialect)
+            default_clause = ""
+            if column.default is not None and getattr(column.default, "is_scalar", False):
+                val = column.default.arg
+                if isinstance(val, str):
+                    default_clause = f" DEFAULT '{val}'"
+                elif isinstance(val, bool):
+                    # TRUE/FALSE — валидно и на Postgres (BOOLEAN), и на SQLite (алиасы 1/0
+                    # начиная с 3.23). "DEFAULT 1"/"DEFAULT 0" ломает Postgres:
+                    # (psycopg2.errors.DatatypeMismatch) column is of type boolean but
+                    # default expression is of type integer.
+                    default_clause = f" DEFAULT {'TRUE' if val else 'FALSE'}"
+                elif isinstance(val, (int, float)):
+                    default_clause = f" DEFAULT {val}"
+            try:
+                with engine.begin() as conn:
                     conn.execute(text(
                         f'ALTER TABLE {table.name} ADD COLUMN {column.name} {col_type}{default_clause}'
                     ))
-                    print(f"MIGRATE: added column {table.name}.{column.name}")
-                except Exception as e:
-                    print(f"MIGRATE WARNING: {table.name}.{column.name} — {e}")
+                print(f"MIGRATE: added column {table.name}.{column.name}")
+            except Exception as e:
+                print(f"MIGRATE WARNING: {table.name}.{column.name} — {e}")
 
 
 def _ensure_pgvector_extension():
