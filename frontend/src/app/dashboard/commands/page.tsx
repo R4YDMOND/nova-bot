@@ -677,31 +677,31 @@ export default function CommandsPage() {
               </div>
             )}
           </Card>
+
+          {/* Статистика команд (текстовое ТЗ раздел 11) — в сайдбаре, той же ширины, что Предпросмотр */}
+          {allCommands.length > 0 && (
+            <Card className="p-5 mt-6">
+              <h3 className="text-sm font-semibold text-[rgb(var(--text))] mb-4 flex items-center gap-2">
+                📊 Статистика команд
+              </h3>
+              <div className="space-y-1.5 text-sm">
+                <p className="text-[rgb(var(--text-secondary))]">Всего команд: <span className="text-[rgb(var(--text))] font-medium">{allCommands.length}</span></p>
+                <p className="text-[rgb(var(--text-secondary))]">• Встроенных: <span className="text-[rgb(var(--text))] font-medium">{builtinCount} ({pct(builtinCount)}%)</span></p>
+                <p className="text-[rgb(var(--text-secondary))]">• Пользовательских: <span className="text-[rgb(var(--text))] font-medium">{customCount} ({pct(customCount)}%)</span></p>
+                <p className="text-[rgb(var(--text-secondary))]">• Отключённых: <span className="text-[rgb(var(--text))] font-medium">{disabledCount} ({pct(disabledCount)}%)</span></p>
+              </div>
+              <div className="mt-4 pt-4 border-t border-[rgb(var(--border))] space-y-1.5 text-sm">
+                <p className="text-[rgb(var(--text-secondary))] mb-1">Популярные категории:</p>
+                {categoryStats.map(({ cat, count, pct: p }) => (
+                  <p key={cat} className="text-[rgb(var(--text-secondary))]">
+                    {CATEGORY_LABELS[cat]} — <span className="text-[rgb(var(--text))] font-medium">{count} {count === 1 ? 'команда' : 'команд'} ({p}%)</span>
+                  </p>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
-
-      {/* Статистика команд (footer, текстовое ТЗ раздел 11) */}
-      {allCommands.length > 0 && (
-        <Card className="p-6">
-          <h3 className="font-semibold text-[rgb(var(--text))] flex items-center gap-2 mb-4">📊 Статистика команд</h3>
-          <div className="grid sm:grid-cols-2 gap-6 text-sm">
-            <div className="space-y-1.5">
-              <p className="text-[rgb(var(--text-secondary))]">Всего команд: <span className="text-[rgb(var(--text))] font-medium">{allCommands.length}</span></p>
-              <p className="text-[rgb(var(--text-secondary))]">• Встроенных: <span className="text-[rgb(var(--text))] font-medium">{builtinCount} ({pct(builtinCount)}%)</span></p>
-              <p className="text-[rgb(var(--text-secondary))]">• Пользовательских: <span className="text-[rgb(var(--text))] font-medium">{customCount} ({pct(customCount)}%)</span></p>
-              <p className="text-[rgb(var(--text-secondary))]">• Отключённых: <span className="text-[rgb(var(--text))] font-medium">{disabledCount} ({pct(disabledCount)}%)</span></p>
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-[rgb(var(--text-secondary))] mb-1">Популярные категории:</p>
-              {categoryStats.map(({ cat, count, pct: p }) => (
-                <p key={cat} className="text-[rgb(var(--text-secondary))]">
-                  {CATEGORY_LABELS[cat]} — <span className="text-[rgb(var(--text))] font-medium">{count} {count === 1 ? 'команда' : 'команд'} ({p}%)</span>
-                </p>
-              ))}
-            </div>
-          </div>
-        </Card>
-      )}
 
       {/* Модалка создания/редактирования */}
       {modalCmd !== null && (

@@ -169,6 +169,8 @@ class LolkaGateway:
             # переопределения builtin просто недоступны без конфига (commands_config={}).
             server_id = self._resolve_server_id(guild_id) if guild_id else None
             member = data.get("member") or {}
+            if content.startswith("/"):
+                print(f"LOLKA GATEWAY DEBUG: получена команда '{content}' guild_id={guild_id} server_id={server_id} channel_id={channel_id}")
             reply = _commands_engine.execute(
                 text=content,
                 platform="lolka",
@@ -179,6 +181,8 @@ class LolkaGateway:
                 member_roles=member.get("roles"),
                 on_usage=(lambda name: self._increment_command_usage(server_id, name)) if server_id else None,
             )
+            if content.startswith("/"):
+                print(f"LOLKA GATEWAY DEBUG: execute() вернул reply={reply!r}")
             if reply:
                 await self.send_message(channel_id, reply)
 
@@ -611,12 +615,13 @@ class LolkaGateway:
         if components:
             payload["components"] = components
         try:
-            await asyncio.to_thread(
+            resp = await asyncio.to_thread(
                 requests.post,
                 f"{self.api_base_url}/channels/{channel_id}/messages",
                 headers={"Authorization": f"Bot {self.token}", "Content-Type": "application/json"},
                 json=payload,
                 timeout=10,
             )
+            print(f"LOLKA GATEWAY DEBUG: send_message → HTTP {resp.status_code}")
         except Exception as e:
             print(f"LOLKA GATEWAY: ошибка отправки сообщения — {e}")
