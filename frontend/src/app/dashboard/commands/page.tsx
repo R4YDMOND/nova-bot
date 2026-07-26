@@ -323,7 +323,7 @@ export default function CommandsPage() {
   const categoryStats = useMemo(() => {
     const counts = new Map<Category, number>();
     for (const c of allCommands) counts.set(c.category, (counts.get(c.category) || 0) + 1);
-    return [...counts.entries()]
+    return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 4)
       .map(([cat, count]) => ({ cat, count, pct: pct(count) }));
