@@ -76,6 +76,16 @@ export interface RankingSettings {
   np_daily_limit: number;
   /** Шаблон сообщения о покупке в магазине ролей — {user}/{item}/{price}/{currency}/{balance} (ТЗ №5 Rev.9, п.12) */
   shop_purchase_template: string;
+  /** Пассивный фарм NP за сообщения (write-behind, ranking/np_farm_cache.py) — ТЗ №5 Rev.9, п.11 */
+  np_farm_enabled: boolean;
+  np_farm_min: number;
+  np_farm_max: number;
+  /** Ежедневный бонус /daily — ТЗ №5 Rev.9, п.11 */
+  np_daily_enabled: boolean;
+  np_daily_min: number;
+  np_daily_max: number;
+  np_daily_jackpot_chance: number;
+  np_daily_jackpot_amount: number;
 }
 
 export interface NovaPointEntry {

@@ -111,6 +111,14 @@ export type RankingSettings = {
   np_cooldown_minutes: number;
   np_daily_limit: number;
   shop_purchase_template: string;
+  np_farm_enabled: boolean;
+  np_farm_min: number;
+  np_farm_max: number;
+  np_daily_enabled: boolean;
+  np_daily_min: number;
+  np_daily_max: number;
+  np_daily_jackpot_chance: number;
+  np_daily_jackpot_amount: number;
 };
 
 export type NovaPointEntry = {

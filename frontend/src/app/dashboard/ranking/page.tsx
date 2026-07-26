@@ -995,6 +995,97 @@ export default function RankingPage() {
             </div>
           </Card>
 
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold flex items-center gap-1.5">
+                  ✍️ Пассивный фарм за сообщения
+                  <Hint text="Участники получают случайное количество очков за каждое сообщение (не чаще раза в минуту на человека). Начисление идёт пачками раз в несколько минут, а не мгновенно." />
+                </h3>
+              </div>
+              <Switch checked={formData.np_farm_enabled ?? settings?.np_farm_enabled ?? false} onCheckedChange={val => updateField('np_farm_enabled', val)} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Минимум за сообщение</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.np_farm_min ?? settings?.np_farm_min ?? 1}
+                  onChange={e => updateField('np_farm_min', parseInt(e.target.value) || 0)}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Максимум за сообщение</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.np_farm_max ?? settings?.np_farm_max ?? 5}
+                  onChange={e => updateField('np_farm_max', parseInt(e.target.value) || 0)}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold flex items-center gap-1.5">
+                  🎁 Ежедневный бонус
+                  <Hint text="Команда /daily (Lolka) и «ежедневный бонус»/«/daily» (VK) — случайное количество очков раз в 24 часа на участника, с шансом джекпота." />
+                </h3>
+              </div>
+              <Switch checked={formData.np_daily_enabled ?? settings?.np_daily_enabled ?? false} onCheckedChange={val => updateField('np_daily_enabled', val)} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Минимум</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.np_daily_min ?? settings?.np_daily_min ?? 5}
+                  onChange={e => updateField('np_daily_min', parseInt(e.target.value) || 0)}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Максимум</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.np_daily_max ?? settings?.np_daily_max ?? 20}
+                  onChange={e => updateField('np_daily_max', parseInt(e.target.value) || 0)}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">
+                  Шанс джекпота: {formData.np_daily_jackpot_chance ?? settings?.np_daily_jackpot_chance ?? 5}%
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={formData.np_daily_jackpot_chance ?? settings?.np_daily_jackpot_chance ?? 5}
+                  onChange={e => updateField('np_daily_jackpot_chance', parseInt(e.target.value) || 0)}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Сумма джекпота</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.np_daily_jackpot_amount ?? settings?.np_daily_jackpot_amount ?? 50}
+                  onChange={e => updateField('np_daily_jackpot_amount', parseInt(e.target.value) || 0)}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+          </Card>
+
           <div className="flex gap-2">
             {(['all', 'month', 'week'] as const).map(p => (
               <button

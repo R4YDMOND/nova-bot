@@ -3128,6 +3128,14 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "np_emoji": s.np_emoji,
         "np_cooldown_minutes": s.np_cooldown_minutes,
         "np_daily_limit": s.np_daily_limit,
+        "np_farm_enabled": s.np_farm_enabled,
+        "np_farm_min": s.np_farm_min,
+        "np_farm_max": s.np_farm_max,
+        "np_daily_enabled": s.np_daily_enabled,
+        "np_daily_min": s.np_daily_min,
+        "np_daily_max": s.np_daily_max,
+        "np_daily_jackpot_chance": s.np_daily_jackpot_chance,
+        "np_daily_jackpot_amount": s.np_daily_jackpot_amount,
         "shop_purchase_template": s.shop_purchase_template,
     }
 
@@ -3184,6 +3192,9 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             "card_bg_image_url", "card_bg_image_enabled", "card_bg_shade",
             "card_bg_fit", "card_bg_position",
             "np_enabled", "np_name", "np_emoji", "np_cooldown_minutes", "np_daily_limit",
+            "np_farm_enabled", "np_farm_min", "np_farm_max",
+            "np_daily_enabled", "np_daily_min", "np_daily_max",
+            "np_daily_jackpot_chance", "np_daily_jackpot_amount",
             "shop_purchase_template",
         }
         for field in simple_fields:
