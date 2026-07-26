@@ -436,7 +436,8 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                         if link_result.get("status") == "ok":
                             reply_text = (
                                 f"🔗 Код для связки аккаунтов: {link_result['code']}\n"
-                                f"Введите «/link {link_result['code']}» в Lolka в течение 10 минут, "
+                                f"Введите «!link {link_result['code']}» в Lolka в течение 10 минут "
+                                f"(именно с «!» — Lolka перехватывает ввод «/» своей панелью команд), "
                                 f"чтобы Nova Points и роли работали на обеих платформах через один баланс."
                             )
                         else:

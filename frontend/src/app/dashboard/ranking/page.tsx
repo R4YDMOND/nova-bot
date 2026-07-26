@@ -1034,7 +1034,7 @@ export default function RankingPage() {
               <div>
                 <h3 className="font-semibold flex items-center gap-1.5">
                   🎁 Ежедневный бонус
-                  <Hint text="Команда /daily (Lolka) и «ежедневный бонус»/«/daily» (VK) — случайное количество очков раз в 24 часа на участника, с шансом джекпота." />
+                  <Hint text="Команда /daily на VK и !daily на Lolka (Lolka перехватывает ввод «/» своей панелью команд) — случайное количество очков раз в 24 часа на участника, с шансом джекпота." />
                 </h3>
               </div>
               <Switch checked={formData.np_daily_enabled ?? settings?.np_daily_enabled ?? false} onCheckedChange={val => updateField('np_daily_enabled', val)} />
@@ -1131,11 +1131,11 @@ export default function RankingPage() {
             <div>
               <h3 className="font-semibold flex items-center gap-1.5">
                 🛒 Магазин ролей
-                <Hint text="Участники покупают роль за очки командой /shop. Роль всегда выдаётся в Lolka (у API VK-сообщества нет назначения ролей участникам). Если покупка сделана в VK, участник должен предварительно связать аккаунты командой /link — иначе бот не будет знать, кому в Lolka выдавать роль." />
+                <Hint text="Участники покупают роль за очки командой /shop на VK и !shop на Lolka. Роль всегда выдаётся в Lolka (у API VK-сообщества нет назначения ролей участникам). Если покупка сделана в VK, участник должен предварительно связать аккаунты командой /link (VK) / !link (Lolka) — иначе бот не будет знать, кому в Lolka выдавать роль." />
               </h3>
               <p className="text-xs text-[rgb(var(--text-secondary))] mt-1">
                 {effectivePlatform === 'vk'
-                  ? 'Списывается баланс VK, роль выдаётся в связанном аккаунте Lolka (команда /link).'
+                  ? 'Списывается баланс VK, роль выдаётся в связанном аккаунте Lolka (команда /link на VK, !link на Lolka).'
                   : 'Роль выдаётся автоматически участнику сразу после покупки.'}
               </p>
             </div>

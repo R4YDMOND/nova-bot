@@ -245,14 +245,20 @@ class LolkaGateway:
             # Nova Points: ежедневный бонус /daily и магазин ролей /shop (ТЗ №5 Rev.9, п.11-12).
             # Отдельно от commands_engine — эти команды требуют динамического ответа
             # (случайная сумма, кнопки), а не фиксированного текста.
+            # "!" — альтернатива "/": Lolka-клиент перехватывает ввод "/" нативной панелью
+            # выбора Slash-команд ДО отправки, а /daily,/shop,/link не зарегистрированы через
+            # Interactions API (см. commands_engine.build_lolka_slash_commands — туда попадают
+            # только builtin/custom из страницы «Команды»), поэтому как текст никогда не
+            # доходят без "!" (тот же фикс, что и для /ping,/help — commands_engine.py).
             if server_id and author.get("id"):
-                lower = content.strip().lower()
-                if lower == "/daily":
+                stripped = content.strip()
+                lower = stripped.lower()
+                if lower in ("/daily", "!daily"):
                     await self._handle_daily(channel_id, server_id, str(author["id"]))
-                elif lower == "/shop":
+                elif lower in ("/shop", "!shop"):
                     await self._handle_shop(channel_id, server_id)
-                elif lower == "/link" or lower.startswith("/link "):
-                    await self._handle_link(channel_id, server_id, str(author["id"]), content.strip())
+                elif lower.startswith("/link") or lower.startswith("!link"):
+                    await self._handle_link(channel_id, server_id, str(author["id"]), stripped)
                 elif lower == "/ai" or lower.startswith("/ai "):
                     display_name = author.get("global_name") or author.get("username") or str(author["id"])
                     await self._handle_ai(channel_id, server_id, str(author["id"]), display_name, content.strip(), str(guild_id))
