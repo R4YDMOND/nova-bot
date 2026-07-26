@@ -168,13 +168,13 @@ export type LeaderboardResponse = {
 };
 
 export type RankingPreview = {
-  platform: "vk" | "lolka";
-  user: {
+  platform?: "vk" | "lolka";
+  user?: {
     id: string;
     username: string;
     avatar_url: string | null;
   };
-  ranking: {
+  ranking?: {
     rank: number;
     level: number;
     current_xp: number;
@@ -183,6 +183,9 @@ export type RankingPreview = {
     voice_minutes: number;
     reactions: number;
   };
+  /** Бэкенд (/api/ranking/preview) при ошибке (сервер/участник не найден) возвращает
+   * ТОЛЬКО это поле, без ranking/user — поэтому оба помечены как опциональные выше. */
+  error?: string;
 };
 
 export type SavedMessageTemplate = {

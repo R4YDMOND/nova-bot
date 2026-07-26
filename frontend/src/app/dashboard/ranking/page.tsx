@@ -1344,7 +1344,7 @@ export default function RankingPage() {
                 bgFit: cardBgFit,
                 bgPosition: cardBgPosition,
               }}
-              data={preview ? {
+              data={preview && preview.ranking && preview.user ? {
                 rank: preview.ranking.rank,
                 level: preview.ranking.level,
                 username: preview.user.username,
