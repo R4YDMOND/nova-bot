@@ -74,6 +74,21 @@ BUILTIN_COMMAND_DESCRIPTIONS: Dict[str, str] = {
     "ai": "Спросить AI",
 }
 
+# Параметры (options) для встроенных Slash-команд, которым нужен ввод текста от пользователя —
+# формат type:3 (STRING) идентичен Discord Interactions API, см. "Документация по ботам в
+# Lolka.md" (раздел "Гилдовые команды", пример /ban с options). Без этого у /ai нет способа
+# принять вопрос как аргумент настоящей Slash-команды (см. _on_slash_command в lolka_gateway.py).
+BUILTIN_COMMAND_OPTIONS: Dict[str, List[Dict[str, Any]]] = {
+    "ai": [{"type": 3, "name": "question", "description": "Вопрос для AI-ассистента", "required": True}],
+}
+
+
+def _build_command_entry(name: str, description: str) -> Dict[str, Any]:
+    entry: Dict[str, Any] = {"name": name, "description": description, "type": 1}
+    if name in BUILTIN_COMMAND_OPTIONS:
+        entry["options"] = BUILTIN_COMMAND_OPTIONS[name]
+    return entry
+
 
 def build_lolka_slash_commands(commands_config: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
@@ -93,14 +108,14 @@ def build_lolka_slash_commands(commands_config: Dict[str, Any]) -> List[Dict[str
             continue
         if not override.get("enabled", True):
             continue
-        commands.append({"name": name, "description": BUILTIN_COMMAND_DESCRIPTIONS[name], "type": 1})
+        commands.append(_build_command_entry(name, BUILTIN_COMMAND_DESCRIPTIONS[name]))
         seen_names.add(name)
 
     # Встроенные без override (дефолт enabled=True) — override просто не создан, пока
     # пользователь не тронул конкретную команду на странице «Команды».
     for name, description in BUILTIN_COMMAND_DESCRIPTIONS.items():
         if name not in overridden_names:
-            commands.append({"name": name, "description": description, "type": 1})
+            commands.append(_build_command_entry(name, description))
             seen_names.add(name)
 
     for cmd in (commands_config.get("custom") or []):

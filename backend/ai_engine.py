@@ -384,6 +384,19 @@ _URL_RE = re.compile(r'https?://\S+')
 
 _PLATFORM_LABELS = {"vk": "VK", "lolka": "Lolka", "max": "MAX"}
 
+# Стили общения (ТЗ №9, редизайн страницы AI) — вместо дублирующих вкладок Gemini/DeepSeek
+# стиль хранится одним полем AISettings.personality и вплетается в системный промпт здесь.
+PERSONALITY_STYLES = {
+    "friendly": "Общайся в тёплом, дружелюбном тоне.",
+    "gaming": "Общайся энергично, уместно используй игровой сленг.",
+    "professional": "Общайся в серьёзном, деловом тоне, избегай сленга.",
+    "creative": "Отвечай нестандартно и ярко, не бойся творческих формулировок.",
+    "humorous": "Используй лёгкий юмор и уместные шутки в ответах.",
+    "anime": "Общайся экспрессивно, в стиле аниме-персонажа.",
+}
+
+LANGUAGE_INSTRUCTIONS = {"ru": "Отвечай на русском языке.", "en": "Отвечай на английском языке (English)."}
+
 
 def _list_lolka_roles(guild_id: str) -> List[Dict[str, str]]:
     """GET /guilds/{id}/roles — список ролей для подсказки LLM в Function Calling (grant_role)."""
@@ -430,7 +443,7 @@ def generate_ai_reply(db: Session, server_id: str, channel_id: str, user_id: str
         return None
 
     # ── Авто-детект и перевод/пересказ URL (ТЗ, этап 3.5, Acceptance Criteria №4) ──
-    url_match = _URL_RE.search(user_text)
+    url_match = _URL_RE.search(user_text) if getattr(ai_settings, "url_translate_enabled", True) else None
     if url_match:
         url = url_match.group(0)
         page_text = fetch_page_text(url)
@@ -452,6 +465,12 @@ def generate_ai_reply(db: Session, server_id: str, channel_id: str, user_id: str
     system_prompt = build_system_prompt(
         ai_settings.system_prompt or "", user_name=user_name, server_name=server_name, channel_name=channel_id,
     )
+    style_instruction = PERSONALITY_STYLES.get(getattr(ai_settings, "personality", "friendly"))
+    if style_instruction:
+        system_prompt += f"\n\n{style_instruction}"
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(getattr(ai_settings, "language", "ru"))
+    if lang_instruction:
+        system_prompt += f"\n{lang_instruction}"
     platform_label = _PLATFORM_LABELS.get(platform)
     if platform_label:
         system_prompt += f"\n\nТы общаешься с пользователем на платформе {platform_label}."

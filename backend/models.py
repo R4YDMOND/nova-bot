@@ -53,6 +53,8 @@ class AISettings(Base):
     system_prompt = Column(Text, default="")
     # ── ТЗ №9: LLM-роутер, RAG, кэш, модерация, function calling ──
     provider = Column(String, default="yandexgpt")          # yandexgpt | deepseek | openrouter
+    language = Column(String, default="ru")                  # ru | en — инструкция языка ответа
+    url_translate_enabled = Column(Boolean, default=True)    # авто-перевод/пересказ ссылок в чате
     context_size = Column(Integer, default=5)               # размер контекста RAG (0-20 сообщений)
     cache_enabled = Column(Boolean, default=True)            # семантический кэш ответов
     moderation_enabled = Column(Boolean, default=False)      # AI AutoMod (уровень 2)

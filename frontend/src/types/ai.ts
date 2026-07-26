@@ -1,15 +1,19 @@
 // ТЗ №9: Доработка страницы AI — типы для мультипровайдерных настроек, RAG, кэша, модерации.
 
 export type AIProvider = 'yandexgpt' | 'deepseek' | 'openrouter';
+export type PersonalityStyle = 'friendly' | 'gaming' | 'professional' | 'creative' | 'humorous' | 'anime';
+export type Language = 'ru' | 'en';
 
 export interface AISettings {
   botName: string;
-  personality: string;
+  personality: PersonalityStyle;
+  language: Language;
   temperature: number;
   systemPrompt: string;
   provider: AIProvider;
   contextSize: number;          // размер контекста RAG (0-20 сообщений)
   cacheEnabled: boolean;        // семантический кэш ответов
+  urlTranslateEnabled: boolean; // авто-перевод/пересказ ссылок в чате
   moderationEnabled: boolean;   // AI AutoMod (уровень 2)
   moderationThreshold: number;  // порог уверенности токсичности (0-100)
   toolGrantRoles: boolean;      // разрешённый инструмент: выдача ролей
@@ -19,6 +23,20 @@ export const PROVIDERS: { value: AIProvider; label: string }[] = [
   { value: 'yandexgpt', label: '☁️ YandexGPT' },
   { value: 'deepseek', label: '🧠 DeepSeek' },
   { value: 'openrouter', label: '🔀 OpenRouter' },
+];
+
+export const LANGUAGES: { value: Language; label: string }[] = [
+  { value: 'ru', label: '🇷🇺 Русский' },
+  { value: 'en', label: '🇬🇧 English' },
+];
+
+export const PERSONALITY_STYLES: { value: PersonalityStyle; label: string }[] = [
+  { value: 'friendly', label: '😊 Дружелюбный' },
+  { value: 'gaming', label: '🎮 Игровой' },
+  { value: 'professional', label: '💼 Профессиональный' },
+  { value: 'creative', label: '🎨 Креативный' },
+  { value: 'humorous', label: '😂 Юмористический' },
+  { value: 'anime', label: '🌸 Аниме' },
 ];
 
 export const PROMPT_VARIABLES: { token: string; desc: string }[] = [

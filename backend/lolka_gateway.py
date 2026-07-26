@@ -259,9 +259,9 @@ class LolkaGateway:
                     await self._handle_shop(channel_id, server_id)
                 elif lower.startswith("/link") or lower.startswith("!link"):
                     await self._handle_link(channel_id, server_id, str(author["id"]), stripped)
-                elif lower == "/ai" or lower.startswith("/ai "):
+                elif lower in ("/ai", "!ai") or lower.startswith("/ai ") or lower.startswith("!ai "):
                     display_name = author.get("global_name") or author.get("username") or str(author["id"])
-                    await self._handle_ai(channel_id, server_id, str(author["id"]), display_name, content.strip(), str(guild_id))
+                    await self._handle_ai(channel_id, server_id, str(author["id"]), display_name, stripped, str(guild_id))
 
         # Начисление XP за сообщение + level-up уведомление (по аналогии с VK, см. main.py)
         user_id = author.get("id")
@@ -283,27 +283,33 @@ class LolkaGateway:
                         settings.np_farm_min, settings.np_farm_max,
                     )
 
-    async def _handle_ai(self, channel_id: str, server_id: str, user_id: str, user_name: str, raw_text: str, guild_id: str) -> None:
-        question = raw_text[3:].strip()
-        if not question:
-            await self.send_message(channel_id, "Использование: /ai <вопрос>")
-            return
-
+    async def _generate_ai_reply_text(self, server_id: str, channel_id: str, user_id: str,
+                                       user_name: str, question: str, guild_id: str) -> str:
+        """Общая логика для /ai (текстовая команда и настоящая Slash-команда) — резолвит
+        AISettings и вызывает generate_ai_reply. Вынесена отдельно, т.к. Slash-путь отвечает
+        через _followup_edit_original, а текстовый — через send_message (разные способы
+        доставки ответа, но одинаковая генерация)."""
         from models import AISettings
 
         db = SessionLocal()
         try:
             ai_settings_row = db.query(AISettings).filter(AISettings.server_id == int(server_id)).first()
             if not ai_settings_row:
-                text = "AI не настроен для этого сервера — откройте /dashboard/ai"
-            else:
-                reply = await asyncio.to_thread(
-                    ai_engine.generate_ai_reply, db, server_id, channel_id, user_id,
-                    user_name, "", question, ai_settings_row, "lolka", guild_id,
-                )
-                text = reply or "AI сейчас недоступен (дневной лимит исчерпан или все провайдеры недоступны)"
+                return "AI не настроен для этого сервера — откройте /dashboard/ai"
+            reply = await asyncio.to_thread(
+                ai_engine.generate_ai_reply, db, server_id, channel_id, user_id,
+                user_name, "", question, ai_settings_row, "lolka", guild_id,
+            )
+            return reply or "AI сейчас недоступен (дневной лимит исчерпан или все провайдеры недоступны)"
         finally:
             db.close()
+
+    async def _handle_ai(self, channel_id: str, server_id: str, user_id: str, user_name: str, raw_text: str, guild_id: str) -> None:
+        question = raw_text[3:].strip()
+        if not question:
+            await self.send_message(channel_id, "Использование: /ai <вопрос> (или !ai <вопрос>)")
+            return
+        text = await self._generate_ai_reply_text(server_id, channel_id, user_id, user_name, question, guild_id)
         await self.send_message(channel_id, text)
 
     async def _handle_link(self, channel_id: str, server_id: str, user_id: str, raw_text: str) -> None:
@@ -656,6 +662,26 @@ class LolkaGateway:
             await self._interaction_callback(interaction_id, interaction_token, 5, {})
 
             server_id = self._resolve_server_id(str(guild_id)) if guild_id else None
+
+            # /ai не проходит через commands_engine.execute() (executable:false в каталоге,
+            # см. frontend/src/lib/commands-catalog.ts) — как и в on_message_create, ответ
+            # генерируется через generate_ai_reply. В отличие от текстового пути, вопрос
+            # приходит не строкой после команды, а параметром Slash-команды (options[].value,
+            # см. BUILTIN_COMMAND_OPTIONS в commands_engine.py).
+            if name == "ai":
+                options = (data.get("data") or {}).get("options") or []
+                question = next((str(o.get("value", "")).strip() for o in options if o.get("name") == "question"), "")
+                if not question:
+                    await self._followup_edit_original(interaction_token, {"content": "Использование: /ai question:<вопрос>"})
+                    return
+                if not server_id:
+                    await self._followup_edit_original(interaction_token, {"content": "AI не настроен для этого сервера — откройте /dashboard/ai"})
+                    return
+                display_name = user.get("global_name") or user.get("username") or str(user_id)
+                text = await self._generate_ai_reply_text(server_id, channel_id, str(user_id), display_name, question, str(guild_id))
+                await self._followup_edit_original(interaction_token, {"content": text})
+                return
+
             reply = _commands_engine.execute(
                 text=f"/{name}",
                 platform="lolka",

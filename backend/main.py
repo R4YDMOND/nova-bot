@@ -1101,18 +1101,20 @@ def get_ai_settings(server_id: str = Query("default")):
         ai = db.query(AISettings).filter(AISettings.server_id == server.id).first()
         if not ai:
             return {"settings": {
-                "botName": "Нова", "personality": "friendly",
+                "botName": "Нова", "personality": "friendly", "language": "ru",
                 "temperature": 0.7, "maxLength": 500,
                 "useEmoji": True, "systemPrompt": "Ты — дружелюбный AI-помощник.",
                 "provider": "yandexgpt", "contextSize": 5, "cacheEnabled": True,
+                "urlTranslateEnabled": True,
                 "moderationEnabled": False, "moderationThreshold": 70, "toolGrantRoles": False,
             }}
 
         return {"settings": {
-            "botName": ai.bot_name, "personality": ai.personality,
+            "botName": ai.bot_name, "personality": ai.personality, "language": ai.language or "ru",
             "temperature": ai.temperature, "systemPrompt": ai.system_prompt or "",
             "provider": ai.provider or "yandexgpt", "contextSize": ai.context_size,
-            "cacheEnabled": ai.cache_enabled, "moderationEnabled": ai.moderation_enabled,
+            "cacheEnabled": ai.cache_enabled, "urlTranslateEnabled": ai.url_translate_enabled,
+            "moderationEnabled": ai.moderation_enabled,
             "moderationThreshold": ai.moderation_threshold, "toolGrantRoles": ai.tool_grant_roles,
         }}
     except Exception as e:
@@ -1137,7 +1139,10 @@ def save_ai_settings(data: dict):
             db.add(ai)
 
         ai.bot_name = data.get("botName", "Нова")
-        ai.personality = data.get("personality", "friendly")
+        if data.get("personality") in ai_engine.PERSONALITY_STYLES:
+            ai.personality = data.get("personality")
+        if data.get("language") in ("ru", "en"):
+            ai.language = data.get("language")
         ai.temperature = data.get("temperature", 0.7)
         ai.system_prompt = data.get("systemPrompt", "")
         # ── ТЗ №9 ──
@@ -1145,6 +1150,7 @@ def save_ai_settings(data: dict):
             ai.provider = data.get("provider")
         ai.context_size = max(0, min(20, int(data.get("contextSize", ai.context_size or 5))))
         ai.cache_enabled = bool(data.get("cacheEnabled", ai.cache_enabled))
+        ai.url_translate_enabled = bool(data.get("urlTranslateEnabled", ai.url_translate_enabled))
         ai.moderation_enabled = bool(data.get("moderationEnabled", ai.moderation_enabled))
         ai.moderation_threshold = max(0, min(100, int(data.get("moderationThreshold", ai.moderation_threshold or 70))))
         ai.tool_grant_roles = bool(data.get("toolGrantRoles", ai.tool_grant_roles))
@@ -1190,6 +1196,8 @@ def ai_playground(data: dict):
         provider = data.get("provider") or (ai.provider if ai else "yandexgpt")
         temperature = data.get("temperature", ai.temperature if ai else 0.7)
         system_prompt = data.get("systemPrompt", ai.system_prompt if ai else "") or ""
+        personality = data.get("personality") or (ai.personality if ai else "friendly")
+        language = data.get("language") or (ai.language if ai else "ru")
 
         rendered_system = ai_engine.build_system_prompt(
             system_prompt,
@@ -1197,6 +1205,12 @@ def ai_playground(data: dict):
             server_name=server.name if server else "",
             channel_name=data.get("channelName", "playground"),
         )
+        style_instruction = ai_engine.PERSONALITY_STYLES.get(personality)
+        if style_instruction:
+            rendered_system += f"\n\n{style_instruction}"
+        lang_instruction = ai_engine.LANGUAGE_INSTRUCTIONS.get(language)
+        if lang_instruction:
+            rendered_system += f"\n{lang_instruction}"
         router = ai_engine.LLMRouter(provider)
         try:
             reply, used_provider = router.chat(
