@@ -525,13 +525,19 @@ class LolkaGateway:
 
     async def on_interaction_create(self, data: dict):
         """
-        Обрабатывает клик по кнопке (type: 3 = MESSAGE_COMPONENT) — предустановленные
-        действия редактора шаблонов (вкладка «Компоненты»): Профиль/Топ/Закрыть/Дать Nova
-        Point. Для select-меню (component_type == 3) действие берётся из выбранного
-        значения опции (values[0]), а не из custom_id самого селекта.
+        type: 2 = APPLICATION_COMMAND (настоящий Slash-вызов, зарегистрированный через
+              sync_lolka_guild_commands в main.py) — см. _on_slash_command.
+        type: 3 = MESSAGE_COMPONENT — клик по кнопке (редактор шаблонов, вкладка
+              «Компоненты»): Профиль/Топ/Закрыть/Дать Nova Point. Для select-меню
+              (component_type == 3) действие берётся из выбранного значения опции
+              (values[0]), а не из custom_id самого селекта.
         Ответить нужно в течение 3 секунд (см. Документация по ботам в Lolka.md).
         """
-        if data.get("type") != 3:
+        interaction_type = data.get("type")
+        if interaction_type == 2:
+            await self._on_slash_command(data)
+            return
+        if interaction_type != 3:
             return
 
         interaction_id = data.get("id")
@@ -618,6 +624,46 @@ class LolkaGateway:
                 await self._interaction_callback(interaction_id, interaction_token, 6, {})
         except Exception as e:
             print(f"LOLKA GATEWAY: ошибка обработки интеракции — {e}")
+
+    async def _on_slash_command(self, data: dict) -> None:
+        """
+        Настоящий Slash-вызов (зарегистрирован через sync_lolka_guild_commands, main.py).
+        Собираем синтетический текст "/name" и прогоняем через тот же
+        commands_engine.execute(), что и обычные текстовые команды (on_message_create) —
+        доступ по ролям/каналам, кулдаун, логирование usageCount не дублируются.
+        Отвечаем DEFERRED (type 5), затем реальный текст — через PATCH @original, т.к.
+        БД-запросы могут не уложиться в 3-секундный бюджет интеракции.
+        """
+        interaction_id = data.get("id")
+        interaction_token = data.get("token")
+        if not interaction_id or not interaction_token:
+            return
+
+        name = ((data.get("data") or {}).get("name")) or ""
+        guild_id = data.get("guild_id")
+        channel_id = data.get("channel_id")
+        member = data.get("member") or {}
+        user = member.get("user") or data.get("user") or {}
+        user_id = user.get("id")
+
+        try:
+            await self._interaction_callback(interaction_id, interaction_token, 5, {})
+
+            server_id = self._resolve_server_id(str(guild_id)) if guild_id else None
+            reply = _commands_engine.execute(
+                text=f"/{name}",
+                platform="lolka",
+                server_id=server_id,
+                user_id=user_id,
+                commands_config=self._load_commands_config(server_id) if server_id else {},
+                channel_id=channel_id,
+                member_roles=member.get("roles"),
+                on_usage=(lambda cmd_name: self._increment_command_usage(server_id, cmd_name)) if server_id else None,
+            )
+            text = reply or "⚠️ Команда сейчас недоступна (отключена, ограничен доступ или кулдаун)"
+            await self._followup_edit_original(interaction_token, {"content": text})
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка обработки Slash-команды '{name}' — {e}")
 
     async def _followup_edit_original(self, interaction_token: str, data: dict):
         """

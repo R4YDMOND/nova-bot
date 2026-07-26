@@ -56,6 +56,67 @@ BUILTIN_RESPONSES: Dict[str, str] = {
     ),
 }
 
+# Описания встроенных команд — зеркало BUILTIN_COMMANDS из
+# frontend/src/lib/commands-catalog.ts. Используется только как метаданные при регистрации
+# настоящих Slash-команд в Lolka (Interactions API, PUT .../guilds/{id}/commands) — на
+# выполнение команд не влияет (для этого — BUILTIN_RESPONSES выше и check_access_lolka).
+BUILTIN_COMMAND_DESCRIPTIONS: Dict[str, str] = {
+    "ping": "Проверка бота",
+    "help": "Список команд",
+    "stats": "Статистика",
+    "ban": "Забанить",
+    "kick": "Выгнать",
+    "mute": "Замутить",
+    "clear": "Очистить чат",
+    "rank": "Уровень",
+    "top": "Топ участников",
+    "play": "Музыка",
+    "ai": "Спросить AI",
+}
+
+
+def build_lolka_slash_commands(commands_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Строит массив объектов команд для PUT /applications/{app.id}/guilds/{guild.id}/commands
+    (bulk overwrite, см. "Документация по ботам в Lolka.md", раздел "Гилдовые команды") —
+    только ВКЛЮЧЁННЫЕ команды (enabled=True, не черновики). PUT — это полная замена, поэтому
+    отключённая/удалённая команда естественным образом не попадёт в список и будет снята
+    Lolka сама, без отдельного DELETE.
+    """
+    commands: List[Dict[str, Any]] = []
+    seen_names: set = set()
+
+    overridden_names = {o.get("name") for o in (commands_config.get("builtin") or [])}
+    for override in (commands_config.get("builtin") or []):
+        name = override.get("name")
+        if not name or name not in BUILTIN_COMMAND_DESCRIPTIONS:
+            continue
+        if not override.get("enabled", True):
+            continue
+        commands.append({"name": name, "description": BUILTIN_COMMAND_DESCRIPTIONS[name], "type": 1})
+        seen_names.add(name)
+
+    # Встроенные без override (дефолт enabled=True) — override просто не создан, пока
+    # пользователь не тронул конкретную команду на странице «Команды».
+    for name, description in BUILTIN_COMMAND_DESCRIPTIONS.items():
+        if name not in overridden_names:
+            commands.append({"name": name, "description": description, "type": 1})
+            seen_names.add(name)
+
+    for cmd in (commands_config.get("custom") or []):
+        name = (cmd.get("name") or "").strip().lower()
+        if not name or name in seen_names:
+            continue
+        if not cmd.get("enabled", True) or cmd.get("isDraft"):
+            continue
+        if "lolka" not in (cmd.get("platforms") or []):
+            continue
+        description = (cmd.get("description") or name)[:100]
+        commands.append({"name": name, "description": description, "type": 1})
+        seen_names.add(name)
+
+    return commands
+
 # Уровни прав VK-руководителей (groups.getMembers?filter=managers, поле role) —
 # 'creator' сопоставляется с внутренним уровнем 'owner'. 'advertiser' не входит
 # в иерархию (отдельное неиерархическое право, как и в интерфейсе управления

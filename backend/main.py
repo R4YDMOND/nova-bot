@@ -17,7 +17,7 @@ from ranking.cache import cache as _shared_cache
 from ranking import np_farm_cache
 from vk_bot_service import VKBotService, VKAPIError, get_vk_service, clear_vk_service, VKLongPollListener
 from moderation_engine import ModerationEngine, ModerationResult
-from commands_engine import get_commands_engine
+from commands_engine import get_commands_engine, build_lolka_slash_commands
 import ai_engine
 import max_gateway
 from fastapi.responses import PlainTextResponse
@@ -1059,6 +1059,15 @@ def save_modules(data: dict):
         
         db.commit()
 
+        if any(m.get("name") == "commands" for m in modules) and server.platform == "lolka":
+            commands_mod = next((m for m in modules if m.get("name") == "commands"), None)
+            if commands_mod:
+                try:
+                    commands_config = json.loads(commands_mod.get("config") or "{}")
+                except (json.JSONDecodeError, TypeError):
+                    commands_config = {}
+                sync_lolka_guild_commands(server.server_id, commands_config)
+
         if any(m.get("name") == "moderation" for m in modules):
             log_event = ModerationEvent(
                 server_id=server.id,
@@ -1835,6 +1844,34 @@ def _lolka_bot_request(method: str, url: str, max_retries: int = 3, **kwargs):
             wait = 0.5 * (attempt + 1)
         time.sleep(wait + 0.1)
     return last_resp
+
+
+def sync_lolka_guild_commands(guild_id: str, commands_config: dict) -> None:
+    """
+    Регистрирует настоящие Slash-команды в Lolka для конкретного сервера (гилдовые команды,
+    см. "Документация по ботам в Lolka.md", раздел "Гилдовые команды") — это то, чего не
+    хватало, чтобы клиент Lolka не перехватывал ввод "/" собственной панелью автодополнения
+    ДО отправки сообщения (см. обсуждение бага "Enter не отправляет команду"). VK не
+    затрагивается — там нет аналога Slash Commands, там команды остаются текстовыми.
+
+    PUT — полная замена списка команд гильдии: отключённая/удалённая команда просто не
+    попадёт в массив и будет снята автоматически, без отдельного DELETE.
+    """
+    client_id = os.getenv("LOLKA_CLIENT_ID", "")
+    if not client_id or not os.getenv("LOLKA_BOT_TOKEN", ""):
+        return
+    payload = build_lolka_slash_commands(commands_config)
+    try:
+        resp = _lolka_bot_request(
+            "PUT", f"{LOLKA_BOT_BASE_URL}/applications/{client_id}/guilds/{guild_id}/commands",
+            json=payload,
+        )
+        if resp is None or resp.status_code >= 400:
+            print(f"⚠️ LOLKA: не удалось зарегистрировать Slash-команды для гильдии {guild_id} — HTTP {resp.status_code if resp else '?'}: {resp.text[:200] if resp else ''}")
+        else:
+            print(f"OK: Lolka Slash-команды синхронизированы для гильдии {guild_id} ({len(payload)} команд)")
+    except Exception as e:
+        print(f"⚠️ LOLKA: ошибка синхронизации Slash-команд — {e}")
 
 
 @app.get("/api/lolka/bot/gateway")
