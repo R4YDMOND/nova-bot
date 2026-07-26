@@ -181,8 +181,8 @@ class CommandsEngine:
         lines = ["🤖 Команды Нова:"]
         builtin_overrides = {o.get("name"): o for o in (commands_config.get("builtin") or [])}
         if (builtin_overrides.get("ping") or {}).get("enabled", True):
-            lines.append("🏓 /ping — проверка бота")
-        lines.append("❓ /help — список команд")
+            lines.append("🏓 !ping или /ping — проверка бота")
+        lines.append("❓ !help или /help — список команд")
 
         prefix_field = "vkPrefix" if platform == "vk" else "lolkaPrefix"
         for cmd in commands_config.get("custom") or []:
@@ -248,8 +248,12 @@ class CommandsEngine:
                     **_access_fields(cmd),
                 )
 
-        # 2. Встроенные команды с реальным ответом (ping/help), только с "/"-префиксом
-        if token.startswith("/"):
+        # 2. Встроенные команды с реальным ответом (ping/help) — "/" или "!" как префикс.
+        # "!" добавлен потому, что на Discord-совместимых клиентах (Lolka) ввод "/" перехватывается
+        # нативной панелью выбора Slash-команд ДО отправки — раз у бота нет зарегистрированных
+        # через Interactions API команд, клиент не даёт отправить "/ping" по Enter вообще
+        # (это ограничение клиента, не бэкенда). "!" не зарезервирован и уходит как обычный текст.
+        if token.startswith("/") or token.startswith("!"):
             name = token[1:]
             if name in BUILTIN_RESPONSES:
                 override = builtin_overrides.get(name) or {}
