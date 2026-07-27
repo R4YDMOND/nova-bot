@@ -25,6 +25,7 @@ import { Hint, HexColorField, RoleMultiSelect } from '@/components/ranking/Ranki
 import { ShopPurchaseTemplateModal } from '@/components/ranking/ShopPurchaseTemplateModal';
 import { MessageTemplateModal } from '@/components/MessageTemplateModal';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { PageSkeleton, TableSkeleton, ListSkeleton } from '@/components/ui/skeleton';
 
 const TABS = [
   { id: 'settings', label: '⚙️ Общие' },
@@ -452,7 +453,7 @@ export default function RankingPage() {
   };
 
   if (serverLoading || settingsLoading) {
-    return <div className="p-8 text-center text-[rgb(var(--text-secondary))]">⏳ Загрузка...</div>;
+    return <div className="p-6"><PageSkeleton /></div>;
   }
   if (!selectedServer) {
     return <NoServerSelected title="🪪 Система уровней" />;
@@ -868,7 +869,7 @@ export default function RankingPage() {
           </div>
           <Card>
             {leaderboardLoading ? (
-              <p className="text-center py-12 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</p>
+              <TableSkeleton rows={8} cols={7} />
             ) : leaderboardEntries.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -1124,7 +1125,7 @@ export default function RankingPage() {
 
           <Card>
             {npTopLoading ? (
-              <p className="text-center py-12 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</p>
+              <TableSkeleton rows={6} cols={3} />
             ) : npEntries.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -1165,7 +1166,7 @@ export default function RankingPage() {
             </div>
 
             {shopLoading ? (
-              <p className="text-center py-8 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</p>
+              <ListSkeleton rows={3} />
             ) : shopItems.length > 0 ? (
               <div className="space-y-2">
                 {shopItems.map(item => (

@@ -34,7 +34,10 @@ export function ServerCard({ server, selected, onSelect, onConfigure, onRemove, 
   return (
     <Card
       className={cn(
-        'relative overflow-hidden transition-all hover:shadow-lg cursor-pointer group border-2',
+        // Концепция визуального оформления → "Анимации (Framer Motion) → Hover на карточках":
+        // scale 1.01, 0.2s, easeOut. Реализовано на чистом Tailwind transition (без
+        // Framer Motion), как и остальные микроанимации в проекте.
+        'relative overflow-hidden transition-all duration-200 ease-out hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] cursor-pointer group border-2',
         colors.border
       )}
       onClick={onSelect}
