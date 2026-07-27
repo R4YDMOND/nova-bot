@@ -1086,6 +1086,30 @@ export default function RankingPage() {
             </div>
           </Card>
 
+          {effectivePlatform === 'lolka' && (
+            <Card className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold flex items-center gap-1.5">
+                    🎙️ Голосовой фарм
+                    <Hint text="Начисляется участникам голосового канала, пока в нём одновременно ≥2 активных человека (защита от фарма в одиночку). Доступно только на Lolka — у VK-сообществ нет голосовых каналов." />
+                  </h3>
+                </div>
+                <Switch checked={formData.np_voice_enabled ?? settings?.np_voice_enabled ?? false} onCheckedChange={val => updateField('np_voice_enabled', val)} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Очков в час</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.np_voice_per_hour ?? settings?.np_voice_per_hour ?? 10}
+                  onChange={e => updateField('np_voice_per_hour', parseInt(e.target.value) || 0)}
+                  className="input w-full sm:w-48"
+                />
+              </div>
+            </Card>
+          )}
+
           <div className="flex gap-2">
             {(['all', 'month', 'week'] as const).map(p => (
               <button

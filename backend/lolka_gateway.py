@@ -6,10 +6,10 @@ import asyncio
 import json
 import os
 import random
-from typing import Optional
+from typing import Dict, Optional
 import websockets
 
-from ranking.xp_handler import award_xp_for_message
+from ranking.xp_handler import award_xp_for_message, award_xp_for_voice_minutes
 from ranking.template import render_notify_template, render_message_template
 from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text
 from ranking.nova_points import give_nova_point, claim_daily, list_shop_items, buy_shop_item, get_currency_label
@@ -75,6 +75,12 @@ class LolkaGateway:
         self.session_id = None
         self.connected = False
         self._heartbeat_task = None
+        # Голосовой фарм (ТЗ №5 Rev.9, п.11) — occupancy голосовых каналов, строится
+        # исключительно из VOICE_STATE_UPDATE (никаких доп. REST-запросов). guild_id ->
+        # channel_id -> set(user_id). Обнуляется при каждом новом connect() — после
+        # разрыва соединения состояние всё равно устарело.
+        self._voice_occupancy: Dict[str, Dict[str, set]] = {}
+        self._voice_tick_started = False
 
     async def run_forever(self):
         """Подключение с автопереподключением при обрыве связи (экспоненциальный backoff)."""
@@ -93,7 +99,11 @@ class LolkaGateway:
         async with websockets.connect(self.gateway_url, ping_interval=None) as ws:
             self.ws = ws
             self.connected = True
+            self._voice_occupancy = {}  # состояние устарело после разрыва — начинаем заново
             print("LOLKA GATEWAY: соединение установлено")
+            if not self._voice_tick_started:
+                self._voice_tick_started = True
+                asyncio.create_task(self.voice_tick_loop())
             await self.identify()
             await self.listen()
 
@@ -155,6 +165,8 @@ class LolkaGateway:
                 await self.on_member_join(d or {})
             elif t == "INTERACTION_CREATE":
                 await self.on_interaction_create(d or {})
+            elif t == "VOICE_STATE_UPDATE":
+                self._on_voice_state_update(d or {})
 
     async def on_message_create(self, data: dict):
         content = (data.get("content") or "").strip()
@@ -438,6 +450,75 @@ class LolkaGateway:
         except Exception as e:
             print(f"LOLKA GATEWAY: ошибка level-up уведомления — {e}")
 
+    async def _award_voice_xp_and_notify(
+        self,
+        guild_id: str,
+        user_id: str,
+        username: str,
+        channel_id: Optional[str],
+    ) -> None:
+        """
+        Голосовой аналог _award_xp_and_notify — начисляет XP за минуту в голосовом канале
+        (award_xp_for_voice_minutes) и, при level-up, отправляет то же уведомление, что и
+        для текстовых сообщений. Логика уведомления намеренно продублирована (а не вынесена
+        в общий метод), чтобы не трогать уже рабочий _award_xp_and_notify.
+        """
+        server_id = self._resolve_server_id(guild_id)
+        if not server_id:
+            return
+
+        result = await award_xp_for_voice_minutes(
+            server_id=server_id, platform="lolka", user_id=user_id, username=username, minutes=1,
+        )
+        if not result or not result.get("leveled_up"):
+            return
+
+        try:
+            notify_channel = result.get("notify_channel")
+            target_channel_id = notify_channel or channel_id
+            if not target_channel_id:
+                return
+
+            mention = f"<@{user_id}>" if result.get("ping_user") else username
+
+            structured = None
+            if result.get("notify_template"):
+                try:
+                    structured = json.loads(result["notify_template"])
+                except (json.JSONDecodeError, TypeError):
+                    structured = None
+
+            if structured and (structured.get("embed_enabled") or structured.get("buttons") or structured.get("select_menus")):
+                rendered = render_message_template(
+                    structured,
+                    platform="lolka",
+                    user=mention,
+                    level=result["new_level"],
+                    guild=result.get("guild", ""),
+                    xp=result.get("xp"),
+                    next_level_xp=result.get("next_level_xp"),
+                    rank=result.get("rank"),
+                    target_user_id=str(user_id),
+                )
+                await self.send_message(
+                    target_channel_id, rendered["content"],
+                    embeds=rendered.get("embeds"), components=rendered.get("components"),
+                )
+            else:
+                template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
+                text_to_send = render_notify_template(
+                    template,
+                    user=mention,
+                    level=result["new_level"],
+                    guild=result.get("guild", ""),
+                    xp=result.get("xp"),
+                    next_level_xp=result.get("next_level_xp"),
+                    rank=result.get("rank"),
+                )
+                await self.send_message(target_channel_id, text_to_send)
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка level-up уведомления (голос) — {e}")
+
     @staticmethod
     def _resolve_server_id(guild_id: str) -> Optional[str]:
         """Сопоставляет Lolka guild_id с внутренним Server.id (используется как server_id в RankingSettings)."""
@@ -534,6 +615,66 @@ class LolkaGateway:
         username = (data.get("user") or {}).get("username", "участник")
         print(f"LOLKA GATEWAY: новый участник — {username}")
         # Место для приветственных сообщений/автовыдачи роли — по аналогии с on_message_create
+
+    def _on_voice_state_update(self, data: dict) -> None:
+        """
+        Обновляет in-memory occupancy голосовых каналов (ТЗ №5 Rev.9, п.11 — голосовой
+        фарм). channel_id отсутствует/None, если участник вышел из голосового канала.
+        Один VOICE_STATE_UPDATE описывает ПОЛНОЕ текущее состояние участника, поэтому
+        сначала убираем его из всех каналов гильдии, затем (если он всё ещё в голосе)
+        добавляем в актуальный канал — так же корректно обрабатывается и переход между
+        каналами одним и тем же событием.
+        """
+        guild_id = data.get("guild_id")
+        if not guild_id:
+            return
+        user_id = data.get("user_id") or ((data.get("member") or {}).get("user") or {}).get("id")
+        if not user_id:
+            return
+        channel_id = data.get("channel_id")
+
+        guild_channels = self._voice_occupancy.setdefault(str(guild_id), {})
+        for members in guild_channels.values():
+            members.discard(str(user_id))
+
+        if channel_id:
+            guild_channels.setdefault(str(channel_id), set()).add(str(user_id))
+
+    async def voice_tick_loop(self) -> None:
+        """
+        Раз в минуту начисляет XP (settings.xp_per_voice_minute) и NP
+        (settings.np_voice_per_hour, через np_farm_cache — write-behind) всем участникам
+        голосовых каналов, где сейчас ≥2 активных участника (анти-фарм условие из ТЗ —
+        см. тултип "Опыт за голосовую минуту"). Работает только для Lolka: у VK нет
+        голосовых каналов/событий вообще.
+        """
+        while True:
+            await asyncio.sleep(60)
+            try:
+                # Копия под локом не нужна — _voice_occupancy обновляется только из
+                # синхронного _on_voice_state_update в том же event loop (нет гонок).
+                for guild_id, channels in list(self._voice_occupancy.items()):
+                    server_id = self._resolve_server_id(guild_id)
+                    if not server_id:
+                        continue
+                    db = SessionLocal()
+                    try:
+                        settings = np_farm_cache.get_farm_settings(db, server_id, "lolka")
+                    finally:
+                        db.close()
+                    if not settings:
+                        continue
+
+                    for channel_id, members in channels.items():
+                        if len(members) < 2:
+                            continue
+                        for user_id in list(members):
+                            if settings.xp_per_voice_minute:
+                                await self._award_voice_xp_and_notify(guild_id, user_id, f"id{user_id}", channel_id)
+                            if settings.np_enabled and settings.np_voice_enabled:
+                                np_farm_cache.register_voice_minute(server_id, "lolka", user_id, settings.np_voice_per_hour)
+            except Exception as e:
+                print(f"LOLKA GATEWAY: ошибка voice_tick_loop — {e}")
 
     async def on_interaction_create(self, data: dict):
         """

@@ -86,6 +86,9 @@ export interface RankingSettings {
   np_daily_max: number;
   np_daily_jackpot_chance: number;
   np_daily_jackpot_amount: number;
+  /** Голосовой фарм NP (только Lolka — у VK нет голосовых каналов) — ТЗ №5 Rev.9, п.11 */
+  np_voice_enabled: boolean;
+  np_voice_per_hour: number;
 }
 
 export interface NovaPointEntry {

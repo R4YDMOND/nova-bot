@@ -24,8 +24,8 @@ _FLUSH_INTERVAL_SECONDS = 180  # раз в 3 минуты, как указано
 _PER_USER_COOLDOWN_SECONDS = 60
 
 _lock = threading.Lock()
-_pending: Dict[Tuple[str, str, str], int] = {}          # (server_id, platform, user_id) -> накопленные NP
-_last_award: Dict[Tuple[str, str, str], float] = {}      # anti-farm кулдаун
+_pending: Dict[Tuple[str, str, str], float] = {}         # (server_id, platform, user_id) -> накопленные NP (дробные — голос начисляется по минутам от ставки "в час")
+_last_award: Dict[Tuple[str, str, str], float] = {}       # anti-farm кулдаун (только для текста)
 
 
 def register_message(server_id: str, platform: str, user_id: str, np_min: int, np_max: int) -> None:
@@ -45,10 +45,29 @@ def register_message(server_id: str, platform: str, user_id: str, np_min: int, n
         _pending[key] = _pending.get(key, 0) + amount
 
 
-def _drain() -> Dict[Tuple[str, str, str], int]:
+def register_voice_minute(server_id: str, platform: str, user_id: str, np_per_hour: int) -> None:
+    """Вызывается раз в минуту из voice_tick_loop (lolka_gateway.py) для каждого участника
+    голосового канала, в котором сейчас ≥2 активных участника. Без anti-farm кулдауна —
+    тик уже ограничен интервалом в 1 минуту самим вызывающим циклом."""
+    if np_per_hour <= 0:
+        return
+    key = (str(server_id), platform, str(user_id))
     with _lock:
-        drained = dict(_pending)
-        _pending.clear()
+        _pending[key] = _pending.get(key, 0) + (np_per_hour / 60.0)
+
+
+def _drain() -> Dict[Tuple[str, str, str], int]:
+    """Возвращает только ЦЕЛУЮ часть накопленных очков (для начисления в БД), дробный
+    остаток (актуально для голоса — доли NP за минуту) оставляет в _pending до следующего сброса."""
+    with _lock:
+        drained: Dict[Tuple[str, str, str], int] = {}
+        for key, value in list(_pending.items()):
+            whole = int(value)
+            if whole > 0:
+                drained[key] = whole
+                _pending[key] = value - whole
+            if _pending[key] <= 0:
+                del _pending[key]
     return drained
 
 

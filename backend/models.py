@@ -391,6 +391,13 @@ class RankingSettings(Base):
     np_daily_jackpot_chance = Column(Integer, default=5)     # шанс джекпота, %
     np_daily_jackpot_amount = Column(Integer, default=50)
 
+    # Голосовой фарм NP (ТЗ №5 Rev.9, п.11) — только Lolka (у VK нет голосовых каналов).
+    # Начисляется, пока в канале ≥2 активных участников (защита от фарма в одиночку) —
+    # см. lolka_gateway.py::voice_tick_loop, тот же порог, что и у голосового XP (см.
+    # тултип "Опыт за голосовую минуту" в текстовом наполнении страницы).
+    np_voice_enabled = Column(Boolean, default=False)
+    np_voice_per_hour = Column(Integer, default=10)
+
     # Шаблон сообщения о покупке в магазине ролей (ТЗ №5 Rev.9, п.12) — тот же формат JSON,
     # что и notify_template (структурированный шаблон из MessageTemplateModal). Пуст — используется
     # дефолтный текст (см. ranking/nova_points.py::buy_shop_item). Переменные: {{user}}, {{item}},

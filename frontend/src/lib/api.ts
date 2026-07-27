@@ -119,6 +119,8 @@ export type RankingSettings = {
   np_daily_max: number;
   np_daily_jackpot_chance: number;
   np_daily_jackpot_amount: number;
+  np_voice_enabled: boolean;
+  np_voice_per_hour: number;
 };
 
 export type NovaPointEntry = {

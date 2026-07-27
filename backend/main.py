@@ -3207,6 +3207,8 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "np_daily_max": s.np_daily_max,
         "np_daily_jackpot_chance": s.np_daily_jackpot_chance,
         "np_daily_jackpot_amount": s.np_daily_jackpot_amount,
+        "np_voice_enabled": s.np_voice_enabled,
+        "np_voice_per_hour": s.np_voice_per_hour,
         "shop_purchase_template": s.shop_purchase_template,
     }
 
@@ -3266,6 +3268,7 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             "np_farm_enabled", "np_farm_min", "np_farm_max",
             "np_daily_enabled", "np_daily_min", "np_daily_max",
             "np_daily_jackpot_chance", "np_daily_jackpot_amount",
+            "np_voice_enabled", "np_voice_per_hour",
             "shop_purchase_template",
         }
         for field in simple_fields:
