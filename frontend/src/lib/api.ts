@@ -175,6 +175,8 @@ export type LeaderboardResponse = {
   platform: "vk" | "lolka";
   total: number;
   entries: LeaderboardEntry[];
+  server_name?: string;
+  server_icon_url?: string;
 };
 
 export type RankingPreview = {

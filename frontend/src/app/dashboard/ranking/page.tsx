@@ -560,10 +560,10 @@ export default function RankingPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
-                  Опыт за сообщение (XP)
+                  Опыт за сообщение (XP): {formData.xp_per_message ?? settings?.xp_per_message ?? 15}
                   <Hint text="Сколько очков получает участник за каждое текстовое сообщение. Оптимально: 10–25 XP — меньше замедлит прокачку, больше ускорит её слишком сильно" />
                 </label>
-                <input type="number" value={formData.xp_per_message ?? settings?.xp_per_message ?? 15} onChange={e => updateField('xp_per_message', parseInt(e.target.value) || 0)} className="input w-full" />
+                <input type="range" min={1} max={50} value={formData.xp_per_message ?? settings?.xp_per_message ?? 15} onChange={e => updateField('xp_per_message', parseInt(e.target.value) || 1)} className="slider w-full" />
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
@@ -581,10 +581,10 @@ export default function RankingPage() {
               </div>
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
-                  Задержка между начислениями (сек)
+                  Задержка между начислениями: {formData.cooldown_seconds ?? settings?.cooldown_seconds ?? 60} сек
                   <Hint text="Минимальное время между начислениями опыта одному пользователю. Защита от спама и накрутки" />
                 </label>
-                <input type="number" value={formData.cooldown_seconds ?? settings?.cooldown_seconds ?? 60} onChange={e => updateField('cooldown_seconds', parseInt(e.target.value) || 0)} className="input w-full" />
+                <input type="range" min={0} max={300} value={formData.cooldown_seconds ?? settings?.cooldown_seconds ?? 60} onChange={e => updateField('cooldown_seconds', parseInt(e.target.value) || 0)} className="slider w-full" />
               </div>
               <div className="flex justify-between items-center pt-1">
                 <div className="flex items-center gap-1.5">
@@ -979,7 +979,7 @@ export default function RankingPage() {
                   max={60}
                   value={formData.np_cooldown_minutes ?? settings?.np_cooldown_minutes ?? 10}
                   onChange={e => updateField('np_cooldown_minutes', parseInt(e.target.value) || 10)}
-                  className="w-full"
+                  className="slider w-full"
                 />
               </div>
               <div>
@@ -1098,13 +1098,16 @@ export default function RankingPage() {
                 <Switch checked={formData.np_voice_enabled ?? settings?.np_voice_enabled ?? false} onCheckedChange={val => updateField('np_voice_enabled', val)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Очков в час</label>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">
+                  Очков в час: {formData.np_voice_per_hour ?? settings?.np_voice_per_hour ?? 10}
+                </label>
                 <input
-                  type="number"
+                  type="range"
                   min={0}
+                  max={60}
                   value={formData.np_voice_per_hour ?? settings?.np_voice_per_hour ?? 10}
                   onChange={e => updateField('np_voice_per_hour', parseInt(e.target.value) || 0)}
-                  className="input w-full sm:w-48"
+                  className="slider w-full sm:w-48"
                 />
               </div>
             </Card>

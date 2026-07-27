@@ -34,6 +34,18 @@ export function useLeaderboard(serverId: string, platform: 'vk' | 'lolka' = 'vk'
   });
 }
 
+// Публичная страница /leaderboard/[serverId] (ТЗ п.14): без авторизации, топ-100,
+// обновление раз в 10 минут (в отличие от «живого» useLeaderboard админки — 30с/60с).
+export function usePublicLeaderboard(serverId: string, platform: 'vk' | 'lolka' = 'vk', sort: 'xp' | 'level' | 'messages' = 'xp') {
+  return useQuery({
+    queryKey: ['ranking', 'leaderboard', 'public', serverId, platform, sort],
+    queryFn: () => api.ranking.getLeaderboard(serverId, platform, sort, 100, 0),
+    enabled: !!serverId,
+    staleTime: 10 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+  });
+}
+
 export function useRankingPreview(serverId: string, platform: 'vk' | 'lolka', userId: string) {
   return useQuery({
     queryKey: ['ranking', 'preview', serverId, platform, userId],

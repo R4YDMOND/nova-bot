@@ -3423,7 +3423,13 @@ def get_ranking_leaderboard(
             }
             for i, m in enumerate(rows)
         ]
-        return {"platform": platform, "total": total, "entries": entries}
+        return {
+            "platform": platform,
+            "total": total,
+            "entries": entries,
+            "server_name": server.name,
+            "server_icon_url": server.icon_url,
+        }
     except Exception as e:
         return {"error": str(e)}
     finally:
