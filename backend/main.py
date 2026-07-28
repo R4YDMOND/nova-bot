@@ -588,7 +588,8 @@ app = FastAPI(title="Nova API", version="0.7.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://nova-bot-1-1hsz.onrender.com",  # реальный frontend на Render
+        "https://nova-bot-frontend-raydmond.amvera.io",  # frontend на Amvera (актуальный)
+        "https://nova-bot-1-1hsz.onrender.com",  # Render — оставлен временно на период переноса
         "https://nova-bot-4vmp.vercel.app",       # старый Vercel — оставлен временно
         "http://localhost:3000",                   # локальная разработка
     ],
@@ -1408,7 +1409,7 @@ def auth_vk():
 
 @app.get("/api/auth/vk/callback")
 def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
-    frontend_url = "https://nova-bot-1-1hsz.onrender.com"
+    frontend_url = os.getenv("FRONTEND_URL", "https://nova-bot-frontend-raydmond.amvera.io")
     if not code:
         return RedirectResponse(url=f"{frontend_url}/login?error=vk_denied")
 
@@ -1440,7 +1441,7 @@ def auth_vk_callback(code: str = None, state: str = "", device_id: str = ""):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка обмена кода: {str(e)}")
 
-    frontend_url = "https://nova-bot-1-1hsz.onrender.com"
+    frontend_url = os.getenv("FRONTEND_URL", "https://nova-bot-frontend-raydmond.amvera.io")
 
     # user_id надёжно приходит уже в ответе на обмен кода (token_data) — это основной источник.
     # /oauth2/user_info используем только как источник имени/аватара, необязательный.
@@ -1570,7 +1571,7 @@ def verify_email(token: str):
         user.verification_token_expires = None
         db.commit()
 
-        frontend_url = "https://nova-bot-1-1hsz.onrender.com"
+        frontend_url = os.getenv("FRONTEND_URL", "https://nova-bot-frontend-raydmond.amvera.io")
         return RedirectResponse(url=f"{frontend_url}/login?verified=1")
     except HTTPException:
         raise
@@ -1712,7 +1713,7 @@ def forgot_password(data: ForgotPasswordRequest):
             user.password_reset_expires = token_expiry(hours=1)
             db.commit()
 
-            frontend_url = "https://nova-bot-1-1hsz.onrender.com"
+            frontend_url = os.getenv("FRONTEND_URL", "https://nova-bot-frontend-raydmond.amvera.io")
             reset_link = f"{frontend_url}/reset-password?token={token}"
             sent = send_email(
                 user.email,
