@@ -24,7 +24,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 
-const API_BASE = 'https://nova-bot-rpsy.onrender.com';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://nova-bot-rpsy.onrender.com';
 const FALLBACK_STATS = { servers: 0, users: 0, responseTime: 0.8 };
 
 // Последние обновления — пока статический список (последние 3-4 записи).
