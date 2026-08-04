@@ -588,9 +588,7 @@ app = FastAPI(title="Nova API", version="0.7.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://nova-bot-frontend-raydmond.amvera.io",  # frontend на Amvera (актуальный)
-        "https://nova-bot-1-1hsz.onrender.com",  # Render — оставлен временно на период переноса
-        "https://nova-bot-4vmp.vercel.app",       # старый Vercel — оставлен временно
+        "https://nova-bot-frontend.pages.dev",     # frontend на Cloudflare Pages (актуальный)
         "http://localhost:3000",                   # локальная разработка
     ],
     allow_credentials=True,
