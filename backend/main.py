@@ -7,11 +7,12 @@ import logging
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal, get_db
 from sqlalchemy.orm import Session
-from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate, NovaPoint, ShopItem
+from models import Server, ModuleConfig, AISettings, Member, MusicProvider, Event, User, NotificationSettings, Webhook, ModerationEvent, VKConnection, RankingSettings, SavedMessageTemplate, NovaPoint, ShopItem, Achievement
 from ranking.xp_handler import award_xp_for_message
 from ranking.template import render_notify_template, render_message_template
-from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text, resolve_action, resolve_receiver_id
+from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, ACTION_ACHV_GIVE, get_profile_summary, get_leaderboard_text, resolve_action, resolve_receiver_id
 from ranking.nova_points import give_nova_point, get_top as get_nova_points_top_rows, claim_daily, list_shop_items, buy_shop_item, get_currency_label
+from ranking.achievements import give_achievement, list_achievements
 from ranking.account_link import generate_link_code, confirm_link_code, resolve_lolka_guild_for_server
 from ranking.cache import cache as _shared_cache
 from ranking import np_farm_cache
@@ -121,6 +122,124 @@ async def _award_xp_and_notify_vk(
         logger.error(f"level-up notify (VK) error: {e}")
 
 
+async def _award_xp_and_notify_max(
+    server_id: str,
+    chat_id: str,
+    user_id: int,
+    username: str,
+    message_text: str,
+) -> None:
+    """
+    Аналог _award_xp_and_notify_vk для MAX (ТЗ №5 Rev.10, п.1/6). Канал уведомлений
+    у MAX — тот же chat_id (у бота один токен на всё приложение, отдельного
+    "канала уведомлений" в терминах MAX не существует, в отличие от VK/Lolka).
+    """
+    result = await award_xp_for_message(
+        server_id=server_id,
+        platform="max",
+        user_id=str(user_id),
+        username=username,
+        message_text=message_text,
+        channel_id=str(chat_id),
+    )
+    if not result or not result.get("leveled_up"):
+        return
+    try:
+        mention = username
+        structured = None
+        if result.get("notify_template"):
+            try:
+                structured = json.loads(result["notify_template"])
+            except (json.JSONDecodeError, TypeError):
+                structured = None
+
+        if structured and (structured.get("embed_enabled") or structured.get("buttons")):
+            rendered = render_message_template(
+                structured, platform="max", user=mention, level=result["new_level"],
+                guild=result.get("guild", ""), xp=result.get("xp"),
+                next_level_xp=result.get("next_level_xp"), rank=result.get("rank"),
+                target_user_id=str(user_id),
+            )
+            await asyncio.to_thread(
+                max_gateway.send_message, str(chat_id), rendered["message"] or " ",
+                rendered.get("attachments"),
+            )
+        else:
+            template = result.get("notify_message") or "🎉 {user} достиг {level} уровня!"
+            text_to_send = render_notify_template(
+                template, user=mention, level=result["new_level"], guild=result.get("guild", ""),
+                xp=result.get("xp"), next_level_xp=result.get("next_level_xp"), rank=result.get("rank"),
+            )
+            await asyncio.to_thread(max_gateway.send_message, str(chat_id), text_to_send)
+    except Exception as e:
+        logger.error(f"level-up notify (MAX) error: {e}")
+
+
+async def _handle_max_message_callback(server_id: str, chat_id: str, callback_id: str, user_id: int, payload: Any) -> None:
+    """
+    Обрабатывает клик по callback-кнопке MAX (update_type == message_callback) — те же
+    предустановленные действия, что и у VK/Lolka (ranking/actions.py). Отвечать нужно
+    через POST /answers (max_gateway.answer_callback), иначе кнопка "зависает" на клиенте.
+    """
+    try:
+        action = resolve_action(payload)
+
+        if action == ACTION_PROFILE:
+            text = get_profile_summary(server_id, "max", str(user_id))
+            await asyncio.to_thread(max_gateway.answer_callback, callback_id, text[:100])
+
+        elif action == ACTION_LEADERBOARD:
+            await asyncio.to_thread(max_gateway.answer_callback, callback_id, "📊 Топ участников")
+            await asyncio.to_thread(max_gateway.send_message, str(chat_id), get_leaderboard_text(server_id, "max"))
+
+        elif action == ACTION_NP_GIVE:
+            receiver_id = resolve_receiver_id(payload)
+            if not receiver_id:
+                await asyncio.to_thread(max_gateway.answer_callback, callback_id, "Не удалось определить получателя")
+            else:
+                db = SessionLocal()
+                try:
+                    np_result = give_nova_point(db, server_id, "max", str(user_id), receiver_id)
+                finally:
+                    db.close()
+                text = np_result.get("message") or np_result.get("error", "Не удалось выдать Nova Point")
+                await asyncio.to_thread(max_gateway.answer_callback, callback_id, text[:100])
+
+        elif action == ACTION_ACHV_GIVE:
+            receiver_id = resolve_receiver_id(payload)
+            if not receiver_id:
+                await asyncio.to_thread(max_gateway.answer_callback, callback_id, "Не удалось определить получателя")
+            else:
+                db = SessionLocal()
+                try:
+                    achv_result = give_achievement(db, server_id, "max", str(user_id), receiver_id)
+                finally:
+                    db.close()
+                text = achv_result.get("message") or achv_result.get("error", "Не удалось выдать достижение")
+                await asyncio.to_thread(max_gateway.answer_callback, callback_id, text[:100])
+
+        elif action == "shop_buy":
+            item_id = _resolve_shop_item_id(payload)
+            if not item_id:
+                await asyncio.to_thread(max_gateway.answer_callback, callback_id, "Не удалось определить товар")
+            else:
+                db = SessionLocal()
+                try:
+                    buy_result = buy_shop_item(db, server_id, "max", str(user_id), item_id)
+                    if buy_result.get("status") == "ok":
+                        text = await _grant_shop_role_in_lolka(db, server_id, buy_result)
+                    else:
+                        text = buy_result.get("error", "Не удалось купить товар")
+                finally:
+                    db.close()
+                await asyncio.to_thread(max_gateway.answer_callback, callback_id, text[:100])
+
+        else:
+            await asyncio.to_thread(max_gateway.answer_callback, callback_id)
+    except Exception as e:
+        logger.error(f"MAX message_callback handling error: {e}")
+
+
 async def _handle_vk_message_event(
     access_token: str,
     server_id: str,
@@ -170,6 +289,19 @@ async def _handle_vk_message_event(
                 finally:
                     db.close()
                 text = np_result.get("message") or np_result.get("error", "Не удалось выдать Nova Point")
+                await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
+
+        elif action == ACTION_ACHV_GIVE:
+            receiver_id = resolve_receiver_id(payload)
+            if not receiver_id:
+                await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": "Не удалось определить получателя"})
+            else:
+                db = SessionLocal()
+                try:
+                    achv_result = give_achievement(db, server_id, "vk", str(user_id), receiver_id)
+                finally:
+                    db.close()
+                text = achv_result.get("message") or achv_result.get("error", "Не удалось выдать достижение")
                 await asyncio.to_thread(service.answer_message_event, event_id, user_id, peer_id, {"type": "show_snackbar", "text": text[:90]})
 
         elif action == "shop_buy":
@@ -3595,6 +3727,76 @@ def api_delete_shop_item(item_id: int, server_id: str = Query(...), platform: st
         db.close()
 
 
+@app.get("/api/achievements")
+def api_list_achievements(server_id: str = Query(...), platform: str = Query("lolka")):
+    """Список достижений (ТЗ №5 Rev.10, п.4) — независимая от Nova Points сущность."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+        items = list_achievements(db, str(server.id), platform)
+        return {"items": [
+            {"id": a.id, "name": a.name, "icon": a.icon, "trigger_level": a.trigger_level}
+            for a in items
+        ]}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.post("/api/achievements")
+def api_create_achievement(server_id: str = Query(...), platform: str = Query("lolka"), data: dict = None):
+    """Создать достижение. Тело: {"name": "...", "icon"?: "🏆", "trigger_level"?: 10}.
+    trigger_level не задан — достижение выдаётся только вручную кнопкой в редакторе шаблонов."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+        payload = data or {}
+        name = str(payload.get("name") or "").strip()
+        if not name:
+            return {"error": "Укажите название достижения"}
+        trigger_level = payload.get("trigger_level")
+        item = Achievement(
+            server_id=str(server.id), platform=platform, name=name,
+            icon=str(payload.get("icon") or "🏆"),
+            trigger_level=int(trigger_level) if trigger_level not in (None, "") else None,
+        )
+        db.add(item)
+        db.commit()
+        return {"status": "ok", "id": item.id}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@app.delete("/api/achievements/{achievement_id}")
+def api_delete_achievement(achievement_id: int, server_id: str = Query(...), platform: str = Query("lolka")):
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+        item = db.query(Achievement).filter(
+            Achievement.id == achievement_id, Achievement.server_id == str(server.id), Achievement.platform == platform,
+        ).first()
+        if not item:
+            return {"error": "Достижение не найдено"}
+        db.delete(item)
+        db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
 @app.post("/api/nova-points/shop/generate-message")
 async def api_generate_shop_message(server_id: str = Query(...), platform: str = Query("lolka")):
     """
@@ -4165,7 +4367,28 @@ async def max_webhook(request: Request):
     except Exception:
         return JSONResponse(status_code=400, content={"error": "invalid_json"})
 
-    if data.get("update_type") != "message_created":
+    update_type = data.get("update_type")
+
+    if update_type == "message_callback":
+        callback = data.get("callback") or {}
+        callback_id = callback.get("callback_id")
+        payload = callback.get("payload")
+        message = data.get("message") or {}
+        recipient = message.get("recipient") or {}
+        chat_id = recipient.get("chat_id") or data.get("chat_id")
+        user = callback.get("user") or data.get("user") or {}
+        user_id = user.get("user_id")
+        if callback_id and chat_id and user_id:
+            db = SessionLocal()
+            try:
+                server = db.query(Server).filter(Server.server_id == str(chat_id), Server.platform == "max").first()
+            finally:
+                db.close()
+            if server:
+                await _handle_max_message_callback(str(server.id), str(chat_id), callback_id, user_id, payload)
+        return JSONResponse(content={"ok": True})
+
+    if update_type != "message_created":
         return JSONResponse(content={"ok": True})
 
     message = data.get("message") or {}
@@ -4226,7 +4449,13 @@ async def max_webhook(request: Request):
             db.commit()
             return JSONResponse(content={"ok": True})
 
-        # 2. AI-ассистент — разговорный ответ (ТЗ №9; область MAX сейчас — только AI)
+        # 2. Система уровней — XP за сообщение + уведомление о level-up (ТЗ №5 Rev.10, п.1)
+        asyncio.create_task(_award_xp_and_notify_max(
+            server_id=str(server.id), chat_id=str(chat_id), user_id=user_id,
+            username=user_name, message_text=text,
+        ))
+
+        # 3. AI-ассистент — разговорный ответ (ТЗ №9; область MAX теперь — AI + уровни)
         if ai_settings_row:
             reply = await asyncio.to_thread(
                 ai_engine.generate_ai_reply, db, str(server.id), str(chat_id), str(user_id),

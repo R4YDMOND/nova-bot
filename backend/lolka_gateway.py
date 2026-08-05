@@ -11,8 +11,9 @@ import websockets
 
 from ranking.xp_handler import award_xp_for_message, award_xp_for_voice_minutes
 from ranking.template import render_notify_template, render_message_template
-from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, get_profile_summary, get_leaderboard_text
+from ranking.actions import ACTION_PROFILE, ACTION_LEADERBOARD, ACTION_CLOSE, ACTION_NP_GIVE, ACTION_ACHV_GIVE, get_profile_summary, get_leaderboard_text
 from ranking.nova_points import give_nova_point, claim_daily, list_shop_items, buy_shop_item, get_currency_label
+from ranking.achievements import give_achievement
 from ranking.account_link import generate_link_code, confirm_link_code
 from ranking import np_farm_cache
 from database import SessionLocal
@@ -749,6 +750,17 @@ class LolkaGateway:
                 finally:
                     db.close()
                 text = np_result.get("message") or np_result.get("error", "Не удалось выдать Nova Point")
+                await self._followup_edit_original(interaction_token, {"content": text})
+
+            elif effective_id.startswith(f"{ACTION_ACHV_GIVE}:") and server_id and user_id:
+                await self._interaction_callback(interaction_id, interaction_token, 5, {"flags": 64})
+                receiver_id = effective_id.split(":", 1)[1]
+                db = SessionLocal()
+                try:
+                    achv_result = give_achievement(db, server_id, "lolka", str(user_id), receiver_id)
+                finally:
+                    db.close()
+                text = achv_result.get("message") or achv_result.get("error", "Не удалось выдать достижение")
                 await self._followup_edit_original(interaction_token, {"content": text})
 
             elif effective_id.startswith("shop_buy:") and server_id and user_id:

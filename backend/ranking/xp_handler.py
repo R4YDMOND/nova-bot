@@ -11,6 +11,7 @@ from sqlalchemy import and_
 from database import SessionLocal
 from models import RankingSettings, Member, Server
 from ranking.formulas import XPFormulaEngine, XPFormulaConfig
+from ranking.achievements import check_level_triggers
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,7 @@ async def award_xp_for_voice_minutes(
                 Member.platform == platform,
                 Member.xp > member.xp,
             )).count() + 1
+            check_level_triggers(db, server_id, platform, user_id, member.level)
             result.update({
                 "guild": server.name if server else "",
                 "xp": member.xp,
@@ -212,6 +214,7 @@ async def award_xp_for_message(
                 Member.platform == platform,
                 Member.xp > member.xp,
             )).count() + 1
+            check_level_triggers(db, server_id, platform, user_id, member.level)
             result.update({
                 "guild": server.name if server else "",
                 "xp": member.xp,

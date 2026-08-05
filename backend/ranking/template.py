@@ -66,10 +66,46 @@ def render_notify_template(
 
 _LOLKA_BUTTON_STYLE = {"primary": 1, "secondary": 2, "success": 3, "danger": 4, "link": 5}
 _VK_BUTTON_COLOR = {"primary": "primary", "secondary": "secondary", "success": "positive", "danger": "negative", "link": "primary"}
+# MAX CallbackButton.intent: только default/positive/negative (см. MAX - Документация.md,
+# Keyboard.button.callback). Маппинг стилей Lolka (1..4) на intent — ТЗ №5 Rev.10, п.5:
+# 1 (primary) -> positive, 2 (secondary) -> default, 4 (danger) -> negative.
+_MAX_BUTTON_INTENT = {"primary": "positive", "secondary": "default", "success": "positive", "danger": "negative", "link": "default"}
 
-# Действие "Выдать Nova Point" (frontend/src/types/ranking.ts, BUTTON_ACTIONS) — единственное
-# действие кнопки/select-опции, которому нужен получатель (см. ranking/actions.py, ACTION_NP_GIVE).
+# Действия кнопки/select-опции, которым нужен получатель (frontend/src/types/ranking.ts,
+# BUTTON_ACTIONS): "Выдать Nova Point" и "Выдать достижения" (ТЗ №5 Rev.10, п.5).
 _ACTION_NP_GIVE = "nova_points_give"
+_ACTION_ACHV_GIVE = "achv_give_action"
+_RECEIVER_ACTIONS = {_ACTION_NP_GIVE, _ACTION_ACHV_GIVE}
+
+
+def convert_components_to_max_keyboard(buttons: list, target_user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Маппинг кнопок редактора шаблонов в attachment "inline_keyboard" MAX Bot API
+    (см. MAX - Документация.md, "Ответ на callback" / Keyboard.inlineKeyboard).
+    Селекты (type: 3 в нумерации компонентов Lolka) MAX не поддерживает и сюда не попадают —
+    вызывающий код (render_message_template) их просто не передаёт.
+    Возвращает None, если кнопок нет.
+    """
+    if not buttons:
+        return None
+    rows: Dict[int, list] = {}
+    for b in buttons:
+        label = (b.get("label", "") or "")[:128]
+        if b.get("style") == "link" and b.get("url"):
+            btn: Dict[str, Any] = {"type": "link", "text": label, "url": b["url"]}
+        else:
+            custom_id = b.get("custom_id") or b.get("id", "") or "nova_profile"
+            max_payload: Dict[str, Any] = {"nova_action": custom_id}
+            if custom_id in _RECEIVER_ACTIONS and target_user_id:
+                max_payload["receiver_id"] = target_user_id
+            btn = {
+                "type": "callback",
+                "text": label,
+                "payload": json.dumps(max_payload, ensure_ascii=False),
+                "intent": _MAX_BUTTON_INTENT.get(b.get("style", "primary"), "default"),
+            }
+        rows.setdefault(int(b.get("row", 0)), []).append(btn)
+    return {"type": "inline_keyboard", "payload": {"buttons": [rows[k] for k in sorted(rows)]}}
 
 
 def render_message_template(
@@ -166,8 +202,8 @@ def render_message_template(
                 btn["url"] = b["url"]
             else:
                 custom_id = b.get("custom_id") or b.get("id", "")
-                if custom_id == _ACTION_NP_GIVE and target_user_id:
-                    custom_id = f"{_ACTION_NP_GIVE}:{target_user_id}"
+                if custom_id in _RECEIVER_ACTIONS and target_user_id:
+                    custom_id = f"{custom_id}:{target_user_id}"
                 btn["custom_id"] = custom_id
             rows.setdefault(int(b.get("row", 0)), []).append(btn)
         for row_key in sorted(rows):
@@ -189,8 +225,8 @@ def render_message_template(
                         {
                             "label": sub(o.get("label", "")),
                             "value": (
-                                f"{_ACTION_NP_GIVE}:{target_user_id}"
-                                if o.get("value") == _ACTION_NP_GIVE and target_user_id
+                                f"{o.get('value')}:{target_user_id}"
+                                if o.get("value") in _RECEIVER_ACTIONS and target_user_id
                                 else o.get("value", "")
                             ),
                             "description": sub(o.get("description", "")) or None,
@@ -201,7 +237,8 @@ def render_message_template(
             })
         return result
 
-    # VK: панель сворачивается в текст, кнопки → inline-клавиатура
+    # VK и MAX: панель сворачивается в текст (нет нативных embed'ов), select-меню игнорируются
+    # (обе платформы не поддерживают выпадающие списки — см. ТЗ №5 Rev.10, п.2).
     lines = [content] if content else []
     if embed_enabled:
         if embed.get("title"):
@@ -216,6 +253,12 @@ def render_message_template(
             lines.append(f"— {sub(footer['text'])}")
     message = "\n".join(line for line in lines if line)
 
+    if platform == "max":
+        # MAX: кнопки → attachment "inline_keyboard" (convert_components_to_max_keyboard).
+        keyboard_attachment = convert_components_to_max_keyboard(buttons, target_user_id)
+        return {"message": message, "attachments": [keyboard_attachment] if keyboard_attachment else []}
+
+    # VK (по умолчанию): кнопки → keyboard (JSON-строка)
     keyboard: Optional[str] = None
     if buttons:
         vk_rows: Dict[int, list] = {}
@@ -229,7 +272,7 @@ def render_message_template(
                 # просто отправил бы payload как обычное сообщение от пользователя.
                 custom_id = b.get("custom_id") or "nova_profile"
                 vk_payload: Dict[str, Any] = {"nova_action": custom_id}
-                if custom_id == _ACTION_NP_GIVE and target_user_id:
+                if custom_id in _RECEIVER_ACTIONS and target_user_id:
                     vk_payload["receiver_id"] = target_user_id
                 action = {"type": "callback", "label": label, "payload": json.dumps(vk_payload)}
             vk_rows.setdefault(int(b.get("row", 0)), []).append({

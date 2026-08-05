@@ -25,6 +25,7 @@ import { Hint, HexColorField, RoleMultiSelect } from '@/components/ranking/Ranki
 import { ShopPurchaseTemplateModal } from '@/components/ranking/ShopPurchaseTemplateModal';
 import { MessageTemplateModal } from '@/components/MessageTemplateModal';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const TABS = [
   { id: 'settings', label: '⚙️ Общие' },
@@ -226,6 +227,56 @@ function calcLevelXp(level: number, formulaType: string): number {
   if (formulaType === 'linear') return 100 * level;
   if (formulaType === 'logarithmic') return Math.round(100 * level * Math.log10(level + 1));
   return 100 * level * level; // exponential / custom — дефолт
+}
+
+const CHART_KEY_LEVELS = [1, 5, 10, 25, 50];
+
+/** График кривой требуемого XP (ТЗ №5 Rev.10, п.4/6) — считается на клиенте из
+ * draft-значений формулы (calcLevelXp), без запросов к бэкенду: обновляется мгновенно
+ * при вводе, а не после «Сохранить» (Draft mode это не нарушает — график не пишет данные).
+ * useMemo пересчитывает точки только при смене типа формулы — правка decay/multiplier
+ * calcLevelXp не использует, они влияют лишь на XP за сообщение, не на порог уровня. */
+function FormulaProgressionChart({ formula }: { formula: XPFormulaConfig }) {
+  const data = useMemo(() => {
+    const points = [];
+    for (let level = 1; level <= 50; level++) {
+      points.push({ level, xp: calcLevelXp(level, formula.formula_type) });
+    }
+    return points;
+  }, [formula.formula_type]);
+
+  return (
+    <div className="h-64 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
+          <XAxis
+            dataKey="level"
+            ticks={CHART_KEY_LEVELS}
+            tick={{ fontSize: 11, fill: '#94A3B8' }}
+            label={{ value: 'Уровень', position: 'insideBottom', offset: -2, fontSize: 11, fill: '#94A3B8' }}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: '#94A3B8' }}
+            tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
+          />
+          <RechartsTooltip
+            contentStyle={{ background: '#020617', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+            labelFormatter={(level: number) => `Уровень ${level}`}
+            formatter={(value: number) => [`${value.toLocaleString('ru-RU')} XP`, 'Требуется']}
+          />
+          <Line type="monotone" dataKey="xp" stroke="#00E5FF" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="flex flex-wrap gap-2 mt-3">
+        {CHART_KEY_LEVELS.map(level => (
+          <span key={level} className="text-xs px-2 py-1 rounded-lg bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))]">
+            Ур. {level}: <span className="text-cyan-400 font-semibold">{calcLevelXp(level, formula.formula_type).toLocaleString('ru-RU')} XP</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function RankingPage() {
@@ -760,6 +811,11 @@ export default function RankingPage() {
             ) : (
               <p className="text-center text-[rgb(var(--text-secondary))] py-8 text-sm">Нажмите «Проверить формулу», чтобы увидеть результат</p>
             )}
+          </Card>
+
+          <Card className="p-5 md:col-span-2">
+            <h3 className="font-semibold mb-3">📈 График прогрессии XP</h3>
+            <FormulaProgressionChart formula={formula} />
           </Card>
         </div>
       )}

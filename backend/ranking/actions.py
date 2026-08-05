@@ -15,6 +15,8 @@ ACTION_PROFILE = "nova_profile"
 ACTION_LEADERBOARD = "nova_leaderboard"
 ACTION_CLOSE = "nova_close"
 ACTION_NP_GIVE = "nova_points_give"
+ACTION_ACHV_GIVE = "achv_give_action"  # "Выдать достижения" (ТЗ №5 Rev.10, п.5) — та же
+# механика получателя, что и у ACTION_NP_GIVE, но без валюты/кулдауна (см. ranking/achievements.py)
 
 
 def get_profile_summary(server_id: str, platform: str, user_id: str) -> str:

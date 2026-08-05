@@ -1,9 +1,12 @@
 """
 backend/max_gateway.py — минимальный клиент MAX Bot API (https://dev.max.ru/docs-api).
 
-MAX подключается как третья платформа бота. Область функционала на MAX сейчас — только:
+MAX подключается как третья платформа бота. Функционал MAX (ТЗ №5 Rev.10, п.1):
   1. AI-ассистент (диалог с ботом + двухуровневая AI-модерация)
-  2. Вебхуки/репостинг событий — В ПЛАНАХ, не реализовано в этом файле.
+  2. Система уровней — начисление XP, уведомления о level-up с inline-клавиатурой
+     (Профиль/Топ/Закрыть/Nova Point), обработка нажатий (update_type == "message_callback",
+     см. backend/main.py, max_webhook).
+  3. Вебхуки/репостинг сторонних событий — В ПЛАНАХ, не реализовано в этом файле.
 
 Архитектура намеренно зеркалит Lolka: ОДИН бот-токен на всё приложение (MAX_BOT_TOKEN),
 конкретные "серверы" в БД (Server.platform == "max") идентифицируются chat_id диалога/чата MAX.
@@ -15,6 +18,7 @@ MAX подключается как третья платформа бота. О
 POST /api/max/webhook (см. backend/main.py).
 """
 import os
+from typing import Optional
 import requests
 
 MAX_API_BASE = "https://platform-api2.max.ru"
@@ -46,7 +50,7 @@ def register_webhook() -> None:
             headers=_headers(),
             json={
                 "url": webhook_url,
-                "update_types": ["message_created", "bot_added", "bot_started", "bot_removed"],
+                "update_types": ["message_created", "message_callback", "bot_added", "bot_started", "bot_removed"],
                 "secret": os.getenv("MAX_WEBHOOK_SECRET", ""),
             },
             timeout=10,
@@ -59,16 +63,21 @@ def register_webhook() -> None:
         print(f"MAX GATEWAY WARNING: не удалось зарегистрировать webhook — {e}")
 
 
-def send_message(chat_id: str, text: str) -> bool:
-    """POST /messages?chat_id=... — отправка ответа AI-ассистента в чат."""
+def send_message(chat_id: str, text: str, attachments: Optional[list] = None) -> bool:
+    """POST /messages?chat_id=... — отправка сообщения в чат (AI-ассистент, уведомления
+    об уровнях). attachments — список вложений (например, inline_keyboard из
+    ranking/template.py, convert_components_to_max_keyboard)."""
     if not is_configured():
         return False
     try:
+        payload: dict = {"text": (text or "")[:4000]}
+        if attachments:
+            payload["attachments"] = attachments
         resp = requests.post(
             f"{MAX_API_BASE}/messages",
             params={"chat_id": chat_id},
             headers=_headers(),
-            json={"text": (text or "")[:4000]},
+            json=payload,
             timeout=15,
         )
         if not resp.ok:
@@ -76,6 +85,34 @@ def send_message(chat_id: str, text: str) -> bool:
         return resp.ok
     except requests.RequestException as e:
         print(f"MAX GATEWAY: сетевая ошибка отправки сообщения — {e}")
+        return False
+
+
+def answer_callback(callback_id: str, notification: Optional[str] = None, message: Optional[dict] = None) -> bool:
+    """POST /answers?callback_id=... — ответ на нажатие callback-кнопки (см.
+    MAX - Документация.md, "Ответ на callback"). Нужно ответить, иначе кнопка "зависает"
+    с индикатором загрузки на клиенте. notification — всплывающее уведомление пользователю
+    (аналог VK show_snackbar); message — опционально обновляет исходное сообщение."""
+    if not is_configured() or not callback_id:
+        return False
+    try:
+        body: dict = {}
+        if notification:
+            body["notification"] = notification[:100]
+        if message:
+            body["message"] = message
+        resp = requests.post(
+            f"{MAX_API_BASE}/answers",
+            params={"callback_id": callback_id},
+            headers=_headers(),
+            json=body,
+            timeout=10,
+        )
+        if not resp.ok:
+            print(f"MAX GATEWAY: ошибка ответа на callback {callback_id} — {resp.status_code} {resp.text[:200]}")
+        return resp.ok
+    except requests.RequestException as e:
+        print(f"MAX GATEWAY: сетевая ошибка ответа на callback — {e}")
         return False
 
 

@@ -508,3 +508,34 @@ class NovaPointTransaction(Base):
     reason = Column(Text, nullable=True)
     message_id = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class Achievement(Base):
+    """Достижение (ТЗ №5 Rev.10, п.4) — независимая от Nova Points сущность: NP/магазин/
+    валюта не переименовываются и не трогаются (экономика уже сложнее, чем "простой счётчик"
+    из анализа ТЗ — открытый вопрос согласован с заказчиком). Выдаётся автоматически при
+    достижении trigger_level, либо вручную кнопкой "Выдать достижения" в редакторе шаблонов
+    (custom_id == achv_give_action, см. ranking/actions.py, ACTION_ACHV_GIVE)."""
+    __tablename__ = "achievements"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    platform = Column(String(20), default="lolka", index=True)
+    name = Column(String(255), nullable=False)
+    icon = Column(String(16), default="🏆")
+    trigger_level = Column(Integer, nullable=True)  # NULL = выдаётся только вручную
+    options = Column(Text, default="")  # JSON доп. условий триггера — задел под будущее расширение
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserAchievement(Base):
+    """Факт выдачи достижения участнику — и авто (level-up), и ручной (кнопка/select)."""
+    __tablename__ = "user_achievements"
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(String(255), nullable=False, index=True)
+    platform = Column(String(20), default="lolka", index=True)
+    user_id = Column(String(255), nullable=False, index=True)
+    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=True)
+    giver_id = Column(String(255), nullable=True)  # кто выдал вручную; NULL — авто-триггер по уровню
+    granted_at = Column(DateTime, default=datetime.utcnow)
