@@ -300,6 +300,7 @@ export default function RankingPage() {
   const [formData, setFormData] = useState<any>({});
   const [sort, setSort] = useState<'xp' | 'level' | 'messages'>('xp');
   const [formulaTest, setFormulaTest] = useState<{ valid: boolean; test_xp?: number; level_10_required_xp?: number; error?: string } | null>(null);
+  const [formulaTestVoice, setFormulaTestVoice] = useState<{ valid: boolean; test_xp?: number; level_10_required_xp?: number; error?: string } | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const effectivePlatform = viewPlatform;
@@ -523,6 +524,20 @@ export default function RankingPage() {
       setFormulaTest(result);
     } catch {
       setFormulaTest({ valid: false, error: 'Не удалось проверить формулу' });
+    }
+  };
+
+  const handleTestVoiceFormula = async () => {
+    try {
+      const result = await validateMutation.mutateAsync({
+        formula_type: formula.formula_type,
+        base_xp: formula.voice_base_xp ?? 15,
+        multiplier: formula.voice_multiplier ?? 1,
+        is_voice: true,
+      });
+      setFormulaTestVoice(result);
+    } catch {
+      setFormulaTestVoice({ valid: false, error: 'Не удалось проверить формулу' });
     }
   };
 
@@ -939,6 +954,14 @@ export default function RankingPage() {
                   <input type="number" step="0.1" value={formula.voice_multiplier ?? 1} onChange={e => updateFormula('voice_multiplier', parseFloat(e.target.value) || 0)} className="input w-full" />
                 </div>
               </div>
+
+              <button
+                onClick={handleTestVoiceFormula}
+                disabled={validateMutation.isPending}
+                className="w-full mt-2 px-4 py-2 rounded-xl font-semibold text-sm bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] hover:bg-[rgb(var(--surface-3))] transition-colors disabled:opacity-60"
+              >
+                {validateMutation.isPending ? 'Проверка...' : '▶️ Проверить формулу'}
+              </button>
             </Card>
           )}
 
@@ -963,6 +986,30 @@ export default function RankingPage() {
               <p className="text-center text-[rgb(var(--text-secondary))] py-8 text-sm">Нажмите «Проверить формулу», чтобы увидеть результат</p>
             )}
           </Card>
+
+          {effectivePlatform === 'lolka' && (
+            <Card className="p-5">
+              <h3 className="font-semibold mb-3">📈 Результат теста</h3>
+              {formulaTestVoice ? (
+                formulaTestVoice.valid ? (
+                  <div className="space-y-3">
+                    <div className="flex justify-between p-3 rounded-xl bg-[rgb(var(--surface-2))]">
+                      <span className="text-sm text-[rgb(var(--text-secondary))]">XP за тестовую голосовую минуту (ур. 5)</span>
+                      <span className="font-bold text-cyan-400">{formulaTestVoice.test_xp}</span>
+                    </div>
+                    <div className="flex justify-between p-3 rounded-xl bg-[rgb(var(--surface-2))]">
+                      <span className="text-sm text-[rgb(var(--text-secondary))]">XP до 10 уровня</span>
+                      <span className="font-bold text-cyan-400">{formulaTestVoice.level_10_required_xp?.toLocaleString('ru-RU')}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-red-400 text-sm">❌ {formulaTestVoice.error}</p>
+                )
+              ) : (
+                <p className="text-center text-[rgb(var(--text-secondary))] py-8 text-sm">Нажмите «Проверить формулу», чтобы увидеть результат</p>
+              )}
+            </Card>
+          )}
 
           <Card className="p-5 md:col-span-2">
             <h3 className="font-semibold mb-3">📈 График прогрессии XP</h3>

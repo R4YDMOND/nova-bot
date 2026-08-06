@@ -4004,13 +4004,19 @@ def get_ranking_preview(server_id: str = Query(...), platform: str = Query("vk")
 
 @app.post("/api/ranking/formulas/validate")
 def validate_ranking_formula(data: dict = None):
+    payload = dict(data or {})
+    # Тест Блока №2 «Формула XP» (голос) — фронт передаёт voice_base_xp/voice_multiplier
+    # как base_xp/multiplier с флагом is_voice=True; у голоса нет "длины сообщения",
+    # поэтому бонус за длину не считается, но применяется голосовой множитель 1.5x
+    # (тот же, что и в XPFormulaEngine.calculate_xp при реальном начислении).
+    is_voice = bool(payload.pop("is_voice", False))
     try:
-        config = XPFormulaConfig(**(data or {}))
+        config = XPFormulaConfig(**payload)
     except Exception as e:
         return {"valid": False, "error": str(e)}
 
     try:
-        test_xp = XPFormulaEngine.calculate_xp(config, current_level=5, message_length=50)
+        test_xp = XPFormulaEngine.calculate_xp(config, current_level=5, message_length=0 if is_voice else 50, is_voice=is_voice)
         level_10_required_xp = XPFormulaEngine.calculate_level_xp(10, config.formula_type, config.base_xp, config.multiplier)
         return {"valid": True, "test_xp": test_xp, "level_10_required_xp": level_10_required_xp}
     except Exception as e:

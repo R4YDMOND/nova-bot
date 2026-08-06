@@ -662,7 +662,7 @@ export const api = {
         `/api/ranking/preview?server_id=${serverId}&platform=${platform}&user_id=${userId}`
       ),
 
-    validateFormula: (formula: XPFormulaConfig) =>
+    validateFormula: (formula: XPFormulaConfig & { is_voice?: boolean }) =>
       apiFetch<FormulaValidationResult>("/api/ranking/formulas/validate", {
         method: "POST",
         body: JSON.stringify(formula),

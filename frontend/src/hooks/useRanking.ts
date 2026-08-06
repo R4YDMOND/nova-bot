@@ -53,7 +53,7 @@ export function useFormulaPresets() {
 
 export function useValidateFormula() {
   return useMutation({
-    mutationFn: (formula: import('@/types/ranking').XPFormulaConfig) => api.ranking.validateFormula(formula),
+    mutationFn: (formula: import('@/types/ranking').XPFormulaConfig & { is_voice?: boolean }) => api.ranking.validateFormula(formula),
   });
 }
 
