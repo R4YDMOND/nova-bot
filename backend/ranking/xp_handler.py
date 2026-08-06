@@ -109,6 +109,9 @@ async def award_xp_for_voice_minutes(
                 "xp": member.xp,
                 "next_level_xp": required,
                 "rank": rank,
+                # Сырой JSON rewards (settings.rewards) — платформенный обработчик (lolka_gateway.py)
+                # сам находит reward.level == new_level и выдаёт add_roles/remove_roles через API.
+                "rewards": settings.rewards,
             })
         return result
     except Exception as e:
@@ -230,6 +233,9 @@ async def award_xp_for_message(
                 "xp": member.xp,
                 "next_level_xp": required,
                 "rank": rank,
+                # Сырой JSON rewards (settings.rewards) — платформенный обработчик (lolka_gateway.py)
+                # сам находит reward.level == new_level и выдаёт add_roles/remove_roles через API.
+                "rewards": settings.rewards,
             })
 
         return result

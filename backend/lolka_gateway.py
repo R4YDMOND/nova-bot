@@ -406,6 +406,11 @@ class LolkaGateway:
             return
 
         try:
+            await self._apply_level_reward_roles(guild_id, user_id, result["new_level"], result.get("rewards"))
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка выдачи наград за уровень — {e}")
+
+        try:
             notify_channel = result.get("notify_channel")
             target_channel_id = notify_channel or channel_id
             if not target_channel_id:
@@ -473,6 +478,11 @@ class LolkaGateway:
         )
         if not result or not result.get("leveled_up"):
             return
+
+        try:
+            await self._apply_level_reward_roles(guild_id, user_id, result["new_level"], result.get("rewards"))
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка выдачи наград за уровень (голос) — {e}")
 
         try:
             notify_channel = result.get("notify_channel")
@@ -885,6 +895,42 @@ class LolkaGateway:
             )
         except Exception as e:
             print(f"LOLKA GATEWAY: ошибка выдачи роли {role_id} участнику {user_id} — {e}")
+
+    async def _revoke_role(self, guild_id: Optional[str], user_id: str, role_id: str) -> None:
+        """DELETE /guilds/{guild}/members/{user}/roles/{role} — снятие роли (симметрично _grant_role,
+        ТЗ №5 Rev.10, п.10.1 — «Награды за уровни», поле remove_roles)."""
+        if not guild_id:
+            return
+        import requests
+        try:
+            await asyncio.to_thread(
+                requests.delete,
+                f"{self.api_base_url}/guilds/{guild_id}/members/{user_id}/roles/{role_id}",
+                headers={"Authorization": f"Bot {self.token}"},
+                timeout=10,
+            )
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка снятия роли {role_id} у участника {user_id} — {e}")
+
+    async def _apply_level_reward_roles(self, guild_id: Optional[str], user_id: str, new_level: int, rewards_json: Optional[str]) -> None:
+        """Выдаёт/снимает роли «Наград за уровни» (settings.rewards) при level-up (ТЗ №5 Rev.10, п.10.1).
+        Ищет запись reward.level == new_level (без диапазонов — тот же принцип, что и у
+        check_level_triggers для достижений) и применяет её add_roles/remove_roles.
+        role (текстовый лейбл, VK) намеренно не читается — для Lolka используются только
+        add_roles/remove_roles (UI скрывает поле role на этой платформе, см. page.tsx)."""
+        if not guild_id or not rewards_json:
+            return
+        try:
+            rewards = json.loads(rewards_json)
+        except (json.JSONDecodeError, TypeError):
+            return
+        reward = next((r for r in rewards if isinstance(r, dict) and r.get("level") == new_level), None)
+        if not reward:
+            return
+        for role_id in reward.get("add_roles") or []:
+            await self._grant_role(guild_id, user_id, role_id)
+        for role_id in reward.get("remove_roles") or []:
+            await self._revoke_role(guild_id, user_id, role_id)
 
     async def _interaction_callback(self, interaction_id: str, interaction_token: str, cb_type: int, data: dict):
         """POST /interactions/{id}/{token}/callback — авторизация самим interaction_token в URL."""
