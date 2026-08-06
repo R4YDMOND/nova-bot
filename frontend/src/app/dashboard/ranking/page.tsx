@@ -493,7 +493,7 @@ export default function RankingPage() {
   const updateField = (field: string, value: any) => setFormData((prev: any) => ({ ...prev, [field]: value }));
 
   const formula: XPFormulaConfig =
-    formData.xp_formula ?? settings?.xp_formula ?? { formula_type: 'exponential', base_xp: 15, multiplier: 1.0, decay_factor: 0, max_xp_per_message: 100 };
+    formData.xp_formula ?? settings?.xp_formula ?? { formula_type: 'exponential', base_xp: 15, multiplier: 1.0, decay_factor: 0, max_xp_per_message: 100, voice_base_xp: 15, voice_multiplier: 1.0 };
   const updateFormula = (field: keyof XPFormulaConfig, value: any) => updateField('xp_formula', { ...formula, [field]: value });
 
   const rewards: RankingReward[] = formData.rewards ?? settings?.rewards ?? [];
@@ -730,69 +730,86 @@ export default function RankingPage() {
             <h3 className="font-semibold mb-3">🔔 Уведомления</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Канал уведомлений</label>
-                <div className="flex gap-2">
-                  {resolvedNotifyChannel && !manualChannelEdit ? (
+                {/* VK не отдаёт числовой ID беседы нигде в интерфейсе — только
+                    пригласительную ссылку (vk.me/join/...), поэтому для VK ручной
+                    ввод ID и «Автоопределение» скрыты как вводящие в заблуждение;
+                    единственный рабочий способ — подключение по ссылке ниже. */}
+                {effectivePlatform !== 'vk' && (
+                  <>
+                    <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Канал уведомлений</label>
+                    <div className="flex gap-2">
+                      {resolvedNotifyChannel && !manualChannelEdit ? (
+                        <div className="input w-full flex items-center gap-2 text-sm">
+                          <span>{resolvedNotifyChannel.type === 'voice' ? '🔊' : '💬'}</span>
+                          <span className="truncate">{resolvedNotifyChannel.name}</span>
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          value={currentNotifyChannel}
+                          onChange={e => updateField('notify_channel', e.target.value)}
+                          placeholder="ID канала"
+                          className="input w-full"
+                        />
+                      )}
+                      {resolvedNotifyChannel && (
+                        <button
+                          type="button"
+                          onClick={() => setManualChannelEdit(v => !v)}
+                          title={manualChannelEdit ? 'Показать название канала' : 'Ввести ID вручную'}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors"
+                        >
+                          ✏️
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleDetectChannels}
+                        disabled={channelsLoading}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
+                      >
+                        {channelsLoading ? '⏳' : '🔍 Автоопределение'}
+                      </button>
+                    </div>
+                    {channelDropdownOpen && (
+                      <div className="mt-2 border border-[rgb(var(--border))] rounded-lg max-h-48 overflow-y-auto bg-[rgb(var(--surface-2))]">
+                        {channelsLoading ? (
+                          <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Поиск каналов...</p>
+                        ) : channelsData?.error ? (
+                          <p className="text-xs text-center py-3 text-red-400">{channelsData.error}</p>
+                        ) : channelsData?.channels?.length ? (
+                          channelsData.channels.map(ch => (
+                            <button
+                              key={ch.id}
+                              type="button"
+                              onClick={() => { updateField('notify_channel', ch.id); setChannelDropdownOpen(false); setManualChannelEdit(false); }}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-400/10 transition-colors flex items-center gap-2"
+                            >
+                              <span>{ch.type === 'voice' ? '🔊' : '💬'}</span>
+                              <span>{ch.name}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Каналы не найдены</p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+                {effectivePlatform === 'vk' && resolvedNotifyChannel && (
+                  <div className="mb-1.5">
+                    <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Беседа для уведомлений</label>
                     <div className="input w-full flex items-center gap-2 text-sm">
-                      <span>{resolvedNotifyChannel.type === 'voice' ? '🔊' : '💬'}</span>
+                      <span>💬</span>
                       <span className="truncate">{resolvedNotifyChannel.name}</span>
                     </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={currentNotifyChannel}
-                      onChange={e => updateField('notify_channel', e.target.value)}
-                      placeholder="ID канала"
-                      className="input w-full"
-                    />
-                  )}
-                  {resolvedNotifyChannel && (
-                    <button
-                      type="button"
-                      onClick={() => setManualChannelEdit(v => !v)}
-                      title={manualChannelEdit ? 'Показать название канала' : 'Ввести ID вручную'}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors"
-                    >
-                      ✏️
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleDetectChannels}
-                    disabled={channelsLoading}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
-                  >
-                    {channelsLoading ? '⏳' : '🔍 Автоопределение'}
-                  </button>
-                </div>
-                {channelDropdownOpen && (
-                  <div className="mt-2 border border-[rgb(var(--border))] rounded-lg max-h-48 overflow-y-auto bg-[rgb(var(--surface-2))]">
-                    {channelsLoading ? (
-                      <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Поиск каналов...</p>
-                    ) : channelsData?.error ? (
-                      <p className="text-xs text-center py-3 text-red-400">{channelsData.error}</p>
-                    ) : channelsData?.channels?.length ? (
-                      channelsData.channels.map(ch => (
-                        <button
-                          key={ch.id}
-                          type="button"
-                          onClick={() => { updateField('notify_channel', ch.id); setChannelDropdownOpen(false); setManualChannelEdit(false); }}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-400/10 transition-colors flex items-center gap-2"
-                        >
-                          <span>{ch.type === 'voice' ? '🔊' : '💬'}</span>
-                          <span>{ch.name}</span>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Каналы не найдены</p>
-                    )}
                   </div>
                 )}
                 {effectivePlatform === 'vk' && (
                   <div className="mt-2 space-y-1.5">
                     <p className="text-xs text-[rgb(var(--text-secondary))] flex items-center gap-1.5">
-                      Нет беседы в списке?
-                      <Hint text="VK нигде не показывает числовой ID беседы — только пригласительную ссылку вида vk.me/join/... Автоопределение находит лишь беседы, в которых бот уже состоит. Вставьте ссылку — бот вступит в беседу и подключит её как канал уведомлений." />
+                      Подключить беседу по ссылке
+                      <Hint text="VK нигде не показывает числовой ID беседы — только пригласительную ссылку вида vk.me/join/... Вставьте ссылку — бот вступит в беседу и подключит её как канал уведомлений." />
                     </p>
                     <div className="flex gap-2">
                       <input
@@ -864,7 +881,10 @@ export default function RankingPage() {
       {activeTab === 'formula' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-5 space-y-3">
-            <h3 className="font-semibold mb-1">🧮 Формула опыта</h3>
+            <h3 className="font-semibold mb-1 flex items-center gap-1.5">
+              💬 Формула опыта — текст
+              <Hint text="Начисление XP за текстовые сообщения и порог перехода на новый уровень" />
+            </h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Базовый XP</label>
@@ -895,6 +915,32 @@ export default function RankingPage() {
               {validateMutation.isPending ? 'Проверка...' : '▶️ Проверить формулу'}
             </button>
           </Card>
+
+          {/* Блок №2 — только Lolka: у VK нет голосовых каналов, поэтому для VK
+              остаётся один блок (текст). Своя, независимая от текстового блока,
+              пара base_xp/multiplier — влияет на порог уровня при голосовом
+              начислении (backend/ranking/xp_handler.py::award_xp_for_voice_minutes). */}
+          {effectivePlatform === 'lolka' && (
+            <Card className="p-5 space-y-3">
+              <h3 className="font-semibold mb-1 flex items-center gap-1.5">
+                🎙️ Формула опыта — голос
+                <Hint text="Влияет на порог перехода на новый уровень при начислении опыта за голосовую активность. Сама ставка XP за минуту задаётся во вкладке «Общие»" />
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Базовый XP</label>
+                  <input type="number" value={formula.voice_base_xp ?? 15} onChange={e => updateFormula('voice_base_xp', parseInt(e.target.value) || 0)} className="input w-full" />
+                </div>
+                <div>
+                  <label className="text-xs text-[rgb(var(--text-secondary))] mb-1 flex items-center gap-1.5">
+                    Множитель скорости
+                    <Hint text="Коэффициент для голосовой активности. Независим от множителя текстовых сообщений" />
+                  </label>
+                  <input type="number" step="0.1" value={formula.voice_multiplier ?? 1} onChange={e => updateFormula('voice_multiplier', parseFloat(e.target.value) || 0)} className="input w-full" />
+                </div>
+              </div>
+            </Card>
+          )}
 
           <Card className="p-5">
             <h3 className="font-semibold mb-3">📈 Результат теста</h3>

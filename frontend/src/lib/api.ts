@@ -65,6 +65,9 @@ export type XPFormulaConfig = {
   decay_factor?: number;
   max_xp_per_message?: number;
   custom_expression?: string;
+  /** Блок №2 «Формула XP» — голосовая активность (только Lolka) */
+  voice_base_xp?: number;
+  voice_multiplier?: number;
 };
 
 export type RankingReward = {

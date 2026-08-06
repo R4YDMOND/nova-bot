@@ -58,8 +58,10 @@ async def award_xp_for_voice_minutes(
         except json.JSONDecodeError:
             formula_data = {}
         formula_type = formula_data.get("formula_type", "exponential")
-        formula_base_xp = formula_data.get("base_xp", 15)
-        formula_multiplier = formula_data.get("multiplier", 1.0)
+        # Блок №2 «Формула XP» (голос, только Lolka) — независим от текстового
+        # base_xp/multiplier (см. formulas.py::XPFormulaConfig.voice_base_xp).
+        formula_base_xp = formula_data.get("voice_base_xp", 15)
+        formula_multiplier = formula_data.get("voice_multiplier", 1.0)
 
         member = db.query(Member).filter(and_(
             Member.server_id == server_id,
@@ -161,10 +163,16 @@ async def award_xp_for_message(
             formula_data = json.loads(settings.xp_formula or "{}")
         except json.JSONDecodeError:
             formula_data = {}
+        # Блок №1 «Формула XP» (текст) — единый источник base_xp/multiplier для расчёта
+        # XP за сообщение и порога уровня. Раньше эти параметры дублировались отдельными
+        # колонками settings.xp_per_message/multiplier («Общие»), из-за чего правки во
+        # вкладке «Формула XP» не влияли на реальное начисление, только на тест/график.
+        # Фоллбэк на settings.xp_per_message/multiplier сохраняет поведение существующих
+        # серверов, у которых xp_formula.base_xp/multiplier ещё не заданы явно.
         config = XPFormulaConfig(
             formula_type=formula_data.get("formula_type", "exponential"),
-            base_xp=settings.xp_per_message or 15,
-            multiplier=settings.multiplier or 1.0,
+            base_xp=formula_data.get("base_xp", settings.xp_per_message or 15),
+            multiplier=formula_data.get("multiplier", settings.multiplier or 1.0),
             decay_factor=formula_data.get("decay_factor", 0.0),
             max_xp_per_message=formula_data.get("max_xp_per_message", 100),
         )

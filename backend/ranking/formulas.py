@@ -20,6 +20,13 @@ class XPFormulaConfig(BaseModel):
     decay_factor: float = 0.0
     max_xp_per_message: int = 100
     custom_expression: Optional[str] = None
+    # Блок №2 «Формула XP» (только Lolka — у VK нет голосовых каналов). Раньше
+    # порог уровня при голосовом начислении ошибочно считался по текстовым
+    # base_xp/multiplier (общий источник с сообщениями) — теперь у голоса свой,
+    # независимый набор параметров. Дефолты совпадают с текстовыми, чтобы для
+    # существующих серверов (где поле ещё не задано) кривая не менялась.
+    voice_base_xp: int = 15
+    voice_multiplier: float = 1.0
 
     @field_validator('formula_type')
     @classmethod

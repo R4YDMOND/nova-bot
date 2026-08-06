@@ -3302,7 +3302,7 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "min_message_length": s.min_message_length,
         "cooldown_seconds": s.cooldown_seconds,
         "multiplier": s.multiplier,
-        "xp_formula": _loads(s.xp_formula, {"formula_type": "exponential", "base_xp": 15, "multiplier": 1.0}),
+        "xp_formula": _loads(s.xp_formula, {"formula_type": "exponential", "base_xp": 15, "multiplier": 1.0, "voice_base_xp": 15, "voice_multiplier": 1.0}),
         "rewards": _loads(s.rewards, []),
         "notify_channel": s.notify_channel,
         "notify_message": s.notify_message,
