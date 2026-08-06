@@ -80,6 +80,19 @@ export function useRankingRoles(serverId: string, platform: 'vk' | 'lolka' = 'vk
   });
 }
 
+// VK не показывает ID беседы в интерфейсе — только пригласительную ссылку.
+// Подключение канала уведомлений напрямую по ссылке (messages.joinChatByInviteLink).
+export function useJoinVkChannelByLink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serverId, link }: { serverId: string; link: string }) =>
+      api.ranking.joinVkChannelByLink(serverId, link),
+    onSuccess: (_, { serverId }) => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'channels', serverId, 'vk'] });
+    },
+  });
+}
+
 export function useSyncMembers() {
   const queryClient = useQueryClient();
 

@@ -686,6 +686,15 @@ export const api = {
           : `/api/lolka/channels?server_id=${serverId}`
       ),
 
+    // VK не показывает ID беседы в интерфейсе — только пригласительную ссылку
+    // (vk.me/join/...). Подключаем канал уведомлений напрямую по ней, минуя
+    // messages.getConversations (которая находит только беседы, где бот уже состоит).
+    joinVkChannelByLink: (serverId: string, link: string) =>
+      apiFetch<{ status?: string; id?: string; name?: string; error?: string }>(
+        `/api/vk/channels/join-by-link?server_id=${serverId}`,
+        { method: "POST", body: JSON.stringify({ link }) }
+      ),
+
     // ТЗ: автоподтягивание ролей сервера для наград за уровень — доступно только для Lolka
     // (у VK нет сопоставимого Bot API для чтения ролей сообщества).
     getRoles: (serverId: string) =>

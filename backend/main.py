@@ -3986,7 +3986,11 @@ def get_ranking_preview(server_id: str = Query(...), platform: str = Query("vk")
                 "rank": rank,
                 "level": member.level,
                 "current_xp": member.xp,
-                "xp_for_next_level": XPFormulaEngine.calculate_level_xp(member.level, formula_type),
+                "xp_for_next_level": XPFormulaEngine.calculate_level_xp(
+                    member.level, formula_type,
+                    (settings.xp_per_message if settings else 15) or 15,
+                    (settings.multiplier if settings else 1.0) or 1.0,
+                ),
                 "messages": member.messages,
                 "voice_minutes": member.voice_minutes,
                 "reactions": member.reactions,
@@ -4007,7 +4011,7 @@ def validate_ranking_formula(data: dict = None):
 
     try:
         test_xp = XPFormulaEngine.calculate_xp(config, current_level=5, message_length=50)
-        level_10_required_xp = XPFormulaEngine.calculate_level_xp(10, config.formula_type)
+        level_10_required_xp = XPFormulaEngine.calculate_level_xp(10, config.formula_type, config.base_xp, config.multiplier)
         return {"valid": True, "test_xp": test_xp, "level_10_required_xp": level_10_required_xp}
     except Exception as e:
         return {"valid": False, "error": str(e)}
@@ -4621,6 +4625,44 @@ def vk_get_channels(server_id: str = Query(...)):
         return {"error": e.message, "channels": []}
     except Exception as e:
         return {"error": str(e), "channels": []}
+    finally:
+        db.close()
+
+
+@app.post("/api/vk/channels/join-by-link")
+def vk_join_channel_by_link(server_id: str = Query(...), data: dict = None):
+    """Подключить канал уведомлений VK по пригласительной ссылке беседы
+    (messages.joinChatByInviteLink) — альтернатива автоопределению из
+    messages.getConversations на случай, когда бот ещё не состоит в нужной беседе.
+    У VK нет способа посмотреть числовой ID беседы в интерфейсе — администратор
+    сообщества видит только ссылку вида vk.me/join/<hash> (ТЗ №5, доработка)."""
+    db = SessionLocal()
+    try:
+        server = _get_server_or_error(db, server_id)
+        if not server:
+            return {"error": "Сервер не найден. Сначала добавьте его на странице /dashboard/servers."}
+
+        conn = db.query(VKConnection).filter(
+            VKConnection.server_id == server.id,
+            VKConnection.is_active == True
+        ).first()
+        if not conn:
+            return {"error": "VK-сообщество не подключено. Подключите его в разделе Настройки → Подключение VK (/dashboard/settings)."}
+
+        link = str((data or {}).get("link") or "").strip()
+        if not link:
+            return {"error": "Укажите пригласительную ссылку (vk.me/join/...)"}
+
+        service = get_vk_service(conn.access_token)
+        chat_id = service.join_chat_by_invite_link(link)
+        peer_id = 2000000000 + chat_id
+        title = service.get_conversation_title(peer_id) or f"Беседа {chat_id}"
+
+        return {"status": "ok", "id": str(peer_id), "name": title}
+    except VKAPIError as e:
+        return {"error": e.message}
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
 

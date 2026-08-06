@@ -172,6 +172,28 @@ class VKBotService:
         })
         return resp.get("items", [])
 
+    def join_chat_by_invite_link(self, link: str) -> int:
+        """Присоединиться к беседе по пригласительной ссылке (messages.joinChatByInviteLink)
+        и вернуть её chat_id. У VK нет способа посмотреть числовой ID беседы в интерфейсе —
+        администратор сообщества видит только ссылку вида vk.me/join/<hash>, поэтому
+        get_conversations() (автоопределение по messages.getConversations) находит только
+        беседы, в которых бот УЖЕ состоит. Этот метод — способ подключить канал уведомлений
+        по ссылке напрямую, без необходимости знать peer_id заранее (ТЗ №5, доработка)."""
+        resp = self._call("messages.joinChatByInviteLink", {"link": link})
+        chat_id = resp.get("chat_id")
+        if not chat_id:
+            raise VKAPIError(-1, "VK не вернул chat_id для этой ссылки")
+        return int(chat_id)
+
+    def get_conversation_title(self, peer_id: int) -> str:
+        """Название беседы по peer_id (messages.getConversationsById) — чтобы после
+        join_chat_by_invite_link сразу показать понятное имя, а не голый ID."""
+        resp = self._call("messages.getConversationsById", {"peer_ids": peer_id})
+        items = resp.get("items", [])
+        if items:
+            return (items[0].get("chat_settings") or {}).get("title", "") or ""
+        return ""
+
     def send_message(
         self,
         peer_id: int,

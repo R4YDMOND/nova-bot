@@ -6,6 +6,12 @@ import math
 from typing import Dict, Optional, Callable
 from pydantic import BaseModel, field_validator
 
+# Базовое значение base_xp, относительно которого исторически откалиброван порог
+# уровня (100 * level^2 при exponential и base_xp=15). Существующие сервера
+# с дефолтным base_xp/multiplier не должны получить скачок требуемого XP при
+# обновлении — поэтому кривая уровня масштабируется как (base_xp / DEFAULT_BASE_XP) * multiplier.
+DEFAULT_BASE_XP = 15
+
 
 class XPFormulaConfig(BaseModel):
     formula_type: str = "exponential"
@@ -49,14 +55,20 @@ class XPFormulaEngine:
         return max(1, int(min(xp, config.max_xp_per_message)))
 
     @staticmethod
-    def calculate_level_xp(level: int, formula_type: str = 'exponential') -> int:
+    def calculate_level_xp(level: int, formula_type: str = 'exponential', base_xp: int = DEFAULT_BASE_XP, multiplier: float = 1.0) -> int:
+        """Требуемый суммарный XP для level. Раньше base_xp/multiplier из «Формулы опыта»
+        никак не влияли на порог уровня (только на XP за одно сообщение) — из-за этого
+        график прогрессии и «ХР до N уровня» не менялись при правке этих полей (ТЗ №5,
+        доработка). Теперь кривая масштабируется относительно них, оставаясь тождественной
+        прежней формуле (100 * level^2 и т.д.) при дефолтных base_xp=15, multiplier=1.0."""
         if level <= 0:
             return 100
+        scale = (base_xp / DEFAULT_BASE_XP) * (multiplier if multiplier > 0 else 1.0)
         if formula_type == 'linear':
-            return 100 * level
+            return max(1, int(100 * scale * level))
         elif formula_type == 'logarithmic':
-            return int(100 * level * math.log10(level + 1))
-        return 100 * (level ** 2)  # exponential — дефолт
+            return max(1, int(100 * scale * level * math.log10(level + 1)))
+        return max(1, int(100 * scale * (level ** 2)))  # exponential — дефолт
 
 
 XP_PRESETS: Dict[str, XPFormulaConfig] = {

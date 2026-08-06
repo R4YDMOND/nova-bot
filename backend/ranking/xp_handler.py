@@ -58,6 +58,8 @@ async def award_xp_for_voice_minutes(
         except json.JSONDecodeError:
             formula_data = {}
         formula_type = formula_data.get("formula_type", "exponential")
+        formula_base_xp = formula_data.get("base_xp", 15)
+        formula_multiplier = formula_data.get("multiplier", 1.0)
 
         member = db.query(Member).filter(and_(
             Member.server_id == server_id,
@@ -75,11 +77,11 @@ async def award_xp_for_voice_minutes(
         member.last_activity = datetime.utcnow()
 
         leveled_up = False
-        required = XPFormulaEngine.calculate_level_xp(member.level, formula_type)
+        required = XPFormulaEngine.calculate_level_xp(member.level, formula_type, formula_base_xp, formula_multiplier)
         while member.xp >= required:
             member.level += 1
             leveled_up = True
-            required = XPFormulaEngine.calculate_level_xp(member.level, formula_type)
+            required = XPFormulaEngine.calculate_level_xp(member.level, formula_type, formula_base_xp, formula_multiplier)
 
         db.commit()
 
@@ -184,11 +186,11 @@ async def award_xp_for_message(
         member.last_activity = datetime.utcnow()
 
         leveled_up = False
-        required = XPFormulaEngine.calculate_level_xp(member.level, config.formula_type)
+        required = XPFormulaEngine.calculate_level_xp(member.level, config.formula_type, config.base_xp, config.multiplier)
         while member.xp >= required:
             member.level += 1
             leveled_up = True
-            required = XPFormulaEngine.calculate_level_xp(member.level, config.formula_type)
+            required = XPFormulaEngine.calculate_level_xp(member.level, config.formula_type, config.base_xp, config.multiplier)
 
         db.commit()
         _last_xp_award[cache_key] = datetime.utcnow()

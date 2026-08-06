@@ -12,6 +12,7 @@ import {
   useRankingPreview,
   useValidateFormula,
   useRankingChannels,
+  useJoinVkChannelByLink,
   useRankingRoles,
   useSyncMembers,
   useNovaPointsTop,
@@ -225,11 +226,16 @@ const MEDAL_COLORS: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#
 
 // Зеркало backend XPFormulaEngine.calculate_level_xp (backend/ranking/formulas.py) —
 // используется только для прогресс-бара в UI, источник истины остаётся на бэкенде.
-function calcLevelXp(level: number, formulaType: string): number {
+// Формула должна быть тождественна backend/ranking/formulas.py::calculate_level_xp —
+// иначе клиентский график (draft, без запроса к бэку) разойдётся с «Проверить формулу».
+const DEFAULT_BASE_XP = 15;
+
+function calcLevelXp(level: number, formulaType: string, baseXp: number = DEFAULT_BASE_XP, multiplier: number = 1): number {
   if (level <= 0) return 100;
-  if (formulaType === 'linear') return 100 * level;
-  if (formulaType === 'logarithmic') return Math.round(100 * level * Math.log10(level + 1));
-  return 100 * level * level; // exponential / custom — дефолт
+  const scale = (baseXp / DEFAULT_BASE_XP) * (multiplier > 0 ? multiplier : 1);
+  if (formulaType === 'linear') return Math.max(1, Math.round(100 * scale * level));
+  if (formulaType === 'logarithmic') return Math.max(1, Math.round(100 * scale * level * Math.log10(level + 1)));
+  return Math.max(1, Math.round(100 * scale * level * level)); // exponential / custom — дефолт
 }
 
 const CHART_KEY_LEVELS = [1, 5, 10, 25, 50];
@@ -237,16 +243,19 @@ const CHART_KEY_LEVELS = [1, 5, 10, 25, 50];
 /** График кривой требуемого XP (ТЗ №5 Rev.10, п.4/6) — считается на клиенте из
  * draft-значений формулы (calcLevelXp), без запросов к бэкенду: обновляется мгновенно
  * при вводе, а не после «Сохранить» (Draft mode это не нарушает — график не пишет данные).
- * useMemo пересчитывает точки только при смене типа формулы — правка decay/multiplier
- * calcLevelXp не использует, они влияют лишь на XP за сообщение, не на порог уровня. */
+ * useMemo пересчитывает точки при смене типа формулы, base_xp и multiplier — все три
+ * поля теперь влияют на порог уровня (раньше игнорировались, из-за чего график и
+ * «ХР до N уровня» не реагировали на ввод — исправлено вместе с backend). decay_factor
+ * и max_xp_per_message на порог уровня не влияют — это ограничения только на разовую
+ * награду за сообщение, не на общую кривую. */
 function FormulaProgressionChart({ formula }: { formula: XPFormulaConfig }) {
   const data = useMemo(() => {
     const points = [];
     for (let level = 1; level <= 50; level++) {
-      points.push({ level, xp: calcLevelXp(level, formula.formula_type) });
+      points.push({ level, xp: calcLevelXp(level, formula.formula_type, formula.base_xp, formula.multiplier) });
     }
     return points;
-  }, [formula.formula_type]);
+  }, [formula.formula_type, formula.base_xp, formula.multiplier]);
 
   return (
     <div className="h-64 w-full">
@@ -274,7 +283,7 @@ function FormulaProgressionChart({ formula }: { formula: XPFormulaConfig }) {
       <div className="flex flex-wrap gap-2 mt-3">
         {CHART_KEY_LEVELS.map(level => (
           <span key={level} className="text-xs px-2 py-1 rounded-lg bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))]">
-            Ур. {level}: <span className="text-cyan-400 font-semibold">{calcLevelXp(level, formula.formula_type).toLocaleString('ru-RU')} XP</span>
+            Ур. {level}: <span className="text-cyan-400 font-semibold">{calcLevelXp(level, formula.formula_type, formula.base_xp, formula.multiplier).toLocaleString('ru-RU')} XP</span>
           </span>
         ))}
       </div>
@@ -329,6 +338,34 @@ export default function RankingPage() {
   const handleDetectChannels = async () => {
     setChannelDropdownOpen(true);
     await refetchChannels();
+  };
+
+  // VK не показывает ID беседы нигде в интерфейсе — администратор видит только
+  // пригласительную ссылку (vk.me/join/...). Автоопределение (messages.getConversations)
+  // находит канал, только если бот уже в нём состоит; для новых бесед — join по ссылке.
+  const joinVkChannelMutation = useJoinVkChannelByLink();
+  const [vkInviteLink, setVkInviteLink] = useState('');
+  const [vkInviteError, setVkInviteError] = useState<string | null>(null);
+
+  const handleJoinVkChannelByLink = async () => {
+    setVkInviteError(null);
+    if (!vkInviteLink.trim()) {
+      setVkInviteError('Вставьте пригласительную ссылку беседы');
+      return;
+    }
+    try {
+      const res = await joinVkChannelMutation.mutateAsync({ serverId: effectiveServerId, link: vkInviteLink.trim() });
+      if (res.error || !res.id) {
+        setVkInviteError(res.error || 'Не удалось подключить беседу по ссылке');
+        return;
+      }
+      updateField('notify_channel', res.id);
+      setManualChannelEdit(false);
+      setVkInviteLink('');
+      await refetchChannels();
+    } catch {
+      setVkInviteError('Не удалось подключить беседу по ссылке');
+    }
   };
 
   const handleSyncMembers = async () => {
@@ -751,6 +788,32 @@ export default function RankingPage() {
                     )}
                   </div>
                 )}
+                {effectivePlatform === 'vk' && (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-xs text-[rgb(var(--text-secondary))] flex items-center gap-1.5">
+                      Нет беседы в списке?
+                      <Hint text="VK нигде не показывает числовой ID беседы — только пригласительную ссылку вида vk.me/join/... Автоопределение находит лишь беседы, в которых бот уже состоит. Вставьте ссылку — бот вступит в беседу и подключит её как канал уведомлений." />
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={vkInviteLink}
+                        onChange={e => setVkInviteLink(e.target.value)}
+                        placeholder="https://vk.me/join/..."
+                        className="input w-full text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleJoinVkChannelByLink}
+                        disabled={joinVkChannelMutation.isPending}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
+                      >
+                        {joinVkChannelMutation.isPending ? '⏳' : '🔗 Подключить по ссылке'}
+                      </button>
+                    </div>
+                    {vkInviteError && <p className="text-xs text-red-400">{vkInviteError}</p>}
+                  </div>
+                )}
               </div>
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5">
@@ -942,7 +1005,7 @@ export default function RankingPage() {
         <Card className="p-5 space-y-4">
           <div>
             <h3 className="font-semibold flex items-center gap-1.5">
-              🏆 Достижения
+              🏆 Достижения {achievements.length > 0 && <span className="text-[rgb(var(--text-secondary))] font-normal">({achievements.length})</span>}
               <Hint text="Отдельная от наград за уровень система: выдаются автоматически по достижении уровня (если указан) или вручную кнопкой «Выдать достижения» в редакторе шаблонов. Не связаны с Nova Points и валютой." />
             </h3>
             <p className="text-xs text-[rgb(var(--text-secondary))] mt-1">
@@ -956,8 +1019,8 @@ export default function RankingPage() {
             <div className="space-y-2">
               {achievements.map(item => (
                 <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-[rgb(var(--surface-2))]">
-                  <div className="min-w-0 flex items-center gap-2">
-                    <span className="text-lg shrink-0">{item.icon}</span>
+                  <div className="min-w-0 flex items-center gap-3">
+                    <span className="w-9 h-9 rounded-lg bg-[rgb(var(--surface-3))] flex items-center justify-center text-lg shrink-0">{item.icon}</span>
                     <div className="min-w-0">
                       <p className="font-medium truncate">{item.name}</p>
                       <p className="text-xs text-[rgb(var(--text-secondary))]">
@@ -981,31 +1044,39 @@ export default function RankingPage() {
           )}
 
           <div className="pt-3 border-t border-[rgb(var(--border))] space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-[64px_1fr_140px] gap-2">
-              <input
-                type="text"
-                value={newAchvIcon}
-                onChange={e => setNewAchvIcon(e.target.value)}
-                placeholder="🏆"
-                maxLength={4}
-                className="input text-center"
-                title="Иконка"
-              />
-              <input
-                type="text"
-                value={newAchvName}
-                onChange={e => setNewAchvName(e.target.value)}
-                placeholder="Название достижения"
-                className="input"
-              />
-              <input
-                type="number"
-                min={1}
-                value={newAchvTriggerLevel}
-                onChange={e => setNewAchvTriggerLevel(e.target.value)}
-                placeholder="Уровень (необяз.)"
-                className="input"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-[88px_1fr_160px] gap-3">
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Иконка</label>
+                <input
+                  type="text"
+                  value={newAchvIcon}
+                  onChange={e => setNewAchvIcon(e.target.value)}
+                  placeholder="🏆"
+                  maxLength={8}
+                  className="input w-full text-center text-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Название</label>
+                <input
+                  type="text"
+                  value={newAchvName}
+                  onChange={e => setNewAchvName(e.target.value)}
+                  placeholder="Название достижения"
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[rgb(var(--text-secondary))] mb-1.5">Уровень (необязательно)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={newAchvTriggerLevel}
+                  onChange={e => setNewAchvTriggerLevel(e.target.value)}
+                  placeholder="Только вручную"
+                  className="input w-full"
+                />
+              </div>
             </div>
             <button
               onClick={handleAddAchievement}
@@ -1060,7 +1131,7 @@ export default function RankingPage() {
                   </thead>
                   <tbody className="divide-y divide-[rgb(var(--border))]">
                     {leaderboardEntries.map((entry: any) => {
-                      const required = calcLevelXp(entry.level, formula.formula_type);
+                      const required = calcLevelXp(entry.level, formula.formula_type, formula.base_xp, formula.multiplier);
                       const pct = Math.min(100, Math.round((entry.xp / required) * 100));
                       return (
                         <tr
