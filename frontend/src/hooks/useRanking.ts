@@ -176,3 +176,35 @@ export function useDeleteShopItem() {
     },
   });
 }
+
+// ── ТЗ №5 Rev.10, п.4: достижения ────────────────────────────────────────
+export function useAchievements(serverId: string, platform: 'vk' | 'lolka' = 'vk', enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['ranking', 'achievements', serverId, platform],
+    queryFn: () => api.achievements.list(serverId, platform),
+    enabled: !!serverId && enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useCreateAchievement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serverId, platform, data }: { serverId: string; platform: 'vk' | 'lolka'; data: { name: string; icon?: string; trigger_level?: number | null } }) =>
+      api.achievements.create(serverId, platform, data),
+    onSuccess: (_, { serverId, platform }) => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'achievements', serverId, platform] });
+    },
+  });
+}
+
+export function useDeleteAchievement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serverId, platform, achievementId }: { serverId: string; platform: 'vk' | 'lolka'; achievementId: number }) =>
+      api.achievements.remove(serverId, platform, achievementId),
+    onSuccess: (_, { serverId, platform }) => {
+      queryClient.invalidateQueries({ queryKey: ['ranking', 'achievements', serverId, platform] });
+    },
+  });
+}

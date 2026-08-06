@@ -145,6 +145,15 @@ export type ShopItem = {
   price: number;
 };
 
+/** Достижение (ТЗ №5 Rev.10, п.4) — независимая от Nova Points сущность.
+ * trigger_level = null → выдаётся только вручную кнопкой "Выдать достижения" в шаблоне. */
+export type Achievement = {
+  id: number;
+  name: string;
+  icon: string;
+  trigger_level: number | null;
+};
+
 export type RankingChannel = {
   id: string;
   name: string;
@@ -731,6 +740,26 @@ export const api = {
       apiFetch<{ status: string; text?: string; error?: string }>(
         `/api/nova-points/shop/generate-message?server_id=${serverId}&platform=${platform}`,
         { method: "POST" }
+      ),
+  },
+
+  // ── ТЗ №5 Rev.10, п.4: достижения (независимая от Nova Points сущность) ─
+  achievements: {
+    list: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+      apiFetch<{ items: Achievement[]; error?: string }>(
+        `/api/achievements?server_id=${serverId}&platform=${platform}`
+      ),
+
+    create: (serverId: string, platform: "vk" | "lolka", data: { name: string; icon?: string; trigger_level?: number | null }) =>
+      apiFetch<{ status: string; id?: number; error?: string }>(
+        `/api/achievements?server_id=${serverId}&platform=${platform}`,
+        { method: "POST", body: JSON.stringify(data) }
+      ),
+
+    remove: (serverId: string, platform: "vk" | "lolka", achievementId: number) =>
+      apiFetch<{ status: string; error?: string }>(
+        `/api/achievements/${achievementId}?server_id=${serverId}&platform=${platform}`,
+        { method: "DELETE" }
       ),
   },
 

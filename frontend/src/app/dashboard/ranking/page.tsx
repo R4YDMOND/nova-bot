@@ -18,6 +18,9 @@ import {
   useShopItems,
   useCreateShopItem,
   useDeleteShopItem,
+  useAchievements,
+  useCreateAchievement,
+  useDeleteAchievement,
 } from '@/hooks/useRanking';
 import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
 import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
@@ -408,6 +411,45 @@ export default function RankingPage() {
       await deleteShopItemMutation.mutateAsync({ serverId: effectiveServerId, platform: effectivePlatform, itemId });
     } catch {
       alert('❌ Не удалось удалить товар');
+    }
+  };
+
+  // ── ТЗ №5 Rev.10, п.4: достижения (независимая от Nova Points сущность) ─
+  const { data: achievementsData, isFetching: achievementsLoading } = useAchievements(effectiveServerId, effectivePlatform, activeTab === 'rewards');
+  const achievements = achievementsData?.items ?? [];
+  const createAchievementMutation = useCreateAchievement();
+  const deleteAchievementMutation = useDeleteAchievement();
+  const [newAchvName, setNewAchvName] = useState('');
+  const [newAchvIcon, setNewAchvIcon] = useState('🏆');
+  const [newAchvTriggerLevel, setNewAchvTriggerLevel] = useState('');
+  const [achvFormError, setAchvFormError] = useState<string | null>(null);
+
+  const handleAddAchievement = async () => {
+    setAchvFormError(null);
+    if (!newAchvName.trim()) {
+      setAchvFormError('Укажите название достижения');
+      return;
+    }
+    try {
+      await createAchievementMutation.mutateAsync({
+        serverId: effectiveServerId, platform: effectivePlatform,
+        data: {
+          name: newAchvName.trim(),
+          icon: newAchvIcon.trim() || '🏆',
+          trigger_level: newAchvTriggerLevel.trim() ? parseInt(newAchvTriggerLevel, 10) : null,
+        },
+      });
+      setNewAchvName(''); setNewAchvIcon('🏆'); setNewAchvTriggerLevel('');
+    } catch {
+      setAchvFormError('Не удалось добавить достижение');
+    }
+  };
+
+  const handleDeleteAchievement = async (achievementId: number) => {
+    try {
+      await deleteAchievementMutation.mutateAsync({ serverId: effectiveServerId, platform: effectivePlatform, achievementId });
+    } catch {
+      alert('❌ Не удалось удалить достижение');
     }
   };
 
@@ -893,6 +935,87 @@ export default function RankingPage() {
           ) : (
             <p className="text-center text-[rgb(var(--text-secondary))] py-8">📭 Наград пока нет. Добавьте первую, чтобы мотивировать участников развиваться!</p>
           )}
+        </Card>
+      )}
+
+      {activeTab === 'rewards' && (
+        <Card className="p-5 space-y-4">
+          <div>
+            <h3 className="font-semibold flex items-center gap-1.5">
+              🏆 Достижения
+              <Hint text="Отдельная от наград за уровень система: выдаются автоматически по достижении уровня (если указан) или вручную кнопкой «Выдать достижения» в редакторе шаблонов. Не связаны с Nova Points и валютой." />
+            </h3>
+            <p className="text-xs text-[rgb(var(--text-secondary))] mt-1">
+              Если уровень-триггер не указан, достижение выдаётся только вручную.
+            </p>
+          </div>
+
+          {achievementsLoading ? (
+            <p className="text-center py-8 text-[rgb(var(--text-secondary))]">⏳ Загрузка...</p>
+          ) : achievements.length > 0 ? (
+            <div className="space-y-2">
+              {achievements.map(item => (
+                <div key={item.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-[rgb(var(--surface-2))]">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="text-lg shrink-0">{item.icon}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{item.name}</p>
+                      <p className="text-xs text-[rgb(var(--text-secondary))]">
+                        {item.trigger_level != null ? `Автовыдача на уровне ${item.trigger_level}` : 'Только ручная выдача'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteAchievement(item.id)}
+                    disabled={deleteAchievementMutation.isPending}
+                    className="px-2 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                    title="Удалить достижение"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-[rgb(var(--text-secondary))] py-6 text-sm">Достижений пока нет — добавьте первое ниже</p>
+          )}
+
+          <div className="pt-3 border-t border-[rgb(var(--border))] space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-[64px_1fr_140px] gap-2">
+              <input
+                type="text"
+                value={newAchvIcon}
+                onChange={e => setNewAchvIcon(e.target.value)}
+                placeholder="🏆"
+                maxLength={4}
+                className="input text-center"
+                title="Иконка"
+              />
+              <input
+                type="text"
+                value={newAchvName}
+                onChange={e => setNewAchvName(e.target.value)}
+                placeholder="Название достижения"
+                className="input"
+              />
+              <input
+                type="number"
+                min={1}
+                value={newAchvTriggerLevel}
+                onChange={e => setNewAchvTriggerLevel(e.target.value)}
+                placeholder="Уровень (необяз.)"
+                className="input"
+              />
+            </div>
+            <button
+              onClick={handleAddAchievement}
+              disabled={createAchievementMutation.isPending}
+              className="px-3 py-1.5 rounded-xl text-sm font-medium bg-cyan-400 text-black hover:bg-cyan-300 transition-colors disabled:opacity-50"
+            >
+              {createAchievementMutation.isPending ? 'Добавление...' : '+ Добавить достижение'}
+            </button>
+            {achvFormError && <p className="text-xs text-red-400">{achvFormError}</p>}
+          </div>
         </Card>
       )}
 
