@@ -25,6 +25,7 @@ import {
 } from '@/hooks/useRanking';
 import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
 import { EMPTY_WELCOME_TEMPLATE, WELCOME_BUTTON_ACTIONS } from '@/types/ranking';
+import type { RankingChannel } from '@/lib/api';
 import { Hint, RoleMultiSelect } from '@/components/ranking/RankingFormControls';
 import { ShopPurchaseTemplateModal } from '@/components/ranking/ShopPurchaseTemplateModal';
 import { MessageTemplateModal, WELCOME_VARIABLES } from '@/components/MessageTemplateModal';
@@ -110,6 +111,136 @@ function FormulaProgressionChart({ formula }: { formula: XPFormulaConfig }) {
   );
 }
 
+/** Единый выбор канала (VK/Lolka) — переиспользуется в "⚙️ Общие" (notify_channel)
+ * и "💳 Визитка" (welcome_channel), чтобы обе вкладки вели себя идентично.
+ * Lolka: автоопределение (dropdown) + ручной ID. VK нигде не показывает числовой ID
+ * беседы — только подключение по пригласительной ссылке (vk.me/join/...). */
+function ChannelPicker({
+  platform, label, vkLabel, hint,
+  value, onChange, resolvedChannel,
+  manualEdit, onToggleManualEdit,
+  channelsData, channelsLoading, dropdownOpen, onDetect, onSelectFromList,
+  inviteLink, onInviteLinkChange, inviteError, onJoinByLink, joinPending,
+}: {
+  platform: 'vk' | 'lolka';
+  label: string;
+  vkLabel: string;
+  hint: string;
+  value: string;
+  onChange: (v: string) => void;
+  resolvedChannel?: RankingChannel;
+  manualEdit: boolean;
+  onToggleManualEdit: () => void;
+  channelsData?: { channels?: RankingChannel[]; error?: string };
+  channelsLoading: boolean;
+  dropdownOpen: boolean;
+  onDetect: () => void;
+  onSelectFromList: (id: string) => void;
+  inviteLink: string;
+  onInviteLinkChange: (v: string) => void;
+  inviteError: string | null;
+  onJoinByLink: () => void;
+  joinPending: boolean;
+}) {
+  if (platform === 'lolka') {
+    return (
+      <div>
+        <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">{label}</label>
+        <div className="flex gap-2">
+          {resolvedChannel && !manualEdit ? (
+            <div className="input w-full flex items-center gap-2 text-sm">
+              <span>{resolvedChannel.type === 'voice' ? '🔊' : '💬'}</span>
+              <span className="truncate">{resolvedChannel.name}</span>
+            </div>
+          ) : (
+            <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder="ID канала" className="input w-full" />
+          )}
+          {resolvedChannel && (
+            <button
+              type="button"
+              onClick={onToggleManualEdit}
+              title={manualEdit ? 'Показать название канала' : 'Ввести ID вручную'}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors"
+            >
+              ✏️
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDetect}
+            disabled={channelsLoading}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
+          >
+            {channelsLoading ? '⏳' : '🔍 Автоопределение'}
+          </button>
+        </div>
+        {dropdownOpen && (
+          <div className="mt-2 border border-[rgb(var(--border))] rounded-lg max-h-48 overflow-y-auto bg-[rgb(var(--surface-2))]">
+            {channelsLoading ? (
+              <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Поиск каналов...</p>
+            ) : channelsData?.error ? (
+              <p className="text-xs text-center py-3 text-red-400">{channelsData.error}</p>
+            ) : channelsData?.channels?.length ? (
+              channelsData.channels.map(ch => (
+                <button
+                  key={ch.id}
+                  type="button"
+                  onClick={() => onSelectFromList(ch.id)}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-400/10 transition-colors flex items-center gap-2"
+                >
+                  <span>{ch.type === 'voice' ? '🔊' : '💬'}</span>
+                  <span>{ch.name}</span>
+                </button>
+              ))
+            ) : (
+              <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Каналы не найдены</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // VK
+  return (
+    <div>
+      {resolvedChannel && (
+        <div className="mb-1.5">
+          <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">{vkLabel}</label>
+          <div className="input w-full flex items-center gap-2 text-sm">
+            <span>💬</span>
+            <span className="truncate">{resolvedChannel.name}</span>
+          </div>
+        </div>
+      )}
+      <div className="space-y-1.5">
+        <p className="text-xs text-[rgb(var(--text-secondary))] flex items-center gap-1.5">
+          Подключить беседу по ссылке
+          <Hint text={hint} />
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={inviteLink}
+            onChange={e => onInviteLinkChange(e.target.value)}
+            placeholder="https://vk.me/join/..."
+            className="input w-full text-sm"
+          />
+          <button
+            type="button"
+            onClick={onJoinByLink}
+            disabled={joinPending}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
+          >
+            {joinPending ? '⏳' : '🔗 Подключить по ссылке'}
+          </button>
+        </div>
+        {inviteError && <p className="text-xs text-red-400">{inviteError}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function RankingPage() {
   const { servers, selectedServer, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState('settings');
@@ -166,9 +297,14 @@ export default function RankingPage() {
   const resolvedWelcomeChannel = channelsData?.channels?.find(ch => ch.id === currentWelcomeChannel);
   const [manualWelcomeChannelEdit, setManualWelcomeChannelEdit] = useState(false);
   useEffect(() => { setManualWelcomeChannelEdit(false); }, [effectiveServerId, effectivePlatform]);
+  const [welcomeChannelDropdownOpen, setWelcomeChannelDropdownOpen] = useState(false);
 
   const handleDetectChannels = async () => {
     setChannelDropdownOpen(true);
+    await refetchChannels();
+  };
+  const handleDetectWelcomeChannels = async () => {
+    setWelcomeChannelDropdownOpen(true);
     await refetchChannels();
   };
 
@@ -197,6 +333,32 @@ export default function RankingPage() {
       await refetchChannels();
     } catch {
       setVkInviteError('Не удалось подключить беседу по ссылке');
+    }
+  };
+
+  // "Визитка" (приветственное сообщение) — та же механика join-по-ссылке, но отдельные
+  // инпут/ошибка/канал: приветствие может уходить в другую беседу, чем level-up уведомления.
+  const [welcomeVkInviteLink, setWelcomeVkInviteLink] = useState('');
+  const [welcomeVkInviteError, setWelcomeVkInviteError] = useState<string | null>(null);
+
+  const handleJoinWelcomeVkChannelByLink = async () => {
+    setWelcomeVkInviteError(null);
+    if (!welcomeVkInviteLink.trim()) {
+      setWelcomeVkInviteError('Вставьте пригласительную ссылку беседы');
+      return;
+    }
+    try {
+      const res = await joinVkChannelMutation.mutateAsync({ serverId: effectiveServerId, link: welcomeVkInviteLink.trim() });
+      if (res.error || !res.id) {
+        setWelcomeVkInviteError(res.error || 'Не удалось подключить беседу по ссылке');
+        return;
+      }
+      updateField('welcome_channel', res.id);
+      setManualWelcomeChannelEdit(false);
+      setWelcomeVkInviteLink('');
+      await refetchChannels();
+    } catch {
+      setWelcomeVkInviteError('Не удалось подключить беседу по ссылке');
     }
   };
 
@@ -519,107 +681,27 @@ export default function RankingPage() {
                 </p>
               )}
               <div className={effectivePlatform === 'max' ? 'hidden' : ''}>
-                {/* VK не отдаёт числовой ID беседы нигде в интерфейсе — только
-                    пригласительную ссылку (vk.me/join/...), поэтому для VK ручной
-                    ввод ID и «Автоопределение» скрыты как вводящие в заблуждение;
-                    единственный рабочий способ — подключение по ссылке ниже. */}
-                {effectivePlatform === 'lolka' && (
-                  <>
-                    <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Канал уведомлений</label>
-                    <div className="flex gap-2">
-                      {resolvedNotifyChannel && !manualChannelEdit ? (
-                        <div className="input w-full flex items-center gap-2 text-sm">
-                          <span>{resolvedNotifyChannel.type === 'voice' ? '🔊' : '💬'}</span>
-                          <span className="truncate">{resolvedNotifyChannel.name}</span>
-                        </div>
-                      ) : (
-                        <input
-                          type="text"
-                          value={currentNotifyChannel}
-                          onChange={e => updateField('notify_channel', e.target.value)}
-                          placeholder="ID канала"
-                          className="input w-full"
-                        />
-                      )}
-                      {resolvedNotifyChannel && (
-                        <button
-                          type="button"
-                          onClick={() => setManualChannelEdit(v => !v)}
-                          title={manualChannelEdit ? 'Показать название канала' : 'Ввести ID вручную'}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors"
-                        >
-                          ✏️
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleDetectChannels}
-                        disabled={channelsLoading}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
-                      >
-                        {channelsLoading ? '⏳' : '🔍 Автоопределение'}
-                      </button>
-                    </div>
-                    {channelDropdownOpen && (
-                      <div className="mt-2 border border-[rgb(var(--border))] rounded-lg max-h-48 overflow-y-auto bg-[rgb(var(--surface-2))]">
-                        {channelsLoading ? (
-                          <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Поиск каналов...</p>
-                        ) : channelsData?.error ? (
-                          <p className="text-xs text-center py-3 text-red-400">{channelsData.error}</p>
-                        ) : channelsData?.channels?.length ? (
-                          channelsData.channels.map(ch => (
-                            <button
-                              key={ch.id}
-                              type="button"
-                              onClick={() => { updateField('notify_channel', ch.id); setChannelDropdownOpen(false); setManualChannelEdit(false); }}
-                              className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-400/10 transition-colors flex items-center gap-2"
-                            >
-                              <span>{ch.type === 'voice' ? '🔊' : '💬'}</span>
-                              <span>{ch.name}</span>
-                            </button>
-                          ))
-                        ) : (
-                          <p className="text-xs text-center py-3 text-[rgb(var(--text-secondary))]">Каналы не найдены</p>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-                {effectivePlatform === 'vk' && resolvedNotifyChannel && (
-                  <div className="mb-1.5">
-                    <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Беседа для уведомлений</label>
-                    <div className="input w-full flex items-center gap-2 text-sm">
-                      <span>💬</span>
-                      <span className="truncate">{resolvedNotifyChannel.name}</span>
-                    </div>
-                  </div>
-                )}
-                {effectivePlatform === 'vk' && (
-                  <div className="mt-2 space-y-1.5">
-                    <p className="text-xs text-[rgb(var(--text-secondary))] flex items-center gap-1.5">
-                      Подключить беседу по ссылке
-                      <Hint text="VK нигде не показывает числовой ID беседы — только пригласительную ссылку вида vk.me/join/... Вставьте ссылку — бот вступит в беседу и подключит её как канал уведомлений." />
-                    </p>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={vkInviteLink}
-                        onChange={e => setVkInviteLink(e.target.value)}
-                        placeholder="https://vk.me/join/..."
-                        className="input w-full text-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleJoinVkChannelByLink}
-                        disabled={joinVkChannelMutation.isPending}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-[rgb(var(--surface-2))] text-[rgb(var(--text-secondary))] hover:bg-cyan-400 hover:text-black transition-colors disabled:opacity-50"
-                      >
-                        {joinVkChannelMutation.isPending ? '⏳' : '🔗 Подключить по ссылке'}
-                      </button>
-                    </div>
-                    {vkInviteError && <p className="text-xs text-red-400">{vkInviteError}</p>}
-                  </div>
-                )}
+                <ChannelPicker
+                  platform={effectivePlatform === 'lolka' ? 'lolka' : 'vk'}
+                  label="Канал уведомлений"
+                  vkLabel="Беседа для уведомлений"
+                  hint="VK нигде не показывает числовой ID беседы — только пригласительную ссылку вида vk.me/join/... Вставьте ссылку — бот вступит в беседу и подключит её как канал уведомлений."
+                  value={currentNotifyChannel}
+                  onChange={v => updateField('notify_channel', v)}
+                  resolvedChannel={resolvedNotifyChannel}
+                  manualEdit={manualChannelEdit}
+                  onToggleManualEdit={() => setManualChannelEdit(v => !v)}
+                  channelsData={channelsData}
+                  channelsLoading={channelsLoading}
+                  dropdownOpen={channelDropdownOpen}
+                  onDetect={handleDetectChannels}
+                  onSelectFromList={id => { updateField('notify_channel', id); setChannelDropdownOpen(false); setManualChannelEdit(false); }}
+                  inviteLink={vkInviteLink}
+                  onInviteLinkChange={setVkInviteLink}
+                  inviteError={vkInviteError}
+                  onJoinByLink={handleJoinVkChannelByLink}
+                  joinPending={joinVkChannelMutation.isPending}
+                />
               </div>
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5">
@@ -1367,35 +1449,27 @@ export default function RankingPage() {
                 На MAX у бота один чат (сам подключённый сервер) — отдельный канал не выбирается, сообщение уходит туда же, куда добавили участника.
               </p>
             ) : (
-              <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Канал приветствия</label>
-                <div className="flex gap-2">
-                  {resolvedWelcomeChannel && !manualWelcomeChannelEdit ? (
-                    <div className="input w-full flex items-center gap-2 text-sm">
-                      <span>{resolvedWelcomeChannel.type === 'voice' ? '🔊' : '💬'}</span>
-                      <span className="truncate">{resolvedWelcomeChannel.name}</span>
-                      <button type="button" onClick={() => setManualWelcomeChannelEdit(true)} className="ml-auto text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]" title="Ввести ID вручную">✏️</button>
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={currentWelcomeChannel}
-                      onChange={e => updateField('welcome_channel', e.target.value)}
-                      placeholder="ID канала"
-                      className="input w-full"
-                      list="welcome-channels-list"
-                    />
-                  )}
-                </div>
-                {channelsData?.channels && channelsData.channels.length > 0 && (
-                  <datalist id="welcome-channels-list">
-                    {channelsData.channels.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
-                  </datalist>
-                )}
-                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">
-                  Список каналов подтягивается автоматически (см. «⚙️ Общие» → 🔍 Автоопределение) — начните вводить ID или выберите канал из подсказки.
-                </p>
-              </div>
+              <ChannelPicker
+                platform={effectivePlatform === 'lolka' ? 'lolka' : 'vk'}
+                label="Канал приветствия"
+                vkLabel="Беседа приветствия"
+                hint="VK нигде не показывает числовой ID беседы — только пригласительную ссылку вида vk.me/join/... Вставьте ссылку — бот вступит в беседу и подключит её как канал приветствия."
+                value={currentWelcomeChannel}
+                onChange={v => updateField('welcome_channel', v)}
+                resolvedChannel={resolvedWelcomeChannel}
+                manualEdit={manualWelcomeChannelEdit}
+                onToggleManualEdit={() => setManualWelcomeChannelEdit(v => !v)}
+                channelsData={channelsData}
+                channelsLoading={channelsLoading}
+                dropdownOpen={welcomeChannelDropdownOpen}
+                onDetect={handleDetectWelcomeChannels}
+                onSelectFromList={id => { updateField('welcome_channel', id); setWelcomeChannelDropdownOpen(false); setManualWelcomeChannelEdit(false); }}
+                inviteLink={welcomeVkInviteLink}
+                onInviteLinkChange={setWelcomeVkInviteLink}
+                inviteError={welcomeVkInviteError}
+                onJoinByLink={handleJoinWelcomeVkChannelByLink}
+                joinPending={joinVkChannelMutation.isPending}
+              />
             )}
           </Card>
           <Card className="p-5 flex items-center justify-center text-center">
