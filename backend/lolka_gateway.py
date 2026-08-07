@@ -623,9 +623,63 @@ class LolkaGateway:
             db.close()
 
     async def on_member_join(self, data: dict):
-        username = (data.get("user") or {}).get("username", "участник")
+        guild_id = data.get("guild_id")
+        user = data.get("user") or {}
+        user_id = user.get("id")
+        username = user.get("username", "участник")
         print(f"LOLKA GATEWAY: новый участник — {username}")
-        # Место для приветственных сообщений/автовыдачи роли — по аналогии с on_message_create
+        if guild_id and user_id:
+            await self._send_welcome(str(guild_id), str(user_id), username)
+
+    async def _send_welcome(self, guild_id: str, user_id: str, username: str) -> None:
+        """Приветственное сообщение при вступлении (вкладка "Визитка"). Аналог
+        _award_xp_and_notify, но без level/xp/rank — участник ещё не имеет прогресса."""
+        server_id = self._resolve_server_id(guild_id)
+        if not server_id:
+            return
+
+        db = SessionLocal()
+        try:
+            from models import RankingSettings, Server as ServerModel
+            try:
+                server_id_int = int(server_id)
+            except (TypeError, ValueError):
+                return
+            settings = db.query(RankingSettings).filter(
+                RankingSettings.server_id == server_id_int, RankingSettings.platform == "lolka",
+            ).first()
+            if not settings or not settings.welcome_enabled or not settings.welcome_channel:
+                return
+            server = db.query(ServerModel).filter(ServerModel.id == server_id_int).first()
+            guild_name = server.name if server else ""
+            welcome_template = settings.welcome_template
+            target_channel_id = settings.welcome_channel
+        finally:
+            db.close()
+
+        try:
+            mention = f"<@{user_id}>"
+            structured = None
+            if welcome_template:
+                try:
+                    structured = json.loads(welcome_template)
+                except (json.JSONDecodeError, TypeError):
+                    structured = None
+
+            if structured and (structured.get("embed_enabled") or structured.get("buttons") or structured.get("select_menus")):
+                rendered = render_message_template(
+                    structured, platform="lolka", user=mention, level=0, guild=guild_name, target_user_id=user_id,
+                )
+                await self.send_message(
+                    target_channel_id, rendered["content"],
+                    embeds=rendered.get("embeds"), components=rendered.get("components"),
+                )
+            else:
+                template = (structured or {}).get("content") or "👋 {user}, добро пожаловать на {guild}!"
+                text_to_send = render_notify_template(template, user=mention, level=0, guild=guild_name)
+                await self.send_message(target_channel_id, text_to_send)
+        except Exception as e:
+            print(f"LOLKA GATEWAY: ошибка приветственного сообщения — {e}")
 
     def _on_voice_state_update(self, data: dict) -> None:
         """

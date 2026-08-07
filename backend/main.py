@@ -122,6 +122,49 @@ async def _award_xp_and_notify_vk(
         logger.error(f"level-up notify (VK) error: {e}")
 
 
+async def _send_welcome_vk(access_token: str, server_id_int: int, user_id: int) -> None:
+    """Приветственное сообщение при вступлении в группу VK (event group_join, вкладка
+    "Визитка"). Переиспользует MessageTemplate/render_message_template — тот же формат,
+    что и notify_template, но без level/xp/rank (участник ещё не имеет прогресса)."""
+    db = SessionLocal()
+    try:
+        settings = db.query(RankingSettings).filter(
+            RankingSettings.server_id == server_id_int, RankingSettings.platform == "vk",
+        ).first()
+        if not settings or not settings.welcome_enabled or not settings.welcome_channel:
+            return
+        server = db.query(Server).filter(Server.id == server_id_int).first()
+        guild_name = server.name if server else ""
+    finally:
+        db.close()
+
+    try:
+        service = get_vk_service(access_token)
+        users = await asyncio.to_thread(service.get_users, [str(user_id)])
+        u = users[0] if users else {}
+        username = f"{u.get('first_name', '')} {u.get('last_name', '')}".strip() or str(user_id)
+        mention = f"[id{user_id}|{username}]"
+        target_peer_id = int(settings.welcome_channel)
+
+        structured = None
+        if settings.welcome_template:
+            try:
+                structured = json.loads(settings.welcome_template)
+            except (json.JSONDecodeError, TypeError):
+                structured = None
+        if structured and (structured.get("embed_enabled") or structured.get("buttons")):
+            rendered = render_message_template(
+                structured, platform="vk", user=mention, level=0, guild=guild_name, target_user_id=str(user_id),
+            )
+            await asyncio.to_thread(service.send_message, peer_id=target_peer_id, message=rendered["message"] or " ", keyboard=rendered.get("keyboard"))
+        else:
+            template = (structured or {}).get("content") or "👋 {user}, добро пожаловать на {guild}!"
+            text_to_send = render_notify_template(template, user=mention, level=0, guild=guild_name)
+            await asyncio.to_thread(service.send_message, peer_id=target_peer_id, message=text_to_send)
+    except Exception as e:
+        logger.error(f"welcome notify (VK) error: {e}")
+
+
 async def _award_xp_and_notify_max(
     server_id: str,
     chat_id: str,
@@ -173,6 +216,43 @@ async def _award_xp_and_notify_max(
             await asyncio.to_thread(max_gateway.send_message, str(chat_id), text_to_send)
     except Exception as e:
         logger.error(f"level-up notify (MAX) error: {e}")
+
+
+async def _send_welcome_max(server_id_int: int, chat_id: str, user_id: int, username: str) -> None:
+    """Приветственное сообщение MAX (update_type == user_added, вкладка "Визитка").
+    У MAX нет отдельного "канала уведомлений" — сообщение всегда уходит в тот же
+    chat_id, куда добавили участника (см. _award_xp_and_notify_max)."""
+    db = SessionLocal()
+    try:
+        settings = db.query(RankingSettings).filter(
+            RankingSettings.server_id == server_id_int, RankingSettings.platform == "max",
+        ).first()
+        if not settings or not settings.welcome_enabled:
+            return
+        server = db.query(Server).filter(Server.id == server_id_int).first()
+        guild_name = server.name if server else ""
+        welcome_template = settings.welcome_template
+    finally:
+        db.close()
+
+    try:
+        structured = None
+        if welcome_template:
+            try:
+                structured = json.loads(welcome_template)
+            except (json.JSONDecodeError, TypeError):
+                structured = None
+        if structured and (structured.get("embed_enabled") or structured.get("buttons")):
+            rendered = render_message_template(
+                structured, platform="max", user=username, level=0, guild=guild_name, target_user_id=str(user_id),
+            )
+            await asyncio.to_thread(max_gateway.send_message, str(chat_id), rendered["message"] or " ", rendered.get("attachments"))
+        else:
+            template = (structured or {}).get("content") or "👋 {user}, добро пожаловать на {guild}!"
+            text_to_send = render_notify_template(template, user=username, level=0, guild=guild_name)
+            await asyncio.to_thread(max_gateway.send_message, str(chat_id), text_to_send)
+    except Exception as e:
+        logger.error(f"welcome notify (MAX) error: {e}")
 
 
 async def _handle_max_message_callback(server_id: str, chat_id: str, callback_id: str, user_id: int, payload: Any) -> None:
@@ -614,6 +694,8 @@ async def _process_vk_event(conn: VKConnection, event_type: str, obj: Dict[str, 
                 target_user_id=str(user_id) if user_id else "",
             ))
             db.commit()
+            if user_id:
+                asyncio.create_task(_send_welcome_vk(conn.access_token, conn.server_id, user_id))
 
         elif event_type == "group_leave":
             user_id = obj.get("user_id")
@@ -3308,6 +3390,9 @@ def _serialize_ranking_settings(s: "RankingSettings") -> dict:
         "notify_message": s.notify_message,
         "notify_template": _loads(s.notify_template, None),
         "ping_user": s.ping_user,
+        "welcome_enabled": s.welcome_enabled,
+        "welcome_channel": s.welcome_channel,
+        "welcome_template": _loads(s.welcome_template, None),
         "decay_enabled": s.decay_enabled,
         "decay_days": s.decay_days,
         "decay_percent": s.decay_percent,
@@ -3386,10 +3471,11 @@ def save_ranking_settings(server_id: str = Query(...), platform: str = Query("vk
             db.add(settings)
 
         payload = data or {}
-        json_fields = {"xp_formula", "rewards", "blacklist_channels", "boost_channels", "boost_roles", "notify_template"}
+        json_fields = {"xp_formula", "rewards", "blacklist_channels", "boost_channels", "boost_roles", "notify_template", "welcome_template"}
         simple_fields = {
             "enabled", "xp_per_message", "xp_per_voice_minute", "min_message_length",
             "cooldown_seconds", "multiplier", "notify_channel", "notify_message", "ping_user",
+            "welcome_enabled", "welcome_channel",
             "decay_enabled", "decay_days", "decay_percent",
             "card_bg_color", "card_accent_color", "card_gradient_color", "card_style",
             "card_radius", "card_glass_intensity",
@@ -4396,6 +4482,21 @@ async def max_webhook(request: Request):
                 db.close()
             if server:
                 await _handle_max_message_callback(str(server.id), str(chat_id), callback_id, user_id, payload)
+        return JSONResponse(content={"ok": True})
+
+    if update_type == "user_added":
+        chat_id = data.get("chat_id")
+        user = data.get("user") or {}
+        user_id = user.get("user_id")
+        username = user.get("name") or user.get("username") or (str(user_id) if user_id else "участник")
+        if chat_id and user_id:
+            db = SessionLocal()
+            try:
+                server = db.query(Server).filter(Server.server_id == str(chat_id), Server.platform == "max").first()
+            finally:
+                db.close()
+            if server:
+                asyncio.create_task(_send_welcome_max(server.id, str(chat_id), user_id, username))
         return JSONResponse(content={"ok": True})
 
     if update_type != "message_created":

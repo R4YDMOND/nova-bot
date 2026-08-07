@@ -1,7 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://nova-bot-rpsy.onrender.com";
 
 import { getAccessToken } from '@/lib/auth';
-import type { MessageTemplate } from '@/types/ranking';
+import type { MessageTemplate, Platform } from '@/types/ranking';
 
 export type NotificationSettings = {
   email: { enabled: boolean; address: string };
@@ -91,6 +91,11 @@ export type RankingSettings = {
   /** Структурированный шаблон (текст+embed+компоненты), заполняется редактором шаблонов (ТЗ №5 Rev.6, п.3.2) */
   notify_template?: MessageTemplate;
   ping_user: boolean;
+  /** Приветственное сообщение при вступлении (вкладка "Визитка"). welcome_channel не
+   * используется на MAX — там один чат = сам сервер, канал не выбирается. */
+  welcome_enabled: boolean;
+  welcome_channel: string;
+  welcome_template?: MessageTemplate;
   decay_enabled: boolean;
   decay_days: number;
   decay_percent: number;
@@ -184,13 +189,13 @@ export type LeaderboardEntry = {
 };
 
 export type LeaderboardResponse = {
-  platform: "vk" | "lolka";
+  platform: Platform;
   total: number;
   entries: LeaderboardEntry[];
 };
 
 export type RankingPreview = {
-  platform?: "vk" | "lolka";
+  platform?: Platform;
   user?: {
     id: string;
     username: string;
@@ -579,7 +584,7 @@ export const api = {
       ),
     create: (data: {
       server_id: string;
-      platform: "vk" | "lolka";
+      platform: Platform;
       project: string;
       url: string;
       event: string;
@@ -629,7 +634,7 @@ export const api = {
       apiFetch<{ entries: object[]; total: number }>(
         `/api/moderation/log?server_id=${serverId}${limit ? `&limit=${limit}` : ""}`
       ),
-    getStats: (serverId: number, platform: "vk" | "lolka", period: "24h" | "7d" | "30d" = "7d") =>
+    getStats: (serverId: number, platform: Platform, period: "24h" | "7d" | "30d" = "7d") =>
       apiFetch<ModerationStatsResponse>(
         `/api/moderation/stats?server_id=${serverId}&platform=${platform}&period=${period}`
       ),
@@ -637,10 +642,10 @@ export const api = {
 
   // ── ТЗ №5: Система уровней ───────────────────────────────────────
   ranking: {
-    getSettings: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+    getSettings: (serverId: string, platform: Platform = "vk") =>
       apiFetch<RankingSettings>(`/api/ranking/settings?server_id=${serverId}&platform=${platform}`),
 
-    saveSettings: (serverId: string, platform: "vk" | "lolka", settings: Partial<RankingSettings>) =>
+    saveSettings: (serverId: string, platform: Platform, settings: Partial<RankingSettings>) =>
       apiFetch<{ status: string }>(
         `/api/ranking/settings?server_id=${serverId}&platform=${platform}`,
         { method: "POST", body: JSON.stringify(settings) }
@@ -648,7 +653,7 @@ export const api = {
 
     getLeaderboard: (
       serverId: string,
-      platform: "vk" | "lolka" = "vk",
+      platform: Platform = "vk",
       sort: "xp" | "level" | "messages" = "xp",
       limit: number = 50,
       offset: number = 0
@@ -657,7 +662,7 @@ export const api = {
         `/api/ranking/leaderboard?server_id=${serverId}&platform=${platform}&sort=${sort}&limit=${limit}&offset=${offset}`
       ),
 
-    getPreview: (serverId: string, platform: "vk" | "lolka", userId: string) =>
+    getPreview: (serverId: string, platform: Platform, userId: string) =>
       apiFetch<RankingPreview>(
         `/api/ranking/preview?server_id=${serverId}&platform=${platform}&user_id=${userId}`
       ),
@@ -682,7 +687,9 @@ export const api = {
     getMembers: () =>
       apiFetch<{ members: object[]; total: number }>("/api/ranking/members"),
 
-    getChannels: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+    getChannels: (serverId: string, platform: Platform = "vk") =>
+      // MAX не имеет каналов (один чат = сам сервер) — эндпоинт для него не существует,
+      // хук useRankingChannels уже не дёргает запрос при platform==='max' (enabled: false).
       apiFetch<{ channels: RankingChannel[]; total: number; error?: string }>(
         platform === "vk"
           ? `/api/vk/channels?server_id=${serverId}`
@@ -705,7 +712,7 @@ export const api = {
         `/api/lolka/roles?server_id=${serverId}`
       ),
 
-    syncMembers: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+    syncMembers: (serverId: string, platform: Platform = "vk") =>
       apiFetch<{ status?: string; synced?: number; error?: string }>(
         `/api/ranking/sync-members?server_id=${serverId}&platform=${platform}`,
         { method: "POST" }
@@ -714,41 +721,41 @@ export const api = {
 
   // ── ТЗ №5 Rev.7, п.3.1: Nova Points (независимая система репутации) ────
   novaPoints: {
-    getTop: (serverId: string, platform: "vk" | "lolka" = "vk", period: "all" | "month" | "week" = "all", limit: number = 10) =>
+    getTop: (serverId: string, platform: Platform = "vk", period: "all" | "month" | "week" = "all", limit: number = 10) =>
       apiFetch<{ platform: string; period: string; entries: NovaPointTopEntry[]; error?: string }>(
         `/api/nova-points/top?server_id=${serverId}&platform=${platform}&period=${period}&limit=${limit}`
       ),
 
-    getUser: (serverId: string, platform: "vk" | "lolka", userId: string) =>
+    getUser: (serverId: string, platform: Platform, userId: string) =>
       apiFetch<NovaPointEntry>(
         `/api/nova-points?server_id=${serverId}&platform=${platform}&user_id=${userId}`
       ),
 
-    give: (serverId: string, platform: "vk" | "lolka", giverId: string, receiverId: string, reason?: string) =>
+    give: (serverId: string, platform: Platform, giverId: string, receiverId: string, reason?: string) =>
       apiFetch<{ status: string; total_points?: number; error?: string }>(
         `/api/nova-points/give?server_id=${serverId}&platform=${platform}`,
         { method: "POST", body: JSON.stringify({ giver_id: giverId, receiver_id: receiverId, reason }) }
       ),
 
     // ── ТЗ №5 Rev.9, п.12: магазин ролей ────────────────────────────────
-    listShopItems: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+    listShopItems: (serverId: string, platform: Platform = "vk") =>
       apiFetch<{ items: ShopItem[]; currency_name?: string; currency_emoji?: string; error?: string }>(
         `/api/nova-points/shop?server_id=${serverId}&platform=${platform}`
       ),
 
-    createShopItem: (serverId: string, platform: "vk" | "lolka", data: { role_id: string; role_name?: string; price: number }) =>
+    createShopItem: (serverId: string, platform: Platform, data: { role_id: string; role_name?: string; price: number }) =>
       apiFetch<{ status: string; id?: number; error?: string }>(
         `/api/nova-points/shop?server_id=${serverId}&platform=${platform}`,
         { method: "POST", body: JSON.stringify(data) }
       ),
 
-    deleteShopItem: (serverId: string, platform: "vk" | "lolka", itemId: number) =>
+    deleteShopItem: (serverId: string, platform: Platform, itemId: number) =>
       apiFetch<{ status: string; error?: string }>(
         `/api/nova-points/shop/${itemId}?server_id=${serverId}&platform=${platform}`,
         { method: "DELETE" }
       ),
 
-    generateShopMessage: (serverId: string, platform: "vk" | "lolka") =>
+    generateShopMessage: (serverId: string, platform: Platform) =>
       apiFetch<{ status: string; text?: string; error?: string }>(
         `/api/nova-points/shop/generate-message?server_id=${serverId}&platform=${platform}`,
         { method: "POST" }
@@ -757,18 +764,18 @@ export const api = {
 
   // ── ТЗ №5 Rev.10, п.4: достижения (независимая от Nova Points сущность) ─
   achievements: {
-    list: (serverId: string, platform: "vk" | "lolka" = "vk") =>
+    list: (serverId: string, platform: Platform = "vk") =>
       apiFetch<{ items: Achievement[]; error?: string }>(
         `/api/achievements?server_id=${serverId}&platform=${platform}`
       ),
 
-    create: (serverId: string, platform: "vk" | "lolka", data: { name: string; icon?: string; trigger_level?: number | null }) =>
+    create: (serverId: string, platform: Platform, data: { name: string; icon?: string; trigger_level?: number | null }) =>
       apiFetch<{ status: string; id?: number; error?: string }>(
         `/api/achievements?server_id=${serverId}&platform=${platform}`,
         { method: "POST", body: JSON.stringify(data) }
       ),
 
-    remove: (serverId: string, platform: "vk" | "lolka", achievementId: number) =>
+    remove: (serverId: string, platform: Platform, achievementId: number) =>
       apiFetch<{ status: string; error?: string }>(
         `/api/achievements/${achievementId}?server_id=${serverId}&platform=${platform}`,
         { method: "DELETE" }

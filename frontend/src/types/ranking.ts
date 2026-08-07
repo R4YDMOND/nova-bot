@@ -1,4 +1,4 @@
-export type Platform = "vk" | "lolka";
+export type Platform = "vk" | "lolka" | "max";
 
 export interface XPFormulaConfig {
   formula_type: "linear" | "exponential" | "logarithmic" | "custom";
@@ -53,6 +53,11 @@ export interface RankingSettings {
   /** Структурированный шаблон (текст + embed + компоненты), заполняется редактором шаблонов (ТЗ №5 Rev.6, п.3.2). Необязателен для обратной совместимости с простым notify_message. */
   notify_template?: MessageTemplate;
   ping_user: boolean;
+  /** Приветственное сообщение при вступлении участника (вкладка "Визитка", бывшая "Карточка").
+   * welcome_channel не используется на MAX — там один чат = сам сервер, канал не выбирается. */
+  welcome_enabled: boolean;
+  welcome_channel: string;
+  welcome_template?: MessageTemplate;
   decay_enabled: boolean;
   decay_days: number;
   decay_percent: number;
@@ -153,6 +158,13 @@ export const BUTTON_ACTIONS: { value: ButtonAction; label: string }[] = [
   { value: 'achv_give_action', label: '🏆 Выдать достижения' },
 ];
 
+/** Curated-подмножество BUTTON_ACTIONS для вкладки "Визитка" (приветственное сообщение) —
+ * действия "Дать Nova Point"/"Выдать достижения" рассчитаны на пару giver→receiver и не
+ * имеют смысла в момент вступления участника (ещё нет собеседника, которому выдавать). */
+export const WELCOME_BUTTON_ACTIONS: { value: ButtonAction; label: string }[] = BUTTON_ACTIONS.filter(
+  a => a.value === 'nova_profile' || a.value === 'nova_leaderboard' || a.value === 'nova_close'
+);
+
 export interface MessageButton {
   id: string;
   label: string;
@@ -203,6 +215,13 @@ export const EMPTY_MESSAGE_TEMPLATE: MessageTemplate = {
   },
   buttons: [],
   select_menus: [],
+};
+
+/** Дефолтный шаблон для вкладки "Визитка" (приветственное сообщение при вступлении).
+ * Переменные ограничены {user}/{guild} — level/xp/rank участнику ещё не присвоены. */
+export const EMPTY_WELCOME_TEMPLATE: MessageTemplate = {
+  ...EMPTY_MESSAGE_TEMPLATE,
+  content: '👋 {user}, добро пожаловать на {guild}!',
 };
 /** Сохранённый пользовательский шаблон (ТЗ №5 Rev.6, п.3.2.4) */
 export interface SavedMessageTemplate {

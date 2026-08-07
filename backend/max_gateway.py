@@ -50,7 +50,7 @@ def register_webhook() -> None:
             headers=_headers(),
             json={
                 "url": webhook_url,
-                "update_types": ["message_created", "message_callback", "bot_added", "bot_started", "bot_removed"],
+                "update_types": ["message_created", "message_callback", "bot_added", "bot_started", "bot_removed", "user_added"],
                 "secret": os.getenv("MAX_WEBHOOK_SECRET", ""),
             },
             timeout=10,

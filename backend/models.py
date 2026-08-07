@@ -332,7 +332,7 @@ class RankingSettings(Base):
     __tablename__ = "ranking_settings"
     id = Column(Integer, primary_key=True)
     server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
-    platform = Column(String(20), nullable=False, default="vk")  # 'vk' | 'lolka'
+    platform = Column(String(20), nullable=False, default="vk")  # 'vk' | 'lolka' | 'max'
     enabled = Column(Boolean, default=True)
 
     xp_per_message = Column(Integer, default=15)
@@ -343,6 +343,14 @@ class RankingSettings(Base):
 
     xp_formula = Column(Text, default='{"formula_type":"exponential","base_xp":15,"multiplier":1.0}')
     rewards = Column(Text, default="[]")
+
+    # Приветственное сообщение при вступлении участника (вкладка "Визитка", бывшая
+    # "Карточка" — переиспользует MessageTemplate-схему notify_template). На MAX
+    # своего "канала" нет (бот = один чат = сам Server), поэтому welcome_channel
+    # там не читается — сообщение всегда уходит в chat_id сервера.
+    welcome_enabled = Column(Boolean, default=False)
+    welcome_channel = Column(String(255), default="")
+    welcome_template = Column(Text, default="")
 
     notify_channel = Column(String(255), default="")
     notify_message = Column(Text, default="🎉 {user} достиг {level} уровня!")

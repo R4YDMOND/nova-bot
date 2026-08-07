@@ -23,203 +23,22 @@ import {
   useCreateAchievement,
   useDeleteAchievement,
 } from '@/hooks/useRanking';
-import type { RankingReward, RewardCardDesign, XPFormulaConfig } from '@/types/ranking';
-import { RankCardPreview, RANK_CARD_RECOMMENDED_SIZE, RANK_CARD_IMAGE_CONSTRAINTS, RANK_CARD_TEST_DATA } from '@/components/ranking/RankCardPreview';
-import { Hint, HexColorField, RoleMultiSelect } from '@/components/ranking/RankingFormControls';
+import type { RankingReward, XPFormulaConfig } from '@/types/ranking';
+import { EMPTY_WELCOME_TEMPLATE, WELCOME_BUTTON_ACTIONS } from '@/types/ranking';
+import { Hint, RoleMultiSelect } from '@/components/ranking/RankingFormControls';
 import { ShopPurchaseTemplateModal } from '@/components/ranking/ShopPurchaseTemplateModal';
-import { MessageTemplateModal } from '@/components/MessageTemplateModal';
+import { MessageTemplateModal, WELCOME_VARIABLES } from '@/components/MessageTemplateModal';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 const TABS = [
   { id: 'settings', label: '⚙️ Общие' },
+  { id: 'welcome', label: '💳 Визитка' },
   { id: 'formula', label: '🧮 Формула XP' },
   { id: 'rewards', label: '🎁 Награды' },
   { id: 'leaderboard', label: '🏆 Лидерборд' },
   { id: 'nova-points', label: '🌟 Nova Points' },
-  { id: 'card', label: '🪪 Карточка' },
 ];
-
-const CARD_STYLES = [
-  { value: 'gradient', label: 'Градиент' },
-  { value: 'glass', label: 'Стекло' },
-  { value: 'neon', label: 'Неон' },
-  { value: 'flat', label: 'Плоский' },
-];
-
-const CARD_BG_FIT_OPTIONS = [
-  { value: 'cover', label: 'Заполнить (обрезать края)' },
-  { value: 'contain', label: 'Вписать целиком' },
-  { value: 'stretch', label: 'Растянуть' },
-];
-
-const CARD_BG_POSITION_OPTIONS = [
-  { value: 'center', label: 'По центру' },
-  { value: 'top', label: 'Сверху' },
-  { value: 'bottom', label: 'Снизу' },
-  { value: 'left', label: 'Слева' },
-  { value: 'right', label: 'Справа' },
-  { value: 'top-left', label: 'Сверху слева' },
-  { value: 'top-right', label: 'Сверху справа' },
-  { value: 'bottom-left', label: 'Снизу слева' },
-  { value: 'bottom-right', label: 'Снизу справа' },
-];
-
-// Пресеты палитры для быстрого выбора акцентного цвета (референс: превью палитры)
-const PALETTE_PRESETS: { name: string; bg: string; accent: string; gradient: string }[] = [
-  { name: 'Неон циан', bg: '#111118', accent: '#00E5FF', gradient: '#7B2FBE' },
-  { name: 'Пурпур', bg: '#15111f', accent: '#A855F7', gradient: '#EC4899' },
-  { name: 'Розовый', bg: '#1a0f14', accent: '#F76FBE', gradient: '#FF3D81' },
-  { name: 'Янтарь', bg: '#1a1408', accent: '#FFA500', gradient: '#F59E0B' },
-  { name: 'Изумруд', bg: '#0a1810', accent: '#22C55E', gradient: '#10B981' },
-  { name: 'Ледяной', bg: '#0d1420', accent: '#38BDF8', gradient: '#818CF8' },
-  { name: 'Огонь', bg: '#1a0a08', accent: '#F87171', gradient: '#FB923C' },
-  { name: 'Монохром', bg: '#111114', accent: '#94A3B8', gradient: '#64748B' },
-  { name: 'Лайм', bg: '#0f1408', accent: '#A3E635', gradient: '#4ADE80' },
-  { name: 'Индиго', bg: '#0e0f1f', accent: '#818CF8', gradient: '#6366F1' },
-];
-
-/** Панель индивидуальной кастомизации карточки для конкретной строки наград.
- *  Повторяет набор контролов вкладки "Карточка", но применяется только к этому уровню (ТЗ №5 Rev.6, п.3.3.2). */
-function RewardDesignPanel({
-  level,
-  role,
-  design,
-  onToggle,
-  onChange,
-}: {
-  level: number;
-  role: string;
-  design?: RewardCardDesign;
-  onToggle: (enabled: boolean) => void;
-  onChange: (field: keyof RewardCardDesign, value: any) => void;
-}) {
-  return (
-    <div className="border-t border-[rgb(var(--border))] p-4 bg-[rgb(var(--surface-1))] rounded-b-xl">
-      <div className="flex justify-between items-center mb-3">
-        <span className="text-xs text-[rgb(var(--text-secondary))]">Собственный дизайн карточки для уровня {level}</span>
-        <Switch checked={!!design} onCheckedChange={onToggle} />
-      </div>
-      {design && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Цвет фона</label>
-              <div className="flex gap-2">
-                <input type="color" value={design.bg_color} onChange={e => onChange('bg_color', e.target.value)} className="h-9 w-9 shrink-0 rounded-lg cursor-pointer" />
-                <HexColorField value={design.bg_color} onChange={v => onChange('bg_color', v)} placeholder="#111118" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Акцентный цвет</label>
-              <div className="flex gap-2">
-                <input type="color" value={design.accent_color} onChange={e => onChange('accent_color', e.target.value)} className="h-9 w-9 shrink-0 rounded-lg cursor-pointer" />
-                <HexColorField value={design.accent_color} onChange={v => onChange('accent_color', v)} placeholder="#00E5FF" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Градиент</label>
-              <div className="flex gap-2">
-                <input type="color" value={design.gradient_color} onChange={e => onChange('gradient_color', e.target.value)} className="h-9 w-9 shrink-0 rounded-lg cursor-pointer" />
-                <HexColorField value={design.gradient_color} onChange={v => onChange('gradient_color', v)} placeholder="#7B2FBE" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Стиль</label>
-                <select value={design.style} onChange={e => onChange('style', e.target.value)} className="input w-full">
-                  {CARD_STYLES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
-                  <label>Радиус</label>
-                  <span>{design.radius} px</span>
-                </div>
-                <input type="range" min={4} max={28} step={2} value={design.radius} onChange={e => onChange('radius', parseInt(e.target.value))} className="w-full accent-cyan-400" />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
-                <label>Интенсивность стекла</label>
-                <span>{design.glass_intensity}%</span>
-              </div>
-              <input type="range" min={0} max={100} step={5} value={design.glass_intensity} onChange={e => onChange('glass_intensity', parseInt(e.target.value))} className="w-full accent-cyan-400" disabled={design.style !== 'glass'} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {PALETTE_PRESETS.map(p => (
-                <button
-                  key={p.name}
-                  onClick={() => { onChange('bg_color', p.bg); onChange('accent_color', p.accent); onChange('gradient_color', p.gradient); }}
-                  className="w-7 h-7 rounded-full transition-transform hover:scale-110 shrink-0"
-                  style={{ background: `linear-gradient(135deg, ${p.accent}, ${p.gradient})` }}
-                  title={p.name}
-                />
-              ))}
-            </div>
-            <div className="pt-3 border-t border-[rgb(var(--border))]">
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs text-[rgb(var(--text-secondary))]">Пользовательский фон (по ссылке)</label>
-                <Switch checked={design.bg_image_enabled} onCheckedChange={val => onChange('bg_image_enabled', val)} />
-              </div>
-              {design.bg_image_enabled && (
-                <>
-                  <input type="url" value={design.bg_image_url} onChange={e => onChange('bg_image_url', e.target.value.trim())} placeholder="https://example.com/image.png" className="input w-full" />
-                  <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div>
-                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Масштабирование</label>
-                      <select value={design.bg_fit} onChange={e => onChange('bg_fit', e.target.value)} className="input w-full">
-                        {CARD_BG_FIT_OPTIONS.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Позиция</label>
-                      <select value={design.bg_position} onChange={e => onChange('bg_position', e.target.value)} className="input w-full">
-                        {CARD_BG_POSITION_OPTIONS.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
-                      <label>Затенение фона</label>
-                      <span>{design.bg_shade}%</span>
-                    </div>
-                    <input type="range" min={0} max={100} step={5} value={design.bg_shade} onChange={e => onChange('bg_shade', parseInt(e.target.value))} className="w-full accent-cyan-400" />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-[rgb(var(--text-secondary))] block mb-2">Превью</label>
-            <RankCardPreview
-              appearance={{
-                bg: design.bg_color,
-                accent: design.accent_color,
-                gradient: design.gradient_color,
-                style: design.style,
-                radius: design.radius,
-                glass: design.glass_intensity,
-                bgImageUrl: design.bg_image_url,
-                bgImageEnabled: design.bg_image_enabled,
-                bgShade: design.bg_shade,
-                bgFit: design.bg_fit,
-                bgPosition: design.bg_position,
-              }}
-              data={{ ...RANK_CARD_TEST_DATA, level, username: role || RANK_CARD_TEST_DATA.username }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 const MEDAL_COLORS: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
@@ -294,9 +113,8 @@ function FormulaProgressionChart({ formula }: { formula: XPFormulaConfig }) {
 export default function RankingPage() {
   const { servers, selectedServer, loading: serverLoading } = useServer();
   const [activeTab, setActiveTab] = useState('settings');
-  const [expandedRewardIndex, setExpandedRewardIndex] = useState<number | null>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [viewPlatform, setViewPlatform] = useState<'vk' | 'lolka'>('vk');
+  const [viewPlatform, setViewPlatform] = useState<'vk' | 'lolka' | 'max'>('vk');
   const [formData, setFormData] = useState<any>({});
   const [sort, setSort] = useState<'xp' | 'level' | 'messages'>('xp');
   const [formulaTest, setFormulaTest] = useState<{ valid: boolean; test_xp?: number; level_10_required_xp?: number; error?: string } | null>(null);
@@ -305,13 +123,18 @@ export default function RankingPage() {
 
   const effectivePlatform = viewPlatform;
 
-  // server_id должен соответствовать выбранной на этой странице платформе (VK/Lolka),
+  // server_id должен соответствовать выбранной на этой странице платформе (VK/Lolka/MAX),
   // а не глобально выбранному серверу на /dashboard/servers — иначе на вкладке Lolka
   // улетал server_id VK-сообщества (и наоборот), что ломало автоопределение каналов
   // и тихо создавало настройки не под тем сервером.
   const vkServer = servers.find(s => s.platform === 'vk');
   const lolkaServer = servers.find(s => s.platform === 'lolka');
-  const effectiveServerId = (effectivePlatform === 'vk' ? vkServer : lolkaServer)?.server_id ?? '';
+  // MAX: "сервер" в БД = один чат бота (см. backend/max_gateway.py) — своих каналов
+  // внутри у него нет, поэтому ниже канал-селекторы для MAX скрываются целиком.
+  const maxServer = servers.find(s => s.platform === 'max');
+  const effectiveServerId = (
+    effectivePlatform === 'vk' ? vkServer : effectivePlatform === 'lolka' ? lolkaServer : maxServer
+  )?.server_id ?? '';
 
   const { data: settings, isLoading: settingsLoading } = useRankingSettings(effectiveServerId, effectivePlatform);
   const saveMutation = useSaveRankingSettings();
@@ -335,6 +158,14 @@ export default function RankingPage() {
   const resolvedNotifyChannel = channelsData?.channels?.find(ch => ch.id === currentNotifyChannel);
   const [manualChannelEdit, setManualChannelEdit] = useState(false);
   useEffect(() => { setManualChannelEdit(false); }, [effectiveServerId, effectivePlatform]);
+
+  // Канал вкладки "Визитка" (приветственное сообщение) — тот же список каналов,
+  // что уже подтягивается кнопкой "🔍 Автоопределение" в "⚙️ Общие". На MAX не
+  // используется вовсе (см. maxServer выше).
+  const currentWelcomeChannel: string = formData.welcome_channel ?? settings?.welcome_channel ?? '';
+  const resolvedWelcomeChannel = channelsData?.channels?.find(ch => ch.id === currentWelcomeChannel);
+  const [manualWelcomeChannelEdit, setManualWelcomeChannelEdit] = useState(false);
+  useEffect(() => { setManualWelcomeChannelEdit(false); }, [effectiveServerId, effectivePlatform]);
 
   const handleDetectChannels = async () => {
     setChannelDropdownOpen(true);
@@ -389,21 +220,22 @@ export default function RankingPage() {
     setFormulaTest(null);
   }, [effectivePlatform, effectiveServerId]);
 
-  const { data: lbVk, isLoading: lbVkLoading } = useLeaderboard(vkServer?.server_id ?? '', 'vk', sort, viewPlatform !== 'lolka');
-  const { data: lbLolka, isLoading: lbLolkaLoading } = useLeaderboard(lolkaServer?.server_id ?? '', 'lolka', sort, viewPlatform !== 'vk');
+  const { data: lbVk, isLoading: lbVkLoading } = useLeaderboard(vkServer?.server_id ?? '', 'vk', sort, viewPlatform === 'vk');
+  const { data: lbLolka, isLoading: lbLolkaLoading } = useLeaderboard(lolkaServer?.server_id ?? '', 'lolka', sort, viewPlatform === 'lolka');
+  const { data: lbMax, isLoading: lbMaxLoading } = useLeaderboard(maxServer?.server_id ?? '', 'max', sort, viewPlatform === 'max');
 
   const leaderboardEntries = useMemo(() => {
-    const src = viewPlatform === 'lolka' ? lbLolka : lbVk;
+    const src = viewPlatform === 'lolka' ? lbLolka : viewPlatform === 'max' ? lbMax : lbVk;
     return (src?.entries || []).map(e => ({ ...e, _platform: viewPlatform }));
-  }, [viewPlatform, lbVk, lbLolka]);
+  }, [viewPlatform, lbVk, lbLolka, lbMax]);
 
-  const leaderboardLoading = viewPlatform === 'lolka' ? lbLolkaLoading : lbVkLoading;
+  const leaderboardLoading = viewPlatform === 'lolka' ? lbLolkaLoading : viewPlatform === 'max' ? lbMaxLoading : lbVkLoading;
 
   // Live Preview — реальные данные топ-1 участника лидерборда (см. Объяснение).
   const topEntry: any = leaderboardEntries[0];
   const { data: preview } = useRankingPreview(
     effectiveServerId,
-    (topEntry?._platform || effectivePlatform) as 'vk' | 'lolka',
+    (topEntry?._platform || effectivePlatform) as 'vk' | 'lolka' | 'max',
     topEntry?.user_id || ''
   );
 
@@ -503,10 +335,6 @@ export default function RankingPage() {
   const updateReward = (i: number, field: keyof RankingReward, value: any) =>
     updateRewards(rewards.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
   const removeReward = (i: number) => updateRewards(rewards.filter((_, idx) => idx !== i));
-  const updateRewardDesign = (i: number, field: keyof RewardCardDesign, value: any) =>
-    updateRewards(rewards.map((r, idx) => (idx === i && r.card_design ? { ...r, card_design: { ...r.card_design, [field]: value } } : r)));
-  const toggleRewardDesign = (i: number, enabled: boolean) =>
-    updateRewards(rewards.map((r, idx) => (idx === i ? { ...r, card_design: enabled ? makeDefaultRewardDesign() : undefined } : r)));
 
   const handleSave = async () => {
     if (!effectiveServerId) return;
@@ -544,40 +372,6 @@ export default function RankingPage() {
   // Вынесено выше early-return блока: хуки (useState/useEffect) не могут вызываться
   // после условных return — иначе порядок хуков "плывёт" между рендерами и React
   // падает с ошибкой #310 (Rendered fewer hooks than expected).
-  const cardBgImageUrl = formData.card_bg_image_url ?? settings?.card_bg_image_url ?? '';
-  const cardBgImageEnabled = formData.card_bg_image_enabled ?? settings?.card_bg_image_enabled ?? false;
-
-  const [bgImageStatus, setBgImageStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
-  const [bgImageDimensions, setBgImageDimensions] = useState<{ width: number; height: number } | null>(null);
-  useEffect(() => {
-    if (!cardBgImageEnabled || !cardBgImageUrl.trim()) { setBgImageStatus('idle'); setBgImageDimensions(null); return; }
-    setBgImageStatus('loading');
-    const timer = setTimeout(() => {
-      const img = new window.Image();
-      img.onload = () => {
-        setBgImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-        setBgImageStatus('ok');
-      };
-      img.onerror = () => { setBgImageDimensions(null); setBgImageStatus('error'); };
-      img.src = cardBgImageUrl.trim();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [cardBgImageUrl, cardBgImageEnabled]);
-
-  // Предупреждение по фактическим размерам изображения относительно допустимого диапазона
-  // (ТЗ №5 Rev.6, п.4.3.3) — только для валидно загруженного изображения.
-  const bgImageSizeWarning = useMemo(() => {
-    if (bgImageStatus !== 'ok' || !bgImageDimensions) return null;
-    const { width, height } = bgImageDimensions;
-    const { minWidth, minHeight, maxWidth, maxHeight } = RANK_CARD_IMAGE_CONSTRAINTS;
-    if (width < minWidth || height < minHeight) {
-      return `⚠️ Изображение меньше минимального размера (${minWidth}×${minHeight}px) — качество может пострадать`;
-    }
-    if (width > maxWidth || height > maxHeight) {
-      return `⚠️ Изображение больше максимального размера (${maxWidth}×${maxHeight}px) — будет автоматически уменьшено`;
-    }
-    return null;
-  }, [bgImageStatus, bgImageDimensions]);
 
   // Онбординг-баннер (ТЗ №5 Rev.5, п.10.1) — показывается один раз в этом браузере,
   // пока участник явно не закроет/не начнёт настройку. Флаг хранится локально:
@@ -603,31 +397,6 @@ export default function RankingPage() {
     return <NoServerSelected title="🪪 Система уровней" />;
   }
 
-  const cardBg = formData.card_bg_color ?? settings?.card_bg_color ?? '#111118';
-  const cardAccent = formData.card_accent_color ?? settings?.card_accent_color ?? '#00E5FF';
-  const cardGradient = formData.card_gradient_color ?? settings?.card_gradient_color ?? '#7B2FBE';
-  const cardStyle = formData.card_style ?? settings?.card_style ?? 'gradient';
-  const cardRadius = formData.card_radius ?? settings?.card_radius ?? 16;
-  const cardGlass = formData.card_glass_intensity ?? settings?.card_glass_intensity ?? 70;
-  const cardBgShade = formData.card_bg_shade ?? settings?.card_bg_shade ?? 80;
-  const cardBgFit = formData.card_bg_fit ?? settings?.card_bg_fit ?? 'cover';
-  const cardBgPosition = formData.card_bg_position ?? settings?.card_bg_position ?? 'center';
-
-  /** Дизайн карточки конкретной награды при первом включении — стартует от текущего глобального дизайна (ТЗ №5 Rev.6, п.3.3.2) */
-  const makeDefaultRewardDesign = (): RewardCardDesign => ({
-    bg_color: cardBg,
-    accent_color: cardAccent,
-    gradient_color: cardGradient,
-    style: cardStyle,
-    radius: cardRadius,
-    glass_intensity: cardGlass,
-    bg_image_enabled: cardBgImageEnabled,
-    bg_image_url: cardBgImageUrl,
-    bg_fit: cardBgFit,
-    bg_position: cardBgPosition,
-    bg_shade: cardBgShade,
-  });
-
   return (
     <TooltipProvider delayDuration={200}>
     <div className="max-w-[1920px] mx-auto px-4 sm:px-8 py-8 space-y-6">
@@ -639,7 +408,7 @@ export default function RankingPage() {
 
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex rounded-xl border border-[rgb(var(--border))] overflow-hidden">
-            {(['vk', 'lolka'] as const).map(p => (
+            {(['vk', 'lolka', 'max'] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setViewPlatform(p)}
@@ -647,7 +416,7 @@ export default function RankingPage() {
                   viewPlatform === p ? 'bg-cyan-400 text-black' : 'bg-[rgb(var(--surface-2))] hover:bg-[rgb(var(--surface-3))]'
                 }`}
               >
-                {p === 'vk' ? 'VK' : 'Lolka'}
+                {p === 'vk' ? 'VK' : p === 'lolka' ? 'Lolka' : 'MAX'}
               </button>
             ))}
           </div>
@@ -692,7 +461,7 @@ export default function RankingPage() {
 
       {!effectiveServerId && (
         <p className="mb-4 text-sm text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-3">
-          ⚠️ {effectivePlatform === 'vk' ? 'VK' : 'Lolka'}-сервер не подключён. Добавьте его на странице{' '}
+          ⚠️ {effectivePlatform === 'vk' ? 'VK' : effectivePlatform === 'lolka' ? 'Lolka' : 'MAX'}-сервер не подключён. Добавьте его на странице{' '}
           <a href="/dashboard/servers" className="underline">/dashboard/servers</a>, чтобы настроить систему уровней для этой платформы.
         </p>
       )}
@@ -744,12 +513,17 @@ export default function RankingPage() {
           <Card className="p-5">
             <h3 className="font-semibold mb-3">🔔 Уведомления</h3>
             <div className="space-y-3">
-              <div>
+              {effectivePlatform === 'max' && (
+                <p className="text-xs text-[rgb(var(--text-secondary))]">
+                  На MAX у бота один чат (сам подключённый сервер) — отдельный канал не выбирается, уведомления о повышении уровня уходят в тот же чат, где было получено сообщение.
+                </p>
+              )}
+              <div className={effectivePlatform === 'max' ? 'hidden' : ''}>
                 {/* VK не отдаёт числовой ID беседы нигде в интерфейсе — только
                     пригласительную ссылку (vk.me/join/...), поэтому для VK ручной
                     ввод ID и «Автоопределение» скрыты как вводящие в заблуждение;
                     единственный рабочий способ — подключение по ссылке ниже. */}
-                {effectivePlatform !== 'vk' && (
+                {effectivePlatform === 'lolka' && (
                   <>
                     <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Канал уведомлений</label>
                     <div className="flex gap-2">
@@ -1032,25 +806,16 @@ export default function RankingPage() {
           {rewards.length > 0 ? (
             <div className="space-y-3">
               {rewards.map((reward, i) => {
-                const design = reward.card_design;
-                const isExpanded = expandedRewardIndex === i;
                 const isLolka = effectivePlatform === 'lolka';
                 return (
                   <div key={i} className="bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-xl">
-                    <div className={`grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr_auto_auto_auto] gap-2 items-center p-3 ${isLolka ? 'sm:!grid-cols-[80px_1fr_auto_auto_auto]' : ''}`}>
+                    <div className={`grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr_auto_auto] gap-2 items-center p-3 ${isLolka ? 'sm:!grid-cols-[80px_1fr_auto_auto]' : ''}`}>
                       <input type="number" value={reward.level} onChange={e => updateReward(i, 'level', parseInt(e.target.value) || 1)} className="input text-center" title="Уровень" />
                       {!isLolka && (
                         <input type="text" value={reward.role} onChange={e => updateReward(i, 'role', e.target.value)} placeholder="Роль/название" className="input" />
                       )}
                       <input type="text" value={reward.message ?? ''} onChange={e => updateReward(i, 'message', e.target.value)} placeholder="Сообщение (необязательно)" className="input" />
                       <input type="color" value={reward.color} onChange={e => updateReward(i, 'color', e.target.value)} className="w-9 h-9 rounded-lg cursor-pointer" title="Цвет" />
-                      <button
-                        onClick={() => setExpandedRewardIndex(isExpanded ? null : i)}
-                        className={`px-2 py-1.5 rounded-lg transition-colors ${design ? 'text-cyan-400 bg-cyan-400/10' : 'text-[rgb(var(--text-secondary))] hover:bg-white/5'}`}
-                        title="Дизайн карточки для этого уровня"
-                      >
-                        🎨
-                      </button>
                       <button onClick={() => removeReward(i)} className="px-2 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors" title="Удалить">🗑️</button>
                     </div>
                     {isLolka && (
@@ -1074,15 +839,6 @@ export default function RankingPage() {
                           error={rolesData?.error}
                         />
                       </div>
-                    )}
-                    {isExpanded && (
-                      <RewardDesignPanel
-                        level={reward.level}
-                        role={reward.role}
-                        design={design}
-                        onToggle={enabled => toggleRewardDesign(i, enabled)}
-                        onChange={(field, value) => updateRewardDesign(i, field, value)}
-                      />
                     )}
                   </div>
                 );
@@ -1582,7 +1338,7 @@ export default function RankingPage() {
             </div>
           </Card>
 
-          {shopTemplateOpen && (
+          {shopTemplateOpen && effectivePlatform !== 'max' && (
             <ShopPurchaseTemplateModal
               open={shopTemplateOpen}
               onOpenChange={setShopTemplateOpen}
@@ -1596,178 +1352,75 @@ export default function RankingPage() {
         </div>
       )}
 
-      {activeTab === 'card' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="p-5 space-y-4">
-            <h3 className="font-semibold">🎨 Дизайн карточки</h3>
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Цвет фона</label>
-              <div className="flex gap-2">
-                <input type="color" value={cardBg} onChange={e => updateField('card_bg_color', e.target.value)} className="h-10 w-10 shrink-0 rounded-lg cursor-pointer" />
-                <HexColorField value={cardBg} onChange={v => updateField('card_bg_color', v)} placeholder="#111118" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Акцентный цвет</label>
-              <div className="flex gap-2">
-                <input type="color" value={cardAccent} onChange={e => updateField('card_accent_color', e.target.value)} className="h-10 w-10 shrink-0 rounded-lg cursor-pointer" />
-                <HexColorField value={cardAccent} onChange={v => updateField('card_accent_color', v)} placeholder="#00E5FF" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Градиент</label>
-              <div className="flex gap-2">
-                <input type="color" value={cardGradient} onChange={e => updateField('card_gradient_color', e.target.value)} className="h-10 w-10 shrink-0 rounded-lg cursor-pointer" />
-                <HexColorField value={cardGradient} onChange={v => updateField('card_gradient_color', v)} placeholder="#7B2FBE" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Стиль</label>
-              <select value={cardStyle} onChange={e => updateField('card_style', e.target.value)} className="input w-full">
-                {CARD_STYLES.map(s => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
-                <label>Радиус углов</label>
-                <span>{cardRadius} px</span>
-              </div>
-              <input type="range" min={4} max={28} step={2} value={cardRadius} onChange={e => updateField('card_radius', parseInt(e.target.value))} className="w-full accent-cyan-400" />
-            </div>
-            <div>
-              <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
-                <label>Интенсивность стекла</label>
-                <span>{cardGlass}%</span>
-              </div>
-              <input type="range" min={0} max={100} step={5} value={cardGlass} onChange={e => updateField('card_glass_intensity', parseInt(e.target.value))} className="w-full accent-cyan-400" disabled={cardStyle !== 'glass'} />
-            </div>
-            <div>
-              <label className="text-xs text-[rgb(var(--text-secondary))] block mb-2">Превью палитры</label>
-              <div className="flex flex-wrap gap-2">
-                {PALETTE_PRESETS.map(p => {
-                  const isActive = cardBg.toLowerCase() === p.bg.toLowerCase()
-                    && cardAccent.toLowerCase() === p.accent.toLowerCase()
-                    && cardGradient.toLowerCase() === p.gradient.toLowerCase();
-                  return (
-                    <button
-                      key={p.name}
-                      onClick={() => {
-                        updateField('card_bg_color', p.bg);
-                        updateField('card_accent_color', p.accent);
-                        updateField('card_gradient_color', p.gradient);
-                      }}
-                      className={`w-8 h-8 rounded-full transition-transform hover:scale-110 shrink-0 ${isActive ? 'ring-2 ring-offset-2 ring-offset-[rgb(var(--surface-1))] ring-white' : ''}`}
-                      style={{ background: `linear-gradient(135deg, ${p.accent}, ${p.gradient})` }}
-                      title={p.name}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-            <div className="pt-3 border-t border-[rgb(var(--border))]">
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs text-[rgb(var(--text-secondary))]">Пользовательский фон (по ссылке)</label>
-                <Switch checked={cardBgImageEnabled} onCheckedChange={val => updateField('card_bg_image_enabled', val)} />
-              </div>
-              {cardBgImageEnabled && (
-                <>
-                  <input
-                    type="url"
-                    value={cardBgImageUrl}
-                    onChange={e => updateField('card_bg_image_url', e.target.value.trim())}
-                    placeholder="https://example.com/image.png"
-                    className="input w-full"
-                  />
-                  {bgImageStatus === 'loading' && (
-                    <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">⏳ Проверяем ссылку…</p>
-                  )}
-                  {bgImageStatus === 'ok' && (
-                    <>
-                      <p className="text-[10px] text-emerald-400 mt-1">
-                        ✅ Изображение загружается корректно{bgImageDimensions ? ` — ${bgImageDimensions.width}×${bgImageDimensions.height}px` : ''}
-                      </p>
-                      {bgImageSizeWarning && (
-                        <p className="text-[10px] text-amber-400 mt-1">{bgImageSizeWarning}</p>
-                      )}
-                    </>
-                  )}
-                  {bgImageStatus === 'error' && (
-                    <p className="text-[10px] text-red-400 mt-1">❌ Не удалось загрузить изображение по этой ссылке — проверьте, что она ведёт напрямую на файл и хостинг разрешает встраивание</p>
-                  )}
-                  <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">Загрузите своё изображение: рекомендуемый размер {RANK_CARD_RECOMMENDED_SIZE}</p>
-                  <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div>
-                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Масштабирование</label>
-                      <select value={cardBgFit} onChange={e => updateField('card_bg_fit', e.target.value)} className="input w-full">
-                        {CARD_BG_FIT_OPTIONS.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Позиция</label>
-                      <select value={cardBgPosition} onChange={e => updateField('card_bg_position', e.target.value)} className="input w-full">
-                        {CARD_BG_POSITION_OPTIONS.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">
-                    Если изображение обрезается или растягивается — выберите подходящий режим масштабирования ниже.
-                  </p>
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs text-[rgb(var(--text-secondary))] mb-1">
-                      <label>Затенение фона</label>
-                      <span>{cardBgShade}%</span>
-                    </div>
-                    <input type="range" min={0} max={100} step={5} value={cardBgShade} onChange={e => updateField('card_bg_shade', parseInt(e.target.value))} className="w-full accent-cyan-400" />
-                  </div>
-                </>
-              )}
-            </div>
-          </Card>
-
+      {activeTab === 'welcome' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="p-5">
-            <h3 className="font-semibold mb-3">👁️ Live Preview {topEntry ? '' : '(тестовые данные)'}</h3>
-            <RankCardPreview
-              appearance={{
-                bg: cardBg,
-                accent: cardAccent,
-                gradient: cardGradient,
-                style: cardStyle,
-                radius: cardRadius,
-                glass: cardGlass,
-                bgImageUrl: cardBgImageUrl,
-                bgImageEnabled: cardBgImageEnabled,
-                bgShade: cardBgShade,
-                bgFit: cardBgFit,
-                bgPosition: cardBgPosition,
-              }}
-              data={preview && preview.ranking && preview.user ? {
-                rank: preview.ranking.rank,
-                level: preview.ranking.level,
-                username: preview.user.username,
-                avatar_url: preview.user.avatar_url,
-                current_xp: preview.ranking.current_xp,
-                xp_for_next_level: preview.ranking.xp_for_next_level,
-              } : undefined}
-            />
-            <p className="text-[10px] text-[rgb(var(--text-secondary))] text-center mt-2">Реальный размер карточки: {RANK_CARD_RECOMMENDED_SIZE}</p>
-            <div className="mt-3 pt-3 border-t border-[rgb(var(--border))] text-[10px] text-[rgb(var(--text-secondary))] space-y-0.5">
-              <p className="font-semibold text-[rgb(var(--text))] mb-1">Технические требования к изображению:</p>
-              <p>• Минимальный размер: {RANK_CARD_IMAGE_CONSTRAINTS.minWidth}×{RANK_CARD_IMAGE_CONSTRAINTS.minHeight}px</p>
-              <p>• Максимальный размер: {RANK_CARD_IMAGE_CONSTRAINTS.maxWidth}×{RANK_CARD_IMAGE_CONSTRAINTS.maxHeight}px</p>
-              <p>• Рекомендуемый размер: {RANK_CARD_IMAGE_CONSTRAINTS.recommendedWidth}×{RANK_CARD_IMAGE_CONSTRAINTS.recommendedHeight}px</p>
-              <p>• Соотношение сторон: {RANK_CARD_IMAGE_CONSTRAINTS.aspectRatio}:1</p>
-              <p>• Форматы: {RANK_CARD_IMAGE_CONSTRAINTS.allowedFormats.join(', ')}</p>
-              <p>• Макс. размер файла: {RANK_CARD_IMAGE_CONSTRAINTS.maxFileSizeMb} MB</p>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-semibold flex items-center gap-1.5">
+                💳 Визитка — приветственное сообщение
+                <Hint text="Отправляется участнику при вступлении в сервер/сообщество/чат. Текст, панель (embed) и кнопки — как у шаблона повышения уровня, но переменные ограничены {user}/{guild}" />
+              </h3>
+              <Switch checked={formData.welcome_enabled ?? settings?.welcome_enabled ?? false} onCheckedChange={val => updateField('welcome_enabled', val)} />
             </div>
+            {effectivePlatform === 'max' ? (
+              <p className="text-xs text-[rgb(var(--text-secondary))]">
+                На MAX у бота один чат (сам подключённый сервер) — отдельный канал не выбирается, сообщение уходит туда же, куда добавили участника.
+              </p>
+            ) : (
+              <div>
+                <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Канал приветствия</label>
+                <div className="flex gap-2">
+                  {resolvedWelcomeChannel && !manualWelcomeChannelEdit ? (
+                    <div className="input w-full flex items-center gap-2 text-sm">
+                      <span>{resolvedWelcomeChannel.type === 'voice' ? '🔊' : '💬'}</span>
+                      <span className="truncate">{resolvedWelcomeChannel.name}</span>
+                      <button type="button" onClick={() => setManualWelcomeChannelEdit(true)} className="ml-auto text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]" title="Ввести ID вручную">✏️</button>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={currentWelcomeChannel}
+                      onChange={e => updateField('welcome_channel', e.target.value)}
+                      placeholder="ID канала"
+                      className="input w-full"
+                      list="welcome-channels-list"
+                    />
+                  )}
+                </div>
+                {channelsData?.channels && channelsData.channels.length > 0 && (
+                  <datalist id="welcome-channels-list">
+                    {channelsData.channels.map(ch => <option key={ch.id} value={ch.id}>{ch.name}</option>)}
+                  </datalist>
+                )}
+                <p className="text-[10px] text-[rgb(var(--text-secondary))] mt-1">
+                  Список каналов подтягивается автоматически (см. «⚙️ Общие» → 🔍 Автоопределение) — начните вводить ID или выберите канал из подсказки.
+                </p>
+              </div>
+            )}
+          </Card>
+          <Card className="p-5 flex items-center justify-center text-center">
+            <p className="text-xs text-[rgb(var(--text-secondary))]">
+              Заполните текст/панель/кнопки ниже — превью появится справа в редакторе.
+            </p>
           </Card>
         </div>
       )}
+
+      {activeTab === 'welcome' && (
+        <MessageTemplateModal
+          key={`welcome-${effectivePlatform}-${effectiveServerId}`}
+          open={true}
+          hideCancel
+          onOpenChange={() => {}}
+          value={formData.welcome_template ?? settings?.welcome_template ?? EMPTY_WELCOME_TEMPLATE}
+          serverId={effectiveServerId}
+          platform={effectivePlatform}
+          actions={WELCOME_BUTTON_ACTIONS}
+          variableGroups={WELCOME_VARIABLES}
+          onSave={tpl => updateField('welcome_template', tpl)}
+        />
+      )}
+
 
     </div>
     </TooltipProvider>

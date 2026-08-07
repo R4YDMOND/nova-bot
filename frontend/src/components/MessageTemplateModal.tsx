@@ -16,7 +16,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Switch } from '@/components/ui/toggle';
 import { Hint, HexColorField } from '@/components/ranking/RankingFormControls';
 import type {
-  MessageTemplate, MessageEmbed, EmbedField, MessageButton, MessageSelectMenu, ButtonStyle,
+  MessageTemplate, MessageEmbed, EmbedField, MessageButton, MessageSelectMenu, ButtonStyle, ButtonAction,
 } from '@/types/ranking';
 import { EMPTY_MESSAGE_TEMPLATE, BUTTON_ACTIONS } from '@/types/ranking';
 import { useMessageTemplates, useSaveMessageTemplate, useDeleteMessageTemplate } from '@/hooks/useRanking';
@@ -69,8 +69,14 @@ const VARIABLES: { group: string; items: { token: string; desc: string }[] }[] =
   },
 ];
 
-const BUTTON_STYLES: { value: ButtonStyle; label: string; className: string }[] = [
-  { value: 'primary', label: 'Primary', className: 'bg-cyan-400 text-black' },
+/** Подмножество VARIABLES для вкладки "Визитка" — только {user}/{guild}, участнику,
+ * который только что вступил, ещё не присвоены level/xp/rank. */
+export const WELCOME_VARIABLES: typeof VARIABLES = [
+  { group: 'Участник', items: [{ token: '{user}', desc: 'упоминание участника' }] },
+  { group: 'Сервер', items: [{ token: '{guild}', desc: 'название сервера' }] },
+];
+
+const BUTTON_STYLES: { value: ButtonStyle; label: string; className: string }[] = [  { value: 'primary', label: 'Primary', className: 'bg-cyan-400 text-black' },
   { value: 'secondary', label: 'Secondary', className: 'bg-[#4e5058] text-white' },
   { value: 'success', label: 'Success', className: 'bg-emerald-500 text-white' },
   { value: 'danger', label: 'Danger', className: 'bg-red-500 text-white' },
@@ -134,6 +140,9 @@ export function MessageTemplateModal({
   onSave,
   serverId,
   platform,
+  actions = BUTTON_ACTIONS,
+  variableGroups = VARIABLES,
+  hideCancel = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -146,11 +155,25 @@ export function MessageTemplateModal({
    * записях. Общий переключатель внутри редактора создавал бы у пользователя ложное
    * впечатление, что он настраивает вторую платформу, а сохранение на деле всегда идёт
    * в текущую активную запись (ту, что выбрана на странице). */
-  platform: 'lolka' | 'vk';
+  platform: 'lolka' | 'vk' | 'max';
+  /** Список действий кнопок/select-опций, доступных в этом контексте (по умолчанию —
+   * полный BUTTON_ACTIONS). Вкладка "Визитка" передаёт WELCOME_BUTTON_ACTIONS —
+   * действия, требующие получателя (Nova Point/достижение), там не имеют смысла. */
+  actions?: { value: ButtonAction; label: string }[];
+  /** Группы переменных, доступные в инжекторе {} (по умолчанию — полный VARIABLES).
+   * Вкладка "Визитка" передаёт только {user}/{guild} — level/xp/rank участнику,
+   * который только что вступил, ещё не присвоены. */
+  variableGroups?: typeof VARIABLES;
+  /** Скрывает кнопку "Отмена" — используется, когда редактор встроен как содержимое
+   * вкладки напрямую (всегда open=true), а не как переключаемая по кнопке панель. */
+  hideCancel?: boolean;
 }) {
   const [draft, setDraft] = useState<MessageTemplate>(value ?? EMPTY_MESSAGE_TEMPLATE);
   const [tab, setTab] = useState<'text' | 'panel' | 'components'>('text');
-  const isVk = platform === 'vk';
+  // "Богатая" платформа — единственная с нативными embed'ами/select-меню (Lolka).
+  // VK и MAX сворачивают панель в текст и не поддерживают выпадающие списки.
+  const isPlain = platform !== 'lolka';
+  const platformLabel = platform === 'lolka' ? 'Lolka' : platform === 'vk' ? 'VK' : 'MAX';
   const [showPreview, setShowPreview] = useState(true);
   const [varMenuOpen, setVarMenuOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
@@ -405,12 +428,12 @@ export function MessageTemplateModal({
               у VK и Lolka в БД раздельные notify_template, редактор всегда один из двух. */}
           <div className="px-5 pt-3 flex flex-col gap-2">
             <span className="self-start px-3 py-1 rounded-lg text-xs font-medium bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] text-[rgb(var(--text-secondary))]">
-              Шаблон для: {isVk ? 'VK (ограниченный функционал)' : 'Lolka (полный функционал)'}
+              Шаблон для: {platform === 'lolka' ? 'Lolka (полный функционал)' : `${platformLabel} (ограниченный функционал)`}
             </span>
-            {isVk && (
+            {isPlain && (
               <p className="flex items-start gap-2 text-xs text-[rgb(var(--warning))] bg-[rgb(var(--warning))]/10 border border-[rgb(var(--warning))]/25 rounded-xl px-4 py-3">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>VK ограничена поддержка панелей и списков. Сообщение будет показано в упрощённом виде.</span>
+                <span>{platformLabel} ограничена поддержка панелей и списков. Сообщение будет показано в упрощённом виде.</span>
               </p>
             )}
           </div>
@@ -434,7 +457,7 @@ export function MessageTemplateModal({
                     <ToolbarBtn icon={<Link2 className="w-3.5 h-3.5" />} title="Ссылка" onClick={() => wrapSelection(contentRef.current, '[', '](https://)', draft.content, v => setDraft(d => ({ ...d, content: v })))} />
                     <div className="relative">
                       <ToolbarBtn icon={<span className="text-xs font-mono">{'{}'}</span>} title="Вставить переменную" onClick={() => setVarMenuOpen(v => !v)} />
-                      {varMenuOpen && <VariableMenu onPick={insertVariable} onClose={() => setVarMenuOpen(false)} />}
+                      {varMenuOpen && <VariableMenu groups={variableGroups} onPick={insertVariable} onClose={() => setVarMenuOpen(false)} />}
                     </div>
                   </div>
                   <textarea
@@ -471,7 +494,7 @@ export function MessageTemplateModal({
                           onChange={e => updateEmbed({ title: e.target.value })} className="input w-full" placeholder="Заголовок панели"
                         />
                       </div>
-                      {!isVk && (
+                      {!isPlain && (
                         <div>
                           <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">URL заголовка</label>
                           <input type="url" value={draft.embed.url} onChange={e => updateEmbed({ url: e.target.value })} className="input w-full" placeholder="https://..." />
@@ -489,7 +512,7 @@ export function MessageTemplateModal({
                           rows={4} className="input w-full resize-none" placeholder="Описание панели"
                         />
                       </div>
-                      {!isVk && (
+                      {!isPlain && (
                         <div>
                           <label className="text-xs text-[rgb(var(--text-secondary))] block mb-1">Цвет</label>
                           <div className="flex gap-2">
@@ -499,7 +522,7 @@ export function MessageTemplateModal({
                         </div>
                       )}
 
-                      {!isVk && (
+                      {!isPlain && (
                         <div className="pt-2 border-t border-[rgb(var(--border))] space-y-2">
                           <label className="text-xs font-medium text-[rgb(var(--text-secondary))]">Автор</label>
                           <input type="text" value={draft.embed.author.name} onChange={e => updateEmbed({ author: { ...draft.embed.author, name: e.target.value } })} className="input w-full" placeholder="Имя автора" />
@@ -510,7 +533,7 @@ export function MessageTemplateModal({
                         </div>
                       )}
 
-                      {!isVk && (
+                      {!isPlain && (
                         <div className="pt-2 border-t border-[rgb(var(--border))] space-y-2">
                           <label className="text-xs font-medium text-[rgb(var(--text-secondary))]">Изображение</label>
                           <input type="url" value={draft.embed.image_url} onChange={e => updateEmbed({ image_url: e.target.value })} className="input w-full" placeholder="Большое изображение (URL)" />
@@ -524,7 +547,7 @@ export function MessageTemplateModal({
                           <CharCounter value={draft.embed.footer.text} max={LIMITS.footerText} />
                         </div>
                         <input type="text" value={draft.embed.footer.text} onChange={e => updateEmbed({ footer: { ...draft.embed.footer, text: e.target.value } })} className="input w-full" placeholder="Текст подвала" />
-                        {!isVk && (
+                        {!isPlain && (
                           <>
                             <input type="url" value={draft.embed.footer.icon_url} onChange={e => updateEmbed({ footer: { ...draft.embed.footer, icon_url: e.target.value } })} className="input w-full" placeholder="Иконка подвала (URL)" />
                             <div className="flex justify-between items-center pt-1">
@@ -593,7 +616,7 @@ export function MessageTemplateModal({
                             <input type="url" value={b.url} onChange={e => updateButton(i, { url: e.target.value })} placeholder="URL" className="input text-sm col-span-2" />
                           ) : (
                             <select value={b.custom_id || 'nova_profile'} onChange={e => updateButton(i, { custom_id: e.target.value })} className="input text-sm col-span-2">
-                              {BUTTON_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                              {actions.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
                             </select>
                           )}
                           <button onClick={() => removeButton(i)} className="col-span-2 flex items-center justify-center gap-1 text-xs text-red-400 hover:bg-red-500/10 rounded-lg py-1 transition-colors">
@@ -605,10 +628,10 @@ export function MessageTemplateModal({
                   </div>
 
                   <div className="pt-3 border-t border-[rgb(var(--border))]">
-                    {isVk ? (
+                    {isPlain ? (
                       <p className="flex items-start gap-2 text-xs text-[rgb(var(--warning))] bg-[rgb(var(--warning))]/10 border border-[rgb(var(--warning))]/25 rounded-xl px-3 py-2.5">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        VK не поддерживает выпадающие списки. Этот раздел редактора скрыт. Вы можете использовать кнопки или обычный текст.
+                        {platformLabel} не поддерживает выпадающие списки. Этот раздел редактора скрыт. Вы можете использовать кнопки или обычный текст.
                       </p>
                     ) : (
                     <>
@@ -648,7 +671,7 @@ export function MessageTemplateModal({
                           <div key={i} className="p-2 bg-[rgb(var(--surface-2))] border border-[rgb(var(--border))] rounded-lg grid grid-cols-2 gap-1.5">
                             <input type="text" value={o.label} onChange={e => updateSelectOption(i, { label: e.target.value })} placeholder="Label" className="input text-sm" />
                             <select value={o.value || 'nova_profile'} onChange={e => updateSelectOption(i, { value: e.target.value })} className="input text-sm">
-                              {BUTTON_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                              {actions.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
                             </select>
                             <input type="text" value={o.description} onChange={e => updateSelectOption(i, { description: e.target.value })} placeholder="Описание" className="input text-sm" />
                             <div className="flex gap-1.5">
@@ -669,12 +692,12 @@ export function MessageTemplateModal({
             {/* Превью */}
             {showPreview && (
               <div className="p-5 bg-[rgb(var(--surface-1))] md:max-h-[calc(88vh-150px)] md:overflow-y-auto">
-                <p className="text-xs text-[rgb(var(--text-secondary))] mb-3">Предпросмотр {isVk ? '(VK)' : '(Lolka)'}</p>
+                <p className="text-xs text-[rgb(var(--text-secondary))] mb-3">Предпросмотр ({platformLabel})</p>
                 <div className="bg-[#111118] rounded-2xl p-4 text-sm text-white">
                   {draft.content && (
                     <p className="mb-2 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(draft.content) }} />
                   )}
-                  {isVk ? (
+                  {isPlain ? (
                     <>
                       {draft.embed_enabled && (
                         <div className="space-y-1 text-[rgb(220,220,230)]">
@@ -776,11 +799,13 @@ export function MessageTemplateModal({
           <div className="flex items-center justify-between border-t border-[rgb(var(--border))] px-5 py-3 sticky bottom-0 bg-[rgb(var(--surface))]">
             <div className="text-xs text-red-400">{errors[0] ?? ''}</div>
             <div className="flex gap-2">
-              <button onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-2))] transition-colors">
-                Отмена
-              </button>
+              {!hideCancel && (
+                <button onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-[rgb(var(--text-secondary))] hover:bg-[rgb(var(--surface-2))] transition-colors">
+                  Отмена
+                </button>
+              )}
               <button
-                onClick={() => { onSave(draft); onOpenChange(false); }}
+                onClick={() => { onSave(draft); if (!hideCancel) onOpenChange(false); }}
                 disabled={errors.length > 0}
                 className="px-4 py-2 rounded-xl text-sm font-medium bg-cyan-400 text-black hover:bg-cyan-300 disabled:opacity-40 transition-colors"
               >
@@ -803,14 +828,14 @@ function ToolbarBtn({ icon, title, onClick }: { icon: ReactNode; title: string; 
   );
 }
 
-function VariableMenu({ onPick, onClose }: { onPick: (token: string) => void; onClose: () => void }) {
+function VariableMenu({ groups, onPick, onClose }: { groups: typeof VARIABLES; onPick: (token: string) => void; onClose: () => void }) {
   return (
     <div className="absolute right-0 top-8 z-20 w-72 max-h-80 overflow-y-auto bg-[rgb(var(--surface))] border border-[rgb(var(--border))] rounded-xl shadow-2xl p-2">
       <div className="flex justify-between items-center px-1 pb-1">
         <span className="text-xs font-medium text-[rgb(var(--text-secondary))]">Переменные</span>
         <button onClick={onClose} className="text-xs text-[rgb(var(--text-secondary))] hover:text-[rgb(var(--text))]">✕</button>
       </div>
-      {VARIABLES.map(group => (
+      {groups.map(group => (
         <div key={group.group} className="mb-1.5">
           <p className="text-[10px] uppercase tracking-wide text-[rgb(var(--text-secondary))] px-1 mb-0.5">{group.group}</p>
           {group.items.map(v => (

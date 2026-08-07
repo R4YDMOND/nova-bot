@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Platform } from '@/types/ranking';
 import { api } from '@/lib/api';
 
-export function useRankingSettings(serverId: string, platform: 'vk' | 'lolka' = 'vk') {
+export function useRankingSettings(serverId: string, platform: Platform = 'vk') {
   return useQuery({
     queryKey: ['ranking', 'settings', serverId, platform],
     queryFn: () => api.ranking.getSettings(serverId, platform),
@@ -14,7 +15,7 @@ export function useSaveRankingSettings() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ serverId, platform, settings }: { serverId: string; platform: 'vk' | 'lolka'; settings: any }) =>
+    mutationFn: ({ serverId, platform, settings }: { serverId: string; platform: Platform; settings: any }) =>
       api.ranking.saveSettings(serverId, platform, settings),
     onSuccess: (_, { serverId, platform }) => {
       // Инвалидируем кэш, чтобы при следующем запросе данные обновились
@@ -24,7 +25,7 @@ export function useSaveRankingSettings() {
   });
 }
 
-export function useLeaderboard(serverId: string, platform: 'vk' | 'lolka' = 'vk', sort: 'xp' | 'level' | 'messages' = 'xp', enabled: boolean = true) {
+export function useLeaderboard(serverId: string, platform: Platform = 'vk', sort: 'xp' | 'level' | 'messages' = 'xp', enabled: boolean = true) {
   return useQuery({
     queryKey: ['ranking', 'leaderboard', serverId, platform, sort],
     queryFn: () => api.ranking.getLeaderboard(serverId, platform, sort),
@@ -34,7 +35,7 @@ export function useLeaderboard(serverId: string, platform: 'vk' | 'lolka' = 'vk'
   });
 }
 
-export function useRankingPreview(serverId: string, platform: 'vk' | 'lolka', userId: string) {
+export function useRankingPreview(serverId: string, platform: Platform, userId: string) {
   return useQuery({
     queryKey: ['ranking', 'preview', serverId, platform, userId],
     queryFn: () => api.ranking.getPreview(serverId, platform, userId),
@@ -57,21 +58,22 @@ export function useValidateFormula() {
   });
 }
 
-export function useRankingChannels(serverId: string, platform: 'vk' | 'lolka' = 'vk') {
+export function useRankingChannels(serverId: string, platform: Platform = 'vk') {
   return useQuery({
     queryKey: ['ranking', 'channels', serverId, platform],
     queryFn: () => api.ranking.getChannels(serverId, platform),
     // Подгружается автоматически при наличии serverId — нужно, чтобы сопоставить
     // сохранённый ID канала уведомлений с его названием (см. RankingPage).
     // Кнопка "Автоопределение" по-прежнему дергает refetch() вручную для дропдауна.
-    enabled: !!serverId,
+    // MAX не имеет каналов (один чат = сам сервер) — эндпоинта для него нет.
+    enabled: !!serverId && platform !== 'max',
     staleTime: 5 * 60 * 1000,
   });
 }
 
 // Автоопределение ролей сервера для наград за уровень — только Lolka (у VK нет
 // сопоставимого Bot API для чтения ролей сообщества).
-export function useRankingRoles(serverId: string, platform: 'vk' | 'lolka' = 'vk') {
+export function useRankingRoles(serverId: string, platform: Platform = 'vk') {
   return useQuery({
     queryKey: ['ranking', 'roles', serverId, platform],
     queryFn: () => api.ranking.getRoles(serverId),
@@ -97,7 +99,7 @@ export function useSyncMembers() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ serverId, platform }: { serverId: string; platform: 'vk' | 'lolka' }) =>
+    mutationFn: ({ serverId, platform }: { serverId: string; platform: Platform }) =>
       api.ranking.syncMembers(serverId, platform),
     onSuccess: (_, { serverId, platform }) => {
       queryClient.invalidateQueries({ queryKey: ['ranking', 'leaderboard', serverId, platform] });
@@ -148,7 +150,7 @@ export function useDeleteMessageTemplate(serverId: string) {
 }
 
 // ── ТЗ №5 Rev.7, п.3.1: Nova Points ──────────────────────────────────────
-export function useNovaPointsTop(serverId: string, platform: 'vk' | 'lolka' = 'vk', period: 'all' | 'month' | 'week' = 'all', enabled: boolean = true) {
+export function useNovaPointsTop(serverId: string, platform: Platform = 'vk', period: 'all' | 'month' | 'week' = 'all', enabled: boolean = true) {
   return useQuery({
     queryKey: ['ranking', 'nova-points', 'top', serverId, platform, period],
     queryFn: () => api.novaPoints.getTop(serverId, platform, period),
@@ -159,7 +161,7 @@ export function useNovaPointsTop(serverId: string, platform: 'vk' | 'lolka' = 'v
 }
 
 // ── ТЗ №5 Rev.9, п.12: магазин ролей ─────────────────────────────────────
-export function useShopItems(serverId: string, platform: 'vk' | 'lolka' = 'vk', enabled: boolean = true) {
+export function useShopItems(serverId: string, platform: Platform = 'vk', enabled: boolean = true) {
   return useQuery({
     queryKey: ['ranking', 'nova-points', 'shop', serverId, platform],
     queryFn: () => api.novaPoints.listShopItems(serverId, platform),
@@ -171,7 +173,7 @@ export function useShopItems(serverId: string, platform: 'vk' | 'lolka' = 'vk', 
 export function useCreateShopItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ serverId, platform, data }: { serverId: string; platform: 'vk' | 'lolka'; data: { role_id: string; role_name?: string; price: number } }) =>
+    mutationFn: ({ serverId, platform, data }: { serverId: string; platform: Platform; data: { role_id: string; role_name?: string; price: number } }) =>
       api.novaPoints.createShopItem(serverId, platform, data),
     onSuccess: (_, { serverId, platform }) => {
       queryClient.invalidateQueries({ queryKey: ['ranking', 'nova-points', 'shop', serverId, platform] });
@@ -182,7 +184,7 @@ export function useCreateShopItem() {
 export function useDeleteShopItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ serverId, platform, itemId }: { serverId: string; platform: 'vk' | 'lolka'; itemId: number }) =>
+    mutationFn: ({ serverId, platform, itemId }: { serverId: string; platform: Platform; itemId: number }) =>
       api.novaPoints.deleteShopItem(serverId, platform, itemId),
     onSuccess: (_, { serverId, platform }) => {
       queryClient.invalidateQueries({ queryKey: ['ranking', 'nova-points', 'shop', serverId, platform] });
@@ -191,7 +193,7 @@ export function useDeleteShopItem() {
 }
 
 // ── ТЗ №5 Rev.10, п.4: достижения ────────────────────────────────────────
-export function useAchievements(serverId: string, platform: 'vk' | 'lolka' = 'vk', enabled: boolean = true) {
+export function useAchievements(serverId: string, platform: Platform = 'vk', enabled: boolean = true) {
   return useQuery({
     queryKey: ['ranking', 'achievements', serverId, platform],
     queryFn: () => api.achievements.list(serverId, platform),
@@ -203,7 +205,7 @@ export function useAchievements(serverId: string, platform: 'vk' | 'lolka' = 'vk
 export function useCreateAchievement() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ serverId, platform, data }: { serverId: string; platform: 'vk' | 'lolka'; data: { name: string; icon?: string; trigger_level?: number | null } }) =>
+    mutationFn: ({ serverId, platform, data }: { serverId: string; platform: Platform; data: { name: string; icon?: string; trigger_level?: number | null } }) =>
       api.achievements.create(serverId, platform, data),
     onSuccess: (_, { serverId, platform }) => {
       queryClient.invalidateQueries({ queryKey: ['ranking', 'achievements', serverId, platform] });
@@ -214,7 +216,7 @@ export function useCreateAchievement() {
 export function useDeleteAchievement() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ serverId, platform, achievementId }: { serverId: string; platform: 'vk' | 'lolka'; achievementId: number }) =>
+    mutationFn: ({ serverId, platform, achievementId }: { serverId: string; platform: Platform; achievementId: number }) =>
       api.achievements.remove(serverId, platform, achievementId),
     onSuccess: (_, { serverId, platform }) => {
       queryClient.invalidateQueries({ queryKey: ['ranking', 'achievements', serverId, platform] });
