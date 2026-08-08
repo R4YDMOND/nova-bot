@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, UniqueConstraint, ForeignKey, Date
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, UniqueConstraint, ForeignKey, Date, Index
 from datetime import datetime
 from database import Base, DATABASE_URL
 
@@ -121,6 +121,12 @@ class Member(Base):
 
     __table_args__ = (
         UniqueConstraint('server_id', 'platform', 'user_id', name='uq_member_entry'),
+        # Лидерборд (GET /api/ranking/leaderboard) фильтрует по server_id+platform и
+        # сортирует по xp/level/messages desc — без составного индекса Postgres делает
+        # seq scan по всей таблице участников (ТЗ №5 Rev.10, Acceptance Criteria п.7).
+        # Для существующих БД индекс досоздаётся отдельно в database.py — create_all()
+        # применяет это только к новым таблицам, не к уже существующей members.
+        Index('idx_members_leaderboard', 'server_id', 'platform', 'xp'),
     )
 
 class MusicProvider(Base):

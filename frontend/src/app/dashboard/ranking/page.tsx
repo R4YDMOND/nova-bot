@@ -937,11 +937,16 @@ export default function RankingPage() {
           <div>
             <h3 className="font-semibold flex items-center gap-1.5">
               🏆 Достижения {achievements.length > 0 && <span className="text-[rgb(var(--text-secondary))] font-normal">({achievements.length})</span>}
-              <Hint text="Отдельная от наград за уровень система: выдаются автоматически по достижении уровня (если указан) или вручную кнопкой «Выдать достижения» в редакторе шаблонов. Не связаны с Nova Points и валютой." />
+              <Hint text="Отдельная от наград за уровень система: выдаются автоматически по достижении уровня (если указан) или вручную кнопкой «Выдать достижения» в редакторе шаблонов. Не связаны с Nova Points и валютой. Выдача достижений невозможна, если система выключена (тумблер «Включить систему уровней» на вкладке «⚙️ Общие»)." />
             </h3>
             <p className="text-xs text-[rgb(var(--text-secondary))] mt-1">
               Если уровень-триггер не указан, достижение выдаётся только вручную.
             </p>
+            {!(formData.enabled ?? settings?.enabled ?? true) && (
+              <p className="text-xs text-amber-400 mt-2 flex items-center gap-1.5">
+                ⚠️ Система уровней выключена — выдача достижений (авто и вручную) сейчас недоступна.
+              </p>
+            )}
           </div>
 
           {achievementsLoading ? (

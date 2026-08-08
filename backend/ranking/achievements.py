@@ -14,7 +14,7 @@ from typing import List, Optional
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from models import Achievement, UserAchievement
+from models import Achievement, UserAchievement, RankingSettings
 
 
 def check_level_triggers(db: Session, server_id: str, platform: str, user_id: str, new_level: int) -> List[Achievement]:
@@ -51,7 +51,25 @@ def check_level_triggers(db: Session, server_id: str, platform: str, user_id: st
 def give_achievement(db: Session, server_id: str, platform: str, giver_id: str, receiver_id: str) -> dict:
     """Ручная выдача достижения кнопкой "Выдать достижения" (ACTION_ACHV_GIVE). В отличие от
     Nova Points, здесь нет валюты/кулдауна/лимита — фиксируется единичный факт признания
-    (повторная попытка той же пары giver→receiver отклоняется, чтобы не накручивать список)."""
+    (повторная попытка той же пары giver→receiver отклоняется, чтобы не накручивать список).
+
+    Автовыдача (check_level_triggers) уже гарантированно недоступна при выключенной системе —
+    она вызывается только изнутри award_xp_for_message/voice, которые сами фильтруют
+    RankingSettings.enabled == True при загрузке настроек. Ручная выдача кнопкой идёт в обход
+    этого пути, поэтому проверяем enabled здесь же (ТЗ №5 Rev.10, п.6 — предупреждение
+    "Выдача достижений невозможна, если система выключена" должно быть не только текстом в UI,
+    но и реально соблюдаться на бэкенде)."""
+    try:
+        server_id_int = int(server_id)
+    except (TypeError, ValueError):
+        server_id_int = None
+    settings = db.query(RankingSettings).filter(and_(
+        RankingSettings.server_id == server_id_int,
+        RankingSettings.platform == platform,
+    )).first() if server_id_int is not None else None
+    if not settings or not settings.enabled:
+        return {"status": "error", "error": "Система уровней выключена — выдача достижений недоступна"}
+
     if giver_id == receiver_id:
         return {"status": "error", "error": "Нельзя выдать достижение самому себе"}
 

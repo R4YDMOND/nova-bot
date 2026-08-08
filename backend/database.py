@@ -92,9 +92,25 @@ def _ensure_pgvector_extension():
         print(f"MIGRATE WARNING: не удалось создать расширение pgvector — {e}")
 
 
+def _ensure_leaderboard_index():
+    """Составной индекс (server_id, platform, xp) на members для лидерборда
+    (ТЗ №5 Rev.10, Acceptance Criteria п.7). Base.metadata.create_all() создаёт индексы
+    только для НОВЫХ таблиц — для уже существующей на проде members досоздаём отдельно,
+    аналогично _run_light_migrations() для колонок."""
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_members_leaderboard ON members (server_id, platform, xp)"
+            ))
+        print("OK: индекс лидерборда (members.server_id, platform, xp) готов")
+    except Exception as e:
+        print(f"MIGRATE WARNING: idx_members_leaderboard — {e}")
+
+
 def init_db():
     _ensure_pgvector_extension()
     Base.metadata.create_all(bind=engine)
     _run_light_migrations()
+    _ensure_leaderboard_index()
     db_type = "PostgreSQL" if DATABASE_URL.startswith("postgresql") else "SQLite"
     print(f"OK: Database ready — using {db_type} ({DATABASE_URL[:40]}...)")
